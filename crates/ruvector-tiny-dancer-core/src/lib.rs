@@ -6,6 +6,7 @@
 //! - FastGRNN model inference (sub-millisecond latency)
 //! - Feature engineering for candidate scoring
 //! - Model optimization (quantization, pruning)
+//! - Model training with knowledge distillation
 //! - Uncertainty quantification with conformal prediction
 //! - Circuit breaker patterns for graceful degradation
 //! - SQLite/AgentDB integration
@@ -16,18 +17,26 @@
 pub mod circuit_breaker;
 pub mod error;
 pub mod feature_engineering;
+pub mod metrics;
 pub mod model;
 pub mod optimization;
 pub mod router;
 pub mod storage;
+pub mod tracing;
+pub mod training;
 pub mod types;
+
+#[cfg(feature = "admin-api")]
+pub mod api;
 pub mod uncertainty;
 
 // Re-exports for convenience
 pub use error::{Result, TinyDancerError};
+pub use metrics::MetricsCollector;
 pub use model::FastGRNN;
 pub use router::Router;
-pub use types::{Candidate, RoutingDecision, RoutingRequest, RoutingResponse};
+pub use tracing::{RoutingSpan, TraceContext, TracingConfig, TracingSystem};
+pub use types::{Candidate, RouterConfig, RoutingDecision, RoutingRequest, RoutingResponse};
 
 /// Version of the Tiny Dancer library
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

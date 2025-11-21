@@ -44,6 +44,14 @@ pub enum TinyDancerError {
     #[error("Model not found: {0}")]
     ModelNotFound(String),
 
+    /// Safetensors error
+    #[error("Safetensors error: {0}")]
+    SafetensorsError(String),
+
+    /// IO error
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
     /// Unknown error
     #[error("Unknown error: {0}")]
     Unknown(String),
@@ -52,5 +60,11 @@ pub enum TinyDancerError {
 impl From<serde_json::Error> for TinyDancerError {
     fn from(err: serde_json::Error) -> Self {
         TinyDancerError::SerializationError(err.to_string())
+    }
+}
+
+impl From<safetensors::SafeTensorError> for TinyDancerError {
+    fn from(err: safetensors::SafeTensorError) -> Self {
+        TinyDancerError::SafetensorsError(err.to_string())
     }
 }

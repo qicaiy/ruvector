@@ -10,6 +10,10 @@ description = "Production-grade AI agent routing system with FastGRNN neural inf
 [lib]
 crate-type = ["lib", "staticlib"]
 
+[features]
+default = []
+admin-api = ["axum", "tower-http", "tokio"]
+
 [dependencies]
 # Workspace dependencies
 redb = { workspace = true }
@@ -40,8 +44,23 @@ rusqlite = { version = "0.32", features = ["bundled", "modern_sqlite"] }
 # Performance monitoring
 once_cell = { workspace = true }
 
+# Observability
+prometheus = "0.13"
+opentelemetry = { version = "0.20", features = ["trace", "rt-tokio"] }
+opentelemetry-jaeger = { version = "0.19", features = ["rt-tokio"] }
+tracing-opentelemetry = "0.21"
+tracing-subscriber = { workspace = true }
+
 # Byte manipulation
 bytemuck = "1.18"
+
+# Model serialization
+safetensors = "0.4"
+
+# Web server (optional, for admin API)
+axum = { version = "0.7", optional = true }
+tower-http = { version = "0.5", features = ["cors"], optional = true }
+tokio = { version = "1.35", features = ["full"], optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
