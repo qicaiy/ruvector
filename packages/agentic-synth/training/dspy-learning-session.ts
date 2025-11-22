@@ -131,7 +131,7 @@ export const TrainingConfigSchema = z.object({
     topP: z.number().optional(),
     presencePenalty: z.number().optional(),
     frequencyPenalty: z.number().optional()
-  })),
+  })).min(1, 'At least one model is required'),
   optimizationRounds: z.number().default(5),
   convergenceThreshold: z.number().default(0.95),
   maxConcurrency: z.number().default(4),

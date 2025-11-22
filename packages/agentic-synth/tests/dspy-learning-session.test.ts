@@ -81,61 +81,67 @@ describe('DSPyTrainingSession', () => {
   });
 
   describe('Event System', () => {
-    it('should emit start event', (done) => {
+    it('should emit start event', async () => {
       const session = new DSPyTrainingSession(config);
 
-      session.on('start', (data) => {
-        expect(data.phase).toBe(TrainingPhase.BASELINE);
-        done();
+      await new Promise<void>((resolve) => {
+        session.on('start', (data) => {
+          expect(data.phase).toBe(TrainingPhase.BASELINE);
+          resolve();
+        });
+
+        const optimizer = new OptimizationEngine();
+        const signature = optimizer.createSignature('test', 'input', 'output');
+
+        session.run('test prompt', signature);
       });
-
-      const optimizer = new OptimizationEngine();
-      const signature = optimizer.createSignature('test', 'input', 'output');
-
-      session.run('test prompt', signature);
     });
 
-    it('should emit phase transitions', (done) => {
+    it('should emit phase transitions', async () => {
       const session = new DSPyTrainingSession(config);
       const phases: TrainingPhase[] = [];
 
-      session.on('phase', (phase) => {
-        phases.push(phase);
+      await new Promise<void>((resolve) => {
+        session.on('phase', (phase) => {
+          phases.push(phase);
+        });
+
+        session.on('complete', () => {
+          expect(phases.length).toBeGreaterThan(0);
+          expect(phases).toContain(TrainingPhase.BASELINE);
+          resolve();
+        });
+
+        const optimizer = new OptimizationEngine();
+        const signature = optimizer.createSignature('test', 'input', 'output');
+
+        session.run('test prompt', signature);
       });
-
-      session.on('complete', () => {
-        expect(phases.length).toBeGreaterThan(0);
-        expect(phases).toContain(TrainingPhase.BASELINE);
-        done();
-      });
-
-      const optimizer = new OptimizationEngine();
-      const signature = optimizer.createSignature('test', 'input', 'output');
-
-      session.run('test prompt', signature);
     });
 
-    it('should emit iteration events', (done) => {
+    it('should emit iteration events', async () => {
       const session = new DSPyTrainingSession(config);
       let iterationCount = 0;
 
-      session.on('iteration', (result) => {
-        iterationCount++;
-        expect(result).toBeDefined();
-        expect(result.modelProvider).toBeDefined();
-        expect(result.quality).toBeDefined();
-        expect(result.performance).toBeDefined();
+      await new Promise<void>((resolve) => {
+        session.on('iteration', (result) => {
+          iterationCount++;
+          expect(result).toBeDefined();
+          expect(result.modelProvider).toBeDefined();
+          expect(result.quality).toBeDefined();
+          expect(result.performance).toBeDefined();
+        });
+
+        session.on('complete', () => {
+          expect(iterationCount).toBeGreaterThan(0);
+          resolve();
+        });
+
+        const optimizer = new OptimizationEngine();
+        const signature = optimizer.createSignature('test', 'input', 'output');
+
+        session.run('test prompt', signature);
       });
-
-      session.on('complete', () => {
-        expect(iterationCount).toBeGreaterThan(0);
-        done();
-      });
-
-      const optimizer = new OptimizationEngine();
-      const signature = optimizer.createSignature('test', 'input', 'output');
-
-      session.run('test prompt', signature);
     });
   });
 
@@ -149,40 +155,44 @@ describe('DSPyTrainingSession', () => {
       expect(initialStats.duration).toBeGreaterThanOrEqual(0);
     });
 
-    it('should update cost during training', (done) => {
+    it('should update cost during training', async () => {
       const session = new DSPyTrainingSession(config);
 
-      session.on('complete', () => {
-        const stats = session.getStatistics();
-        expect(stats.totalCost).toBeGreaterThan(0);
-        done();
+      await new Promise<void>((resolve) => {
+        session.on('complete', () => {
+          const stats = session.getStatistics();
+          expect(stats.totalCost).toBeGreaterThan(0);
+          resolve();
+        });
+
+        const optimizer = new OptimizationEngine();
+        const signature = optimizer.createSignature('test', 'input', 'output');
+
+        session.run('test prompt', signature);
       });
-
-      const optimizer = new OptimizationEngine();
-      const signature = optimizer.createSignature('test', 'input', 'output');
-
-      session.run('test prompt', signature);
     });
   });
 
   describe('Stop Functionality', () => {
-    it('should stop training session', (done) => {
+    it('should stop training session', async () => {
       const session = new DSPyTrainingSession(config);
 
-      session.on('stopped', (stats) => {
-        expect(stats).toBeDefined();
-        expect(stats.currentPhase).toBeDefined();
-        done();
+      await new Promise<void>((resolve) => {
+        session.on('stopped', (stats) => {
+          expect(stats).toBeDefined();
+          expect(stats.currentPhase).toBeDefined();
+          resolve();
+        });
+
+        setTimeout(() => {
+          session.stop();
+        }, 100);
+
+        const optimizer = new OptimizationEngine();
+        const signature = optimizer.createSignature('test', 'input', 'output');
+
+        session.run('test prompt', signature);
       });
-
-      setTimeout(() => {
-        session.stop();
-      }, 100);
-
-      const optimizer = new OptimizationEngine();
-      const signature = optimizer.createSignature('test', 'input', 'output');
-
-      session.run('test prompt', signature);
     });
   });
 });

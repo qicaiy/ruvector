@@ -50,7 +50,10 @@
     "test:integration": "vitest run tests/integration",
     "test:cli": "vitest run tests/cli",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint src tests training --ext .ts,.js",
+    "lint:fix": "eslint src tests training --ext .ts,.js --fix",
+    "format": "prettier --write \"src/**/*.{ts,js}\" \"tests/**/*.{ts,js}\" \"training/**/*.{ts,js}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,js}\" \"tests/**/*.{ts,js}\" \"training/**/*.{ts,js}\"",
     "prepublishOnly": "npm run build:all",
     "benchmark": "node benchmarks/run.js"
   },
@@ -79,8 +82,11 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.25",
-    "@vitest/coverage-v8": "^1.0.4",
-    "eslint": "^8.55.0",
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
+    "@vitest/coverage-v8": "^1.6.1",
+    "eslint": "^8.57.1",
+    "prettier": "^3.6.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^1.6.1"
