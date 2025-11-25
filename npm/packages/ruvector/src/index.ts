@@ -28,7 +28,7 @@ try {
   }
 
   try {
-    implementation = require('ruvector-wasm');
+    implementation = require('@ruvector/wasm');
     implementationType = 'wasm';
   } catch (wasmError: any) {
     throw new Error(
