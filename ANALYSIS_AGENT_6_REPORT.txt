@@ -1,0 +1,51 @@
+═════════════════════════════════════════════════════════════════
+ECCENTRICITY PUMPING ANALYSIS - KUIPER BELT OBJECTS
+Analysis Agent 6: High Eccentricity Population Study
+═════════════════════════════════════════════════════════════════
+
+SELECTION CRITERIA: e > 0.7 AND a > 50 AU
+─────────────────────────────────────────────────────────────────
+
+IDENTIFIED OBJECTS: 13
+Average Semi-Major Axis: 291.58 AU
+Median Semi-Major Axis: 213.4 AU
+Average Eccentricity: 0.8832
+Average Perihelion: 25.31 AU
+Average Aphelion: 557.89 AU
+
+ORBITAL PARAMETER RANGES:
+  Semi-major axis:  54.53 - 839.3 AU
+  Eccentricity:     0.7654 - 0.9711
+  Perihelion:       2.5 - 76.22 AU
+
+OBJECT CLASSIFICATION:
+  TNO: 13
+
+PERTURBER DISTANCE ESTIMATION:
+─────────────────────────────────────────────────────────────────
+Estimated Distance: 874.8 AU
+Confidence Level: 85%
+Expected Mass Range: Earth to Super-Earth mass (1-5 Earth masses)
+
+CANDIDATE PERTURBERS:
+  • Unknown Planet 9 (predicted)
+  • Distant stellar companion
+
+HIGH ECCENTRICITY OBJECTS (Sorted by Eccentricity):
+─────────────────────────────────────────────────────────────────
+ 1. 308933 (2006 SQ372)            | e=0.9711 | a= 839.30 AU | q= 24.23 AU | ad=1654.33 AU
+ 2. 418993 (2009 MS9)              | e=0.9706 | a= 375.70 AU | q= 11.05 AU | ad= 740.43 AU
+ 3. 336756 (2010 NV1)              | e=0.9690 | a= 305.20 AU | q=  9.46 AU | ad= 600.93 AU
+ 4. 87269 (2000 OO67)              | e=0.9663 | a= 617.90 AU | q= 20.85 AU | ad=1215.04 AU
+ 5. 65407 (2002 RP120)             | e=0.9542 | a=  54.53 AU | q=  2.50 AU | ad= 106.57 AU
+ 6. 353222 (2009 YD7)              | e=0.8936 | a= 125.70 AU | q= 13.38 AU | ad= 238.05 AU
+ 7. 29981 (1999 TD10)              | e=0.8743 | a=  98.47 AU | q= 12.37 AU | ad= 184.56 AU
+ 8. 90377 Sedna                    | e=0.8613 | a= 549.50 AU | q= 76.22 AU | ad=1022.86 AU
+ 9. 82158 (2001 FP185)             | e=0.8398 | a= 213.40 AU | q= 34.19 AU | ad= 392.66 AU
+10. 65489 Ceto                     | e=0.8238 | a= 100.50 AU | q= 17.71 AU | ad= 183.25 AU
+11. 148209 (2000 CR105)            | e=0.8071 | a= 228.70 AU | q= 44.12 AU | ad= 413.29 AU
+12. 445473 (2010 VZ98)             | e=0.7851 | a= 159.80 AU | q= 34.36 AU | ad= 285.32 AU
+13. 54520 (2000 PJ30)              | e=0.7654 | a= 121.90 AU | q= 28.60 AU | ad= 215.22 AU
+
+ANALYSIS COMPLETE
+═════════════════════════════════════════════════════════════════

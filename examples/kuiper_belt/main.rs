@@ -15,11 +15,13 @@
 
 mod kuiper_cluster;
 mod kbo_data;
+mod inclination_analysis;
 
 use kuiper_cluster::{
     DBSCANClusterer, SelfLearningAnalyzer, KuiperBeltObject, ClusterSignificance,
 };
 use kbo_data::get_kbo_data;
+use inclination_analysis::analyze_inclination_anomalies;
 use ruvector_core::advanced::tda::TopologicalAnalyzer;
 
 fn main() -> ruvector_core::Result<()> {
@@ -58,6 +60,9 @@ fn main() -> ruvector_core::Result<()> {
     // Display extreme objects
     println!("\n🌟 Extreme Objects of Interest...\n");
     find_extreme_objects(&objects);
+
+    // Analysis Agent 4: Inclination Anomalies
+    let _inclination_results = analyze_inclination_anomalies();
 
     // Interactive cluster exploration (simulated)
     println!("\n🔭 DISCOVERY SUMMARY\n");

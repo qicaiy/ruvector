@@ -10,6 +10,10 @@
 
 pub mod kuiper_cluster;
 pub mod kbo_data;
+pub mod inclination_analysis;
+pub mod aphelion_clustering;
+pub mod eccentricity_analysis;
+pub mod perihelion_analysis;
 
 pub use kuiper_cluster::{
     KuiperBeltObject,
@@ -23,3 +27,24 @@ pub use kuiper_cluster::{
 };
 
 pub use kbo_data::{get_kbo_data, get_sample_kbos};
+pub use inclination_analysis::analyze_inclination_anomalies;
+pub use aphelion_clustering::{
+    AphelionClusterer,
+    AphelionClusteringResult,
+    AphelionBin,
+    EstimatedPlanet,
+};
+pub use eccentricity_analysis::{
+    analyze_eccentricity_pumping,
+    get_analysis_summary,
+    EccentricityAnalysis,
+    HighEccentricityObject,
+    EccentricityStats,
+    PerturberEstimate,
+};
+pub use perihelion_analysis::{
+    analyze_argument_of_perihelion,
+    generate_report,
+    ClusteringAnalysis,
+    HighQObject,
+};

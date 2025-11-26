@@ -42,6 +42,10 @@ once_cell = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true, optional = true }
 
+# Cryptography for signed discoveries
+sha2 = "0.10"
+hex = "0.4"
+
 [dev-dependencies]
 criterion = { workspace = true }
 proptest = { workspace = true }
@@ -81,6 +85,29 @@ memory-only = []  # Pure in-memory storage for WASM
 name = "kuiper_belt_agenticdb"
 path = "../../examples/kuiper_belt/agenticdb_analysis.rs"
 required-features = ["storage"]
+
+[[example]]
+name = "planet_discovery"
+path = "../../examples/kuiper_belt/planet_discovery.rs"
+required-features = ["storage"]
+
+[[example]]
+name = "perihelion_clustering"
+path = "../../examples/perihelion_clustering.rs"
+required-features = ["storage"]
+
+[[example]]
+name = "kuiper_belt_sma_gap_analysis"
+path = "../../examples/kuiper_belt_sma_gap_analysis.rs"
+required-features = ["storage"]
+
+[[example]]
+name = "kuiper_belt_omega_analysis"
+path = "../../examples/kuiper_belt_omega_analysis.rs"
+
+[[example]]
+name = "sma_gap_analyzer"
+path = "../../examples/sma_gap_analyzer.rs"
 
 [lib]
 crate-type = ["rlib"]

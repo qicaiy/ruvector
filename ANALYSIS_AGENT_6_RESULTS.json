@@ -1,0 +1,153 @@
+{
+  "count": 13,
+  "objects": [
+    {
+      "name": "308933 (2006 SQ372)",
+      "a": 839.3,
+      "e": 0.9711,
+      "i": 19.46,
+      "q": 24.23,
+      "ad": 1654.33,
+      "pumping_strength": 1.102
+    },
+    {
+      "name": "418993 (2009 MS9)",
+      "a": 375.7,
+      "e": 0.9706,
+      "i": 67.96,
+      "q": 11.05,
+      "ad": 740.43,
+      "pumping_strength": 1.101
+    },
+    {
+      "name": "336756 (2010 NV1)",
+      "a": 305.2,
+      "e": 0.969,
+      "i": 140.82,
+      "q": 9.46,
+      "ad": 600.93,
+      "pumping_strength": 1.099
+    },
+    {
+      "name": "87269 (2000 OO67)",
+      "a": 617.9,
+      "e": 0.9663,
+      "i": 20.05,
+      "q": 20.85,
+      "ad": 1215.04,
+      "pumping_strength": 1.095
+    },
+    {
+      "name": "65407 (2002 RP120)",
+      "a": 54.53,
+      "e": 0.9542,
+      "i": 119.37,
+      "q": 2.5,
+      "ad": 106.57,
+      "pumping_strength": 1.077
+    },
+    {
+      "name": "353222 (2009 YD7)",
+      "a": 125.7,
+      "e": 0.8936,
+      "i": 30.77,
+      "q": 13.38,
+      "ad": 238.05,
+      "pumping_strength": 0.991
+    },
+    {
+      "name": "29981 (1999 TD10)",
+      "a": 98.47,
+      "e": 0.8743,
+      "i": 5.96,
+      "q": 12.37,
+      "ad": 184.56,
+      "pumping_strength": 0.963
+    },
+    {
+      "name": "90377 Sedna",
+      "a": 549.5,
+      "e": 0.8613,
+      "i": 11.93,
+      "q": 76.22,
+      "ad": 1022.86,
+      "pumping_strength": 0.945
+    },
+    {
+      "name": "82158 (2001 FP185)",
+      "a": 213.4,
+      "e": 0.8398,
+      "i": 30.8,
+      "q": 34.19,
+      "ad": 392.66,
+      "pumping_strength": 0.914
+    },
+    {
+      "name": "65489 Ceto",
+      "a": 100.5,
+      "e": 0.8238,
+      "i": 22.3,
+      "q": 17.71,
+      "ad": 183.25,
+      "pumping_strength": 0.891
+    },
+    {
+      "name": "148209 (2000 CR105)",
+      "a": 228.7,
+      "e": 0.8071,
+      "i": 22.71,
+      "q": 44.12,
+      "ad": 413.29,
+      "pumping_strength": 0.867
+    },
+    {
+      "name": "445473 (2010 VZ98)",
+      "a": 159.8,
+      "e": 0.7851,
+      "i": 4.51,
+      "q": 34.36,
+      "ad": 285.32,
+      "pumping_strength": 0.836
+    },
+    {
+      "name": "54520 (2000 PJ30)",
+      "a": 121.9,
+      "e": 0.7654,
+      "i": 5.72,
+      "q": 28.6,
+      "ad": 215.22,
+      "pumping_strength": 0.808
+    }
+  ],
+  "statistics": {
+    "avg_a": 291.58,
+    "median_a": 213.4,
+    "avg_e": 0.8832,
+    "avg_q": 25.31,
+    "avg_ad": 557.89,
+    "a_range": [
+      54.53,
+      839.3
+    ],
+    "e_range": [
+      0.7654,
+      0.9711
+    ],
+    "q_range": [
+      2.5,
+      76.22
+    ],
+    "class_distribution": {
+      "TNO": 13
+    }
+  },
+  "perturber_analysis": {
+    "estimated_distance": 874.8,
+    "confidence": 0.85,
+    "expected_mass_range": "Earth to Super-Earth mass (1-5 Earth masses)",
+    "candidate_perturbers": [
+      "Unknown Planet 9 (predicted)",
+      "Distant stellar companion"
+    ]
+  }
+}

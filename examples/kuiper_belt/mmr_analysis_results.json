@@ -1,0 +1,552 @@
+{
+  "metadata": {
+    "agent": "Analysis Agent 9 - Mean Motion Resonance",
+    "analysis_date": "2025-11-26",
+    "purpose": "Detect MMR signatures with hypothetical planet at 300-700 AU",
+    "dataset": {
+      "total_kbos": 21,
+      "planet_distances_tested": 9,
+      "resonance_orders_tested": "n=2 to 9",
+      "resonance_tolerance_au": 3.0
+    }
+  },
+  "all_resonances": {
+    "300": {
+      "planet_distance_au": 300,
+      "resonances": {
+        "6:1": {
+          "resonant_semimajor_axis": 90.86,
+          "object_count": 2,
+          "objects": [
+            {
+              "name": "26181 (1996 GQ21)",
+              "a_measured": 92.48,
+              "a_expected": 90.86,
+              "delta_a": 1.62,
+              "orbital_elements": {
+                "e": 0.5874,
+                "i": 13.36,
+                "q": 38.152,
+                "Q": 146.81
+              }
+            },
+            {
+              "name": "145451 Rumina",
+              "a_measured": 92.27,
+              "a_expected": 90.86,
+              "delta_a": 1.41,
+              "orbital_elements": {
+                "e": 0.619,
+                "i": 28.7,
+                "q": 35.16,
+                "Q": 149.39
+              }
+            }
+          ]
+        },
+        "7:1": {
+          "resonant_semimajor_axis": 81.98,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "15874 (1996 TL66)",
+              "a_measured": 84.89,
+              "a_expected": 81.98,
+              "delta_a": 2.91,
+              "orbital_elements": {
+                "e": 0.5866,
+                "i": 23.96,
+                "q": 35.094,
+                "Q": 134.69
+              }
+            }
+          ]
+        },
+        "8:1": {
+          "resonant_semimajor_axis": 75.0,
+          "object_count": 2,
+          "objects": [
+            {
+              "name": "145480 (2005 TB190)",
+              "a_measured": 75.93,
+              "a_expected": 75.0,
+              "delta_a": 0.93,
+              "orbital_elements": {
+                "e": 0.3912,
+                "i": 26.48,
+                "q": 46.227,
+                "Q": 105.64
+              }
+            },
+            {
+              "name": "229762 G!kun||'homdima",
+              "a_measured": 74.59,
+              "a_expected": 75.0,
+              "delta_a": 0.41,
+              "orbital_elements": {
+                "e": 0.4961,
+                "i": 23.33,
+                "q": 37.585,
+                "Q": 111.59
+              }
+            }
+          ]
+        },
+        "9:1": {
+          "resonant_semimajor_axis": 69.34,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "136199 Eris",
+              "a_measured": 68.0,
+              "a_expected": 69.34,
+              "delta_a": 1.34,
+              "orbital_elements": {
+                "e": 0.437,
+                "i": 43.87,
+                "q": 38.284,
+                "Q": 97.71
+              }
+            }
+          ]
+        }
+      },
+      "total_objects_detected": 6,
+      "resonance_strength_score": 24
+    },
+    "350": {
+      "planet_distance_au": 350,
+      "resonances": {
+        "8:1": {
+          "resonant_semimajor_axis": 87.5,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "15874 (1996 TL66)",
+              "a_measured": 84.89,
+              "a_expected": 87.5,
+              "delta_a": 2.61,
+              "orbital_elements": {
+                "e": 0.5866,
+                "i": 23.96,
+                "q": 35.094,
+                "Q": 134.69
+              }
+            }
+          ]
+        }
+      },
+      "total_objects_detected": 1,
+      "resonance_strength_score": 1
+    },
+    "400": {
+      "planet_distance_au": 400,
+      "resonances": {
+        "4:1": {
+          "resonant_semimajor_axis": 158.74,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "445473 (2010 VZ98)",
+              "a_measured": 159.8,
+              "a_expected": 158.74,
+              "delta_a": 1.06,
+              "orbital_elements": {
+                "e": 0.7851,
+                "i": 4.51,
+                "q": 34.356,
+                "Q": 285.32
+              }
+            }
+          ]
+        },
+        "7:1": {
+          "resonant_semimajor_axis": 109.31,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "303775 (2005 QU182)",
+              "a_measured": 112.2,
+              "a_expected": 109.31,
+              "delta_a": 2.89,
+              "orbital_elements": {
+                "e": 0.6696,
+                "i": 14.01,
+                "q": 37.059,
+                "Q": 187.28
+              }
+            }
+          ]
+        },
+        "9:1": {
+          "resonant_semimajor_axis": 92.45,
+          "object_count": 2,
+          "objects": [
+            {
+              "name": "26181 (1996 GQ21)",
+              "a_measured": 92.48,
+              "a_expected": 92.45,
+              "delta_a": 0.03,
+              "orbital_elements": {
+                "e": 0.5874,
+                "i": 13.36,
+                "q": 38.152,
+                "Q": 146.81
+              }
+            },
+            {
+              "name": "145451 Rumina",
+              "a_measured": 92.27,
+              "a_expected": 92.45,
+              "delta_a": 0.18,
+              "orbital_elements": {
+                "e": 0.619,
+                "i": 28.7,
+                "q": 35.16,
+                "Q": 149.39
+              }
+            }
+          ]
+        }
+      },
+      "total_objects_detected": 4,
+      "resonance_strength_score": 12
+    },
+    "450": {
+      "planet_distance_au": 450,
+      "resonances": {
+        "3:1": {
+          "resonant_semimajor_axis": 216.34,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "82158 (2001 FP185)",
+              "a_measured": 213.4,
+              "a_expected": 216.34,
+              "delta_a": 2.94,
+              "orbital_elements": {
+                "e": 0.8398,
+                "i": 30.8,
+                "q": 34.19,
+                "Q": 392.66
+              }
+            }
+          ]
+        },
+        "8:1": {
+          "resonant_semimajor_axis": 112.5,
+          "object_count": 2,
+          "objects": [
+            {
+              "name": "303775 (2005 QU182)",
+              "a_measured": 112.2,
+              "a_expected": 112.5,
+              "delta_a": 0.3,
+              "orbital_elements": {
+                "e": 0.6696,
+                "i": 14.01,
+                "q": 37.059,
+                "Q": 187.28
+              }
+            },
+            {
+              "name": "437360 (2013 TV158)",
+              "a_measured": 114.1,
+              "a_expected": 112.5,
+              "delta_a": 1.6,
+              "orbital_elements": {
+                "e": 0.6801,
+                "i": 31.14,
+                "q": 36.482,
+                "Q": 191.62
+              }
+            }
+          ]
+        }
+      },
+      "total_objects_detected": 3,
+      "resonance_strength_score": 6
+    },
+    "500": {
+      "planet_distance_au": 500,
+      "resonances": {
+        "9:1": {
+          "resonant_semimajor_axis": 115.56,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "437360 (2013 TV158)",
+              "a_measured": 114.1,
+              "a_expected": 115.56,
+              "delta_a": 1.46,
+              "orbital_elements": {
+                "e": 0.6801,
+                "i": 31.14,
+                "q": 36.482,
+                "Q": 191.62
+              }
+            }
+          ]
+        }
+      },
+      "total_objects_detected": 1,
+      "resonance_strength_score": 1
+    },
+    "550": {
+      "planet_distance_au": 550,
+      "resonances": {},
+      "total_objects_detected": 0,
+      "resonance_strength_score": 0
+    },
+    "600": {
+      "planet_distance_au": 600,
+      "resonances": {
+        "2:1": {
+          "resonant_semimajor_axis": 377.98,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "418993 (2009 MS9)",
+              "a_measured": 375.7,
+              "a_expected": 377.98,
+              "delta_a": 2.28,
+              "orbital_elements": {
+                "e": 0.9706,
+                "i": 67.96,
+                "q": 11.046,
+                "Q": 740.43
+              }
+            }
+          ]
+        }
+      },
+      "total_objects_detected": 1,
+      "resonance_strength_score": 1
+    },
+    "650": {
+      "planet_distance_au": 650,
+      "resonances": {
+        "8:1": {
+          "resonant_semimajor_axis": 162.5,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "445473 (2010 VZ98)",
+              "a_measured": 159.8,
+              "a_expected": 162.5,
+              "delta_a": 2.7,
+              "orbital_elements": {
+                "e": 0.7851,
+                "i": 4.51,
+                "q": 34.356,
+                "Q": 285.32
+              }
+            }
+          ]
+        }
+      },
+      "total_objects_detected": 1,
+      "resonance_strength_score": 1
+    },
+    "700": {
+      "planet_distance_au": 700,
+      "resonances": {
+        "6:1": {
+          "resonant_semimajor_axis": 212.0,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "82158 (2001 FP185)",
+              "a_measured": 213.4,
+              "a_expected": 212.0,
+              "delta_a": 1.4,
+              "orbital_elements": {
+                "e": 0.8398,
+                "i": 30.8,
+                "q": 34.19,
+                "Q": 392.66
+              }
+            }
+          ]
+        },
+        "9:1": {
+          "resonant_semimajor_axis": 161.78,
+          "object_count": 1,
+          "objects": [
+            {
+              "name": "445473 (2010 VZ98)",
+              "a_measured": 159.8,
+              "a_expected": 161.78,
+              "delta_a": 1.98,
+              "orbital_elements": {
+                "e": 0.7851,
+                "i": 4.51,
+                "q": 34.356,
+                "Q": 285.32
+              }
+            }
+          ]
+        }
+      },
+      "total_objects_detected": 2,
+      "resonance_strength_score": 4
+    }
+  },
+  "summary": {
+    "planet_candidates": [
+      {
+        "planet_distance_au": 300,
+        "strength_score": 24,
+        "objects_detected": 6,
+        "resonance_types": 4
+      },
+      {
+        "planet_distance_au": 400,
+        "strength_score": 12,
+        "objects_detected": 4,
+        "resonance_types": 3
+      },
+      {
+        "planet_distance_au": 450,
+        "strength_score": 6,
+        "objects_detected": 3,
+        "resonance_types": 2
+      },
+      {
+        "planet_distance_au": 700,
+        "strength_score": 4,
+        "objects_detected": 2,
+        "resonance_types": 2
+      },
+      {
+        "planet_distance_au": 350,
+        "strength_score": 1,
+        "objects_detected": 1,
+        "resonance_types": 1
+      },
+      {
+        "planet_distance_au": 500,
+        "strength_score": 1,
+        "objects_detected": 1,
+        "resonance_types": 1
+      },
+      {
+        "planet_distance_au": 600,
+        "strength_score": 1,
+        "objects_detected": 1,
+        "resonance_types": 1
+      },
+      {
+        "planet_distance_au": 650,
+        "strength_score": 1,
+        "objects_detected": 1,
+        "resonance_types": 1
+      }
+    ],
+    "multi_resonance_objects": [
+      {
+        "name": "445473 (2010 VZ98)",
+        "resonance_count": 3,
+        "resonances": [
+          {
+            "planet_a": 400,
+            "resonance_order": "4:1"
+          },
+          {
+            "planet_a": 650,
+            "resonance_order": "8:1"
+          },
+          {
+            "planet_a": 700,
+            "resonance_order": "9:1"
+          }
+        ]
+      },
+      {
+        "name": "26181 (1996 GQ21)",
+        "resonance_count": 2,
+        "resonances": [
+          {
+            "planet_a": 300,
+            "resonance_order": "6:1"
+          },
+          {
+            "planet_a": 400,
+            "resonance_order": "9:1"
+          }
+        ]
+      },
+      {
+        "name": "145451 Rumina",
+        "resonance_count": 2,
+        "resonances": [
+          {
+            "planet_a": 300,
+            "resonance_order": "6:1"
+          },
+          {
+            "planet_a": 400,
+            "resonance_order": "9:1"
+          }
+        ]
+      },
+      {
+        "name": "15874 (1996 TL66)",
+        "resonance_count": 2,
+        "resonances": [
+          {
+            "planet_a": 300,
+            "resonance_order": "7:1"
+          },
+          {
+            "planet_a": 350,
+            "resonance_order": "8:1"
+          }
+        ]
+      },
+      {
+        "name": "303775 (2005 QU182)",
+        "resonance_count": 2,
+        "resonances": [
+          {
+            "planet_a": 400,
+            "resonance_order": "7:1"
+          },
+          {
+            "planet_a": 450,
+            "resonance_order": "8:1"
+          }
+        ]
+      },
+      {
+        "name": "82158 (2001 FP185)",
+        "resonance_count": 2,
+        "resonances": [
+          {
+            "planet_a": 450,
+            "resonance_order": "3:1"
+          },
+          {
+            "planet_a": 700,
+            "resonance_order": "6:1"
+          }
+        ]
+      },
+      {
+        "name": "437360 (2013 TV158)",
+        "resonance_count": 2,
+        "resonances": [
+          {
+            "planet_a": 450,
+            "resonance_order": "8:1"
+          },
+          {
+            "planet_a": 500,
+            "resonance_order": "9:1"
+          }
+        ]
+      }
+    ],
+    "strongest_single_resonance": null
+  }
+}
