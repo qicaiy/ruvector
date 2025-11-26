@@ -1,12 +1,16 @@
 //! Vector indexing for graph elements
 //!
-//! Integrates RuVector's HNSW index with graph nodes, edges, and hyperedges.
+//! Integrates RuVector's index (HNSW or Flat) with graph nodes, edges, and hyperedges.
 
 use crate::error::{GraphError, Result};
 use crate::types::{NodeId, EdgeId, PropertyValue, Properties};
+#[cfg(feature = "hnsw_rs")]
 use ruvector_core::index::hnsw::HnswIndex;
+use ruvector_core::index::flat::FlatIndex;
 use ruvector_core::index::VectorIndex;
-use ruvector_core::types::{DistanceMetric, HnswConfig, SearchResult};
+use ruvector_core::types::{DistanceMetric, SearchResult};
+#[cfg(feature = "hnsw_rs")]
+use ruvector_core::types::HnswConfig;
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -30,7 +34,8 @@ pub struct EmbeddingConfig {
     pub dimensions: usize,
     /// Distance metric for similarity
     pub metric: DistanceMetric,
-    /// HNSW index configuration
+    /// HNSW index configuration (only used when hnsw_rs feature is enabled)
+    #[cfg(feature = "hnsw_rs")]
     pub hnsw_config: HnswConfig,
     /// Property name where embeddings are stored
     pub embedding_property: String,
@@ -41,20 +46,27 @@ impl Default for EmbeddingConfig {
         Self {
             dimensions: 384, // Common for small models like MiniLM
             metric: DistanceMetric::Cosine,
+            #[cfg(feature = "hnsw_rs")]
             hnsw_config: HnswConfig::default(),
             embedding_property: "embedding".to_string(),
         }
     }
 }
 
+// Index type alias based on feature flags
+#[cfg(feature = "hnsw_rs")]
+type IndexImpl = HnswIndex;
+#[cfg(not(feature = "hnsw_rs"))]
+type IndexImpl = FlatIndex;
+
 /// Hybrid index combining graph structure with vector search
 pub struct HybridIndex {
     /// Node embeddings index
-    node_index: Arc<RwLock<Option<HnswIndex>>>,
+    node_index: Arc<RwLock<Option<IndexImpl>>>,
     /// Edge embeddings index
-    edge_index: Arc<RwLock<Option<HnswIndex>>>,
+    edge_index: Arc<RwLock<Option<IndexImpl>>>,
     /// Hyperedge embeddings index
-    hyperedge_index: Arc<RwLock<Option<HnswIndex>>>,
+    hyperedge_index: Arc<RwLock<Option<IndexImpl>>>,
 
     /// Mapping from node IDs to internal vector IDs
     node_id_map: Arc<DashMap<NodeId, String>>,
@@ -82,12 +94,33 @@ impl HybridIndex {
     }
 
     /// Initialize index for a specific element type
+    #[cfg(feature = "hnsw_rs")]
     pub fn initialize_index(&self, index_type: VectorIndexType) -> Result<()> {
         let index = HnswIndex::new(
             self.config.dimensions,
             self.config.metric,
             self.config.hnsw_config.clone(),
         ).map_err(|e| GraphError::IndexError(format!("Failed to create HNSW index: {}", e)))?;
+
+        match index_type {
+            VectorIndexType::Node => {
+                *self.node_index.write() = Some(index);
+            }
+            VectorIndexType::Edge => {
+                *self.edge_index.write() = Some(index);
+            }
+            VectorIndexType::Hyperedge => {
+                *self.hyperedge_index.write() = Some(index);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Initialize index for a specific element type (Flat index for WASM)
+    #[cfg(not(feature = "hnsw_rs"))]
+    pub fn initialize_index(&self, index_type: VectorIndexType) -> Result<()> {
+        let index = FlatIndex::new(self.config.dimensions, self.config.metric);
 
         match index_type {
             VectorIndexType::Node => {

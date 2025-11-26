@@ -2,36 +2,55 @@
 //!
 //! Provides ACID-compliant storage for graph nodes, edges, and hyperedges
 
+#[cfg(feature = "storage")]
 use crate::edge::Edge;
+#[cfg(feature = "storage")]
 use crate::hyperedge::{Hyperedge, HyperedgeId};
+#[cfg(feature = "storage")]
 use crate::node::Node;
+#[cfg(feature = "storage")]
 use crate::types::{EdgeId, NodeId};
+#[cfg(feature = "storage")]
 use anyhow::Result;
+#[cfg(feature = "storage")]
 use bincode::config;
+#[cfg(feature = "storage")]
 use parking_lot::Mutex;
+#[cfg(feature = "storage")]
 use redb::{Database, ReadableTable, TableDefinition};
+#[cfg(feature = "storage")]
 use std::collections::HashMap;
+#[cfg(feature = "storage")]
 use std::path::{Path, PathBuf};
+#[cfg(feature = "storage")]
 use std::sync::Arc;
+#[cfg(feature = "storage")]
 use once_cell::sync::Lazy;
 
+#[cfg(feature = "storage")]
 // Table definitions
 const NODES_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("nodes");
+#[cfg(feature = "storage")]
 const EDGES_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("edges");
+#[cfg(feature = "storage")]
 const HYPEREDGES_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("hyperedges");
+#[cfg(feature = "storage")]
 const METADATA_TABLE: TableDefinition<&str, &str> = TableDefinition::new("metadata");
 
+#[cfg(feature = "storage")]
 // Global database connection pool to allow multiple GraphStorage instances
 // to share the same underlying database file
 static DB_POOL: Lazy<Mutex<HashMap<PathBuf, Arc<Database>>>> = Lazy::new(|| {
     Mutex::new(HashMap::new())
 });
 
+#[cfg(feature = "storage")]
 /// Storage backend for graph database
 pub struct GraphStorage {
     db: Arc<Database>,
 }
 
+#[cfg(feature = "storage")]
 impl GraphStorage {
     /// Create or open a graph storage at the given path
     ///

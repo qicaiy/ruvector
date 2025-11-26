@@ -6,8 +6,10 @@ use crate::hyperedge::{Hyperedge, HyperedgeId};
 use crate::index::{AdjacencyIndex, EdgeTypeIndex, HyperedgeNodeIndex, LabelIndex, PropertyIndex};
 use crate::node::Node;
 use crate::types::{EdgeId, NodeId, PropertyValue};
+#[cfg(feature = "storage")]
 use crate::storage::GraphStorage;
 use dashmap::DashMap;
+#[cfg(feature = "storage")]
 use std::path::Path;
 use std::sync::Arc;
 
@@ -30,6 +32,7 @@ pub struct GraphDB {
     /// Hyperedge node index
     hyperedge_node_index: HyperedgeNodeIndex,
     /// Optional persistent storage
+    #[cfg(feature = "storage")]
     storage: Option<GraphStorage>,
 }
 
@@ -45,11 +48,13 @@ impl GraphDB {
             edge_type_index: EdgeTypeIndex::new(),
             adjacency_index: AdjacencyIndex::new(),
             hyperedge_node_index: HyperedgeNodeIndex::new(),
+            #[cfg(feature = "storage")]
             storage: None,
         }
     }
 
     /// Create a new graph database with persistent storage
+    #[cfg(feature = "storage")]
     pub fn with_storage<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let storage = GraphStorage::new(path)?;
 
@@ -63,6 +68,7 @@ impl GraphDB {
     }
 
     /// Load all data from storage into memory
+    #[cfg(feature = "storage")]
     fn load_from_storage(&mut self) -> anyhow::Result<()> {
         if let Some(storage) = &self.storage {
             // Load nodes
@@ -108,6 +114,7 @@ impl GraphDB {
         self.nodes.insert(id.clone(), node.clone());
 
         // Persist to storage if available
+        #[cfg(feature = "storage")]
         if let Some(storage) = &self.storage {
             storage.insert_node(&node)?;
         }
@@ -128,6 +135,7 @@ impl GraphDB {
             self.property_index.remove_node(&node);
 
             // Delete from storage if available
+            #[cfg(feature = "storage")]
             if let Some(storage) = &self.storage {
                 storage.delete_node(id.as_ref())?;
             }
@@ -177,6 +185,7 @@ impl GraphDB {
         self.edges.insert(id.clone(), edge.clone());
 
         // Persist to storage if available
+        #[cfg(feature = "storage")]
         if let Some(storage) = &self.storage {
             storage.insert_edge(&edge)?;
         }
@@ -197,6 +206,7 @@ impl GraphDB {
             self.adjacency_index.remove_edge(&edge);
 
             // Delete from storage if available
+            #[cfg(feature = "storage")]
             if let Some(storage) = &self.storage {
                 storage.delete_edge(id.as_ref())?;
             }
@@ -256,6 +266,7 @@ impl GraphDB {
         self.hyperedges.insert(id.clone(), hyperedge.clone());
 
         // Persist to storage if available
+        #[cfg(feature = "storage")]
         if let Some(storage) = &self.storage {
             storage.insert_hyperedge(&hyperedge)?;
         }

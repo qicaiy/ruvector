@@ -40,7 +40,7 @@ once_cell = { workspace = true }
 
 # Time and UUID
 chrono = { workspace = true }
-uuid = { workspace = true, optional = true }
+uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 criterion = { workspace = true }
@@ -70,12 +70,12 @@ name = "comprehensive_bench"
 harness = false
 
 [features]
-default = ["simd", "uuid-support", "storage", "hnsw"]
-uuid-support = ["uuid"]
+default = ["simd", "storage", "hnsw"]
 simd = []
 storage = ["redb", "memmap2"]  # File-based storage (not available in WASM)
 hnsw = ["hnsw_rs"]  # HNSW indexing (not available in WASM due to mmap dependency)
 memory-only = []  # Pure in-memory storage for WASM
+uuid-support = []  # Deprecated: uuid is now always included
 
 [lib]
 crate-type = ["rlib"]

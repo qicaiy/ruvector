@@ -2604,6 +2604,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "page_size"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "papergrid"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3674,6 +3684,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruvector-gnn"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "criterion",
+ "dashmap",
+ "libc",
+ "memmap2",
+ "napi",
+ "napi-derive",
+ "ndarray 0.16.1",
+ "page_size",
+ "parking_lot 0.12.5",
+ "proptest",
+ "rand 0.8.5",
+ "rand_distr",
+ "rayon",
+ "ruvector-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "ruvector-gnn-node"
+version = "0.1.1"
+dependencies = [
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "ruvector-gnn",
+ "serde_json",
+]
+
+[[package]]
+name = "ruvector-gnn-wasm"
+version = "0.1.1"
+dependencies = [
+ "console_error_panic_hook",
+ "getrandom 0.2.16",
+ "getrandom 0.3.4",
+ "js-sys",
+ "ruvector-gnn",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "ruvector-graph"
 version = "0.1.1"
 dependencies = [
@@ -3764,6 +3825,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "regex",
  "ruvector-core",
+ "ruvector-graph",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

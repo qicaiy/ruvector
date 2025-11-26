@@ -1,5 +1,6 @@
 //! Index structures for efficient vector search
 
+#[cfg(feature = "hnsw")]
 pub mod hnsw;
 pub mod flat;
 

@@ -54,36 +54,42 @@ pub enum RuvectorError {
     Internal(String),
 }
 
+#[cfg(feature = "storage")]
 impl From<redb::Error> for RuvectorError {
     fn from(err: redb::Error) -> Self {
         RuvectorError::DatabaseError(err.to_string())
     }
 }
 
+#[cfg(feature = "storage")]
 impl From<redb::DatabaseError> for RuvectorError {
     fn from(err: redb::DatabaseError) -> Self {
         RuvectorError::DatabaseError(err.to_string())
     }
 }
 
+#[cfg(feature = "storage")]
 impl From<redb::StorageError> for RuvectorError {
     fn from(err: redb::StorageError) -> Self {
         RuvectorError::DatabaseError(err.to_string())
     }
 }
 
+#[cfg(feature = "storage")]
 impl From<redb::TableError> for RuvectorError {
     fn from(err: redb::TableError) -> Self {
         RuvectorError::DatabaseError(err.to_string())
     }
 }
 
+#[cfg(feature = "storage")]
 impl From<redb::TransactionError> for RuvectorError {
     fn from(err: redb::TransactionError) -> Self {
         RuvectorError::DatabaseError(err.to_string())
     }
 }
 
+#[cfg(feature = "storage")]
 impl From<redb::CommitError> for RuvectorError {
     fn from(err: redb::CommitError) -> Self {
         RuvectorError::DatabaseError(err.to_string())

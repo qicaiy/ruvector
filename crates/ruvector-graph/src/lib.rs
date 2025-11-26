@@ -33,6 +33,7 @@ pub use node::{Node, NodeBuilder};
 pub use edge::{Edge, EdgeBuilder};
 pub use hyperedge::{Hyperedge, HyperedgeBuilder, HyperedgeId};
 pub use graph::GraphDB;
+#[cfg(feature = "storage")]
 pub use storage::GraphStorage;
 pub use transaction::{Transaction, TransactionManager, IsolationLevel};
 

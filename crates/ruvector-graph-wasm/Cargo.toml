@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ruvector-core = { version = "0.1.1", path = "../ruvector-core", default-features = false }
+ruvector-graph = { path = "../ruvector-graph", default-features = false, features = ["wasm"] }
 parking_lot = { workspace = true }
 getrandom = { workspace = true }
 

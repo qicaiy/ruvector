@@ -50,7 +50,9 @@ impl MemoryStorage {
 
         // Insert metadata if present
         if let Some(metadata) = &entry.metadata {
-            self.metadata.insert(id.clone(), metadata.clone());
+            self.metadata.insert(id.clone(), serde_json::Value::Object(
+                metadata.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            ));
         }
 
         Ok(id)
@@ -73,7 +75,9 @@ impl MemoryStorage {
             self.vectors.insert(id.clone(), entry.vector.clone());
 
             if let Some(metadata) = &entry.metadata {
-                self.metadata.insert(id.clone(), metadata.clone());
+                self.metadata.insert(id.clone(), serde_json::Value::Object(
+                    metadata.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+                ));
             }
 
             ids.push(id);
@@ -86,7 +90,13 @@ impl MemoryStorage {
     pub fn get(&self, id: &str) -> Result<Option<VectorEntry>> {
         if let Some(vector_ref) = self.vectors.get(id) {
             let vector = vector_ref.clone();
-            let metadata = self.metadata.get(id).map(|m| m.clone());
+            let metadata = self.metadata.get(id).and_then(|m| {
+                if let serde_json::Value::Object(map) = m.value() {
+                    Some(map.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                } else {
+                    None
+                }
+            });
 
             Ok(Some(VectorEntry {
                 id: Some(id.to_string()),
