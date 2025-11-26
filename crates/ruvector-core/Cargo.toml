@@ -109,6 +109,15 @@ path = "../../examples/kuiper_belt_omega_analysis.rs"
 name = "sma_gap_analyzer"
 path = "../../examples/sma_gap_analyzer.rs"
 
+[[example]]
+name = "kuiper_belt_kozai_lidov"
+path = "../../examples/kuiper_belt_kozai_lidov.rs"
+
+[[example]]
+name = "universal_planet_search"
+path = "../../examples/kuiper_belt/universal_planet_search.rs"
+required-features = ["storage"]
+
 [lib]
 crate-type = ["rlib"]
 bench = false
