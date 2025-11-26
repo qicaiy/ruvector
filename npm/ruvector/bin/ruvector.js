@@ -94,6 +94,173 @@ function formatDuration(ms) {
   return `${ms.toFixed(2)}ms`;
 }
 
+// Doctor command - diagnose installation
+program
+  .command('doctor')
+  .description('Diagnose installation and check all dependencies')
+  .action(async () => {
+    console.log(chalk.bold.cyan('\n🩺 rUvector Doctor - Diagnosing Installation\n'));
+
+    const checks = [];
+
+    // Check Node.js version
+    const nodeVersion = process.version;
+    const nodeMajor = parseInt(nodeVersion.slice(1).split('.')[0]);
+    checks.push({
+      name: 'Node.js Version',
+      status: nodeMajor >= 16 ? 'pass' : 'fail',
+      message: nodeVersion,
+      hint: nodeMajor < 16 ? 'Requires Node.js >= 16.0.0' : null
+    });
+
+    // Check core package
+    let coreVersion = null;
+    try {
+      const core = require('@ruvector/core');
+      coreVersion = typeof core.version === 'function' ? core.version() : (core.version || 'installed');
+      checks.push({
+        name: '@ruvector/core',
+        status: 'pass',
+        message: coreVersion
+      });
+    } catch (e) {
+      checks.push({
+        name: '@ruvector/core',
+        status: 'warn',
+        message: 'Not installed (using fallback)',
+        hint: 'npm install @ruvector/core'
+      });
+    }
+
+    // Check graph package (Node.js native)
+    try {
+      const graph = require('@ruvector/graph-node');
+      checks.push({
+        name: '@ruvector/graph-node',
+        status: 'pass',
+        message: graph.version || 'installed'
+      });
+    } catch (e) {
+      // Check WASM fallback
+      try {
+        const graphWasm = require('@ruvector/graph-wasm');
+        checks.push({
+          name: '@ruvector/graph-wasm',
+          status: 'pass',
+          message: graphWasm.version || 'installed (WASM)'
+        });
+      } catch (e2) {
+        checks.push({
+          name: 'Graph Module',
+          status: 'warn',
+          message: 'Not installed',
+          hint: 'npm install @ruvector/graph-node'
+        });
+      }
+    }
+
+    // Check GNN package (Node.js native)
+    try {
+      const gnn = require('@ruvector/gnn-node');
+      checks.push({
+        name: '@ruvector/gnn-node',
+        status: 'pass',
+        message: gnn.version || 'installed'
+      });
+    } catch (e) {
+      // Check WASM fallback
+      try {
+        const gnnWasm = require('@ruvector/gnn-wasm');
+        checks.push({
+          name: '@ruvector/gnn-wasm',
+          status: 'pass',
+          message: gnnWasm.version || 'installed (WASM)'
+        });
+      } catch (e2) {
+        checks.push({
+          name: 'GNN Module',
+          status: 'warn',
+          message: 'Not installed',
+          hint: 'npm install @ruvector/gnn-node'
+        });
+      }
+    }
+
+    // Check dist files
+    const distPath = require('path').join(__dirname, '..', 'dist', 'index.js');
+    try {
+      require('fs').accessSync(distPath);
+      checks.push({
+        name: 'Built dist files',
+        status: 'pass',
+        message: 'Found'
+      });
+    } catch (e) {
+      checks.push({
+        name: 'Built dist files',
+        status: 'fail',
+        message: 'Not found',
+        hint: 'Run npm run build in the ruvector package'
+      });
+    }
+
+    // Display results
+    const table = new Table({
+      head: ['Check', 'Status', 'Details'],
+      colWidths: [25, 10, 40]
+    });
+
+    let hasErrors = false;
+    let hasWarnings = false;
+
+    checks.forEach(check => {
+      let statusIcon;
+      if (check.status === 'pass') {
+        statusIcon = chalk.green('✓ Pass');
+      } else if (check.status === 'warn') {
+        statusIcon = chalk.yellow('○ Warn');
+        hasWarnings = true;
+      } else {
+        statusIcon = chalk.red('✗ Fail');
+        hasErrors = true;
+      }
+
+      table.push([
+        check.name,
+        statusIcon,
+        check.message + (check.hint ? chalk.gray(` (${check.hint})`) : '')
+      ]);
+    });
+
+    console.log(table.toString());
+    console.log();
+
+    // Summary
+    if (hasErrors) {
+      console.log(chalk.red('✗ Some required checks failed. Please fix the issues above.'));
+    } else if (hasWarnings) {
+      console.log(chalk.yellow('○ All required checks passed, but some optional modules are missing.'));
+      console.log(chalk.cyan('  Install optional modules for full functionality.'));
+    } else {
+      console.log(chalk.green('✓ All checks passed! rUvector is ready to use.'));
+    }
+
+    // Show available features
+    console.log(chalk.bold.cyan('\n📦 Available Commands:\n'));
+    console.log(chalk.white('  Core:  ') + chalk.green('info, init, stats, insert, search, benchmark'));
+    if (getGraphBackend()) {
+      console.log(chalk.white('  Graph: ') + chalk.green('graph query, graph create-node'));
+    } else {
+      console.log(chalk.white('  Graph: ') + chalk.gray('(install @ruvector/graph-node)'));
+    }
+    if (getGnnBackend()) {
+      console.log(chalk.white('  GNN:   ') + chalk.green('gnn layer, gnn compress'));
+    } else {
+      console.log(chalk.white('  GNN:   ') + chalk.gray('(install @ruvector/gnn-node)'));
+    }
+    console.log();
+  });
+
 // Info command
 program
   .command('info')
@@ -608,9 +775,13 @@ program.version(require('../package.json').version, '-v, --version', 'Show versi
 // Help customization
 program.on('--help', () => {
   console.log('');
-  console.log(chalk.bold.cyan('Vector Commands:'));
+  console.log(chalk.bold.cyan('Diagnostics:'));
+  console.log('  $ ruvector doctor                                  Diagnose installation');
   console.log('  $ ruvector info                                    Show backend info');
+  console.log('');
+  console.log(chalk.bold.cyan('Vector Commands:'));
   console.log('  $ ruvector init my-index.bin -d 384                Initialize index');
+  console.log('  $ ruvector stats my-index.bin                      Show index statistics');
   console.log('  $ ruvector insert my-index.bin vectors.json        Insert vectors');
   console.log('  $ ruvector search my-index.bin -q "[0.1,...]" -k 10');
   console.log('  $ ruvector benchmark -d 384 -n 10000               Run benchmarks');
