@@ -8,10 +8,11 @@
 
 use anyhow::Result;
 use clap::Parser;
-use ruvector_bench::{
-    create_progress_bar, DatasetGenerator, MemoryProfiler, VectorDistribution,
+use ruvector_bench::{create_progress_bar, DatasetGenerator, MemoryProfiler, VectorDistribution};
+use ruvector_core::{
+    types::{DbOptions, HnswConfig, QuantizationConfig},
+    DistanceMetric, SearchQuery, VectorDB, VectorEntry,
 };
-use ruvector_core::{DbOptions, DistanceMetric, HnswConfig, QuantizationConfig, SearchQuery, VectorDB, VectorEntry};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -59,21 +60,21 @@ fn main() -> Result<()> {
     };
 
     // Profile 1: Indexing performance
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Profiling: Index Construction");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     profile_indexing(&args)?;
 
     // Profile 2: Search performance
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Profiling: Search Operations");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     profile_search(&args)?;
 
     // Profile 3: Mixed workload
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Profiling: Mixed Read/Write Workload");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     profile_mixed_workload(&args)?;
 
     // Stop profiling and generate flamegraph
@@ -89,7 +90,10 @@ fn main() -> Result<()> {
         println!("  cargo build --release --features profiling");
     }
 
-    println!("\n✓ Profiling complete! Results saved to: {}", args.output.display());
+    println!(
+        "\n✓ Profiling complete! Results saved to: {}",
+        args.output.display()
+    );
     Ok(())
 }
 
@@ -141,10 +145,13 @@ fn profile_indexing(args: &Args) -> Result<()> {
 
     let db = VectorDB::new(options)?;
 
-    let gen = DatasetGenerator::new(args.dimensions, VectorDistribution::Normal {
-        mean: 0.0,
-        std_dev: 1.0,
-    });
+    let gen = DatasetGenerator::new(
+        args.dimensions,
+        VectorDistribution::Normal {
+            mean: 0.0,
+            std_dev: 1.0,
+        },
+    );
 
     println!("Indexing {} vectors for profiling...", args.num_vectors);
     let pb = create_progress_bar(args.num_vectors as u64, "Indexing");
@@ -165,7 +172,10 @@ fn profile_indexing(args: &Args) -> Result<()> {
 
     println!("\nIndexing Performance:");
     println!("  Total time: {:.2}s", elapsed.as_secs_f64());
-    println!("  Throughput: {:.0} vectors/sec", args.num_vectors as f64 / elapsed.as_secs_f64());
+    println!(
+        "  Throughput: {:.0} vectors/sec",
+        args.num_vectors as f64 / elapsed.as_secs_f64()
+    );
     println!("  Memory: {:.2} MB", memory_mb);
 
     Ok(())
@@ -194,7 +204,10 @@ fn profile_search(args: &Args) -> Result<()> {
     println!("\nSearch Performance:");
     println!("  Total time: {:.2}s", elapsed.as_secs_f64());
     println!("  QPS: {:.0}", args.queries as f64 / elapsed.as_secs_f64());
-    println!("  Avg latency: {:.2}ms", elapsed.as_secs_f64() * 1000.0 / args.queries as f64);
+    println!(
+        "  Avg latency: {:.2}ms",
+        elapsed.as_secs_f64() * 1000.0 / args.queries as f64
+    );
 
     Ok(())
 }
@@ -213,13 +226,19 @@ fn profile_mixed_workload(args: &Args) -> Result<()> {
 
     let db = VectorDB::new(options)?;
 
-    let gen = DatasetGenerator::new(args.dimensions, VectorDistribution::Normal {
-        mean: 0.0,
-        std_dev: 1.0,
-    });
+    let gen = DatasetGenerator::new(
+        args.dimensions,
+        VectorDistribution::Normal {
+            mean: 0.0,
+            std_dev: 1.0,
+        },
+    );
 
     let num_ops = args.num_vectors / 10;
-    println!("Running {} mixed operations (70% writes, 30% reads)...", num_ops);
+    println!(
+        "Running {} mixed operations (70% writes, 30% reads)...",
+        num_ops
+    );
     let pb = create_progress_bar(num_ops as u64, "Processing");
 
     let start = Instant::now();
@@ -255,9 +274,20 @@ fn profile_mixed_workload(args: &Args) -> Result<()> {
 
     println!("\nMixed Workload Performance:");
     println!("  Total time: {:.2}s", elapsed.as_secs_f64());
-    println!("  Writes: {} ({:.0} writes/sec)", write_count, write_count as f64 / elapsed.as_secs_f64());
-    println!("  Reads: {} ({:.0} reads/sec)", read_count, read_count as f64 / elapsed.as_secs_f64());
-    println!("  Total throughput: {:.0} ops/sec", num_ops as f64 / elapsed.as_secs_f64());
+    println!(
+        "  Writes: {} ({:.0} writes/sec)",
+        write_count,
+        write_count as f64 / elapsed.as_secs_f64()
+    );
+    println!(
+        "  Reads: {} ({:.0} reads/sec)",
+        read_count,
+        read_count as f64 / elapsed.as_secs_f64()
+    );
+    println!(
+        "  Total throughput: {:.0} ops/sec",
+        num_ops as f64 / elapsed.as_secs_f64()
+    );
 
     Ok(())
 }
@@ -276,10 +306,13 @@ fn setup_database(args: &Args) -> Result<(VectorDB, Vec<Vec<f32>>)> {
 
     let db = VectorDB::new(options)?;
 
-    let gen = DatasetGenerator::new(args.dimensions, VectorDistribution::Normal {
-        mean: 0.0,
-        std_dev: 1.0,
-    });
+    let gen = DatasetGenerator::new(
+        args.dimensions,
+        VectorDistribution::Normal {
+            mean: 0.0,
+            std_dev: 1.0,
+        },
+    );
 
     println!("Preparing database with {} vectors...", args.num_vectors);
     let pb = create_progress_bar(args.num_vectors as u64, "Preparing");

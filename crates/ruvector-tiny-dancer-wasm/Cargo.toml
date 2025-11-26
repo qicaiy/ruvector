@@ -5,13 +5,14 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
 description = "WASM bindings for Tiny Dancer neural routing"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-ruvector-tiny-dancer-core = { version = "0.1.1", path = "../ruvector-tiny-dancer-core" }
+ruvector-tiny-dancer-core = { version = "0.1.2", path = "../ruvector-tiny-dancer-core" }
 
 # WASM dependencies
 wasm-bindgen = { workspace = true }

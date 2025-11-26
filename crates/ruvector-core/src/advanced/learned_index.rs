@@ -3,10 +3,10 @@
 //! Experimental learned indexes using neural networks to approximate data distribution.
 //! Based on Recursive Model Index (RMI) concept with bounded error correction.
 
-use crate::types::VectorId;
 use crate::error::{Result, RuvectorError};
+use crate::types::VectorId;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Trait for learned index structures
 pub trait LearnedIndex {
@@ -138,11 +138,17 @@ impl RecursiveModelIndex {
     /// Build the index from data
     pub fn build(&mut self, mut data: Vec<(Vec<f32>, VectorId)>) -> Result<()> {
         if data.is_empty() {
-            return Err(RuvectorError::InvalidInput("Cannot build index from empty data".into()));
+            return Err(RuvectorError::InvalidInput(
+                "Cannot build index from empty data".into(),
+            ));
         }
 
         // Sort data by first dimension (simple heuristic)
-        data.sort_by(|a, b| a.0[0].partial_cmp(&b.0[0]).unwrap_or(std::cmp::Ordering::Equal));
+        data.sort_by(|a, b| {
+            a.0[0]
+                .partial_cmp(&b.0[0])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let n = data.len();
 
@@ -163,7 +169,11 @@ impl RecursiveModelIndex {
         let chunk_size = n / num_leaf_models;
         for (i, model) in self.leaf_models.iter_mut().enumerate() {
             let start = i * chunk_size;
-            let end = if i == num_leaf_models - 1 { n } else { (i + 1) * chunk_size };
+            let end = if i == num_leaf_models - 1 {
+                n
+            } else {
+                (i + 1) * chunk_size
+            };
 
             if start < n {
                 let leaf_data: Vec<(Vec<f32>, usize)> = data[start..end.min(n)]
@@ -184,7 +194,9 @@ impl RecursiveModelIndex {
 impl LearnedIndex for RecursiveModelIndex {
     fn predict(&self, key: &[f32]) -> Result<usize> {
         if key.len() != self.dimensions {
-            return Err(RuvectorError::InvalidInput("Key dimensions mismatch".into()));
+            return Err(RuvectorError::InvalidInput(
+                "Key dimensions mismatch".into(),
+            ));
         }
 
         // Root model predicts leaf model
@@ -291,8 +303,9 @@ impl HybridIndex {
         let mut all_data: Vec<(Vec<f32>, VectorId)> = self.learned.data.clone();
 
         for (key_bytes, value) in &self.dynamic_buffer {
-            let (key, _): (Vec<f32>, usize) = bincode::decode_from_slice(key_bytes, bincode::config::standard())
-                .map_err(|e| RuvectorError::SerializationError(e.to_string()))?;
+            let (key, _): (Vec<f32>, usize) =
+                bincode::decode_from_slice(key_bytes, bincode::config::standard())
+                    .map_err(|e| RuvectorError::SerializationError(e.to_string()))?;
             all_data.push((key, value.clone()));
         }
 
@@ -361,7 +374,7 @@ mod tests {
         let data: Vec<(Vec<f32>, VectorId)> = (0..100)
             .map(|i| {
                 let x = i as f32 / 100.0;
-                (vec![x, x * x], i as VectorId)
+                (vec![x, x * x], i.to_string())
             })
             .collect();
 
@@ -377,15 +390,15 @@ mod tests {
         let mut rmi = RecursiveModelIndex::new(1, 2);
 
         let data = vec![
-            (vec![0.0], 0),
-            (vec![0.5], 1),
-            (vec![1.0], 2),
+            (vec![0.0], "0".to_string()),
+            (vec![0.5], "1".to_string()),
+            (vec![1.0], "2".to_string()),
         ];
 
         rmi.build(data).unwrap();
 
         let result = rmi.search(&[0.5]).unwrap();
-        assert_eq!(result, Some(1));
+        assert_eq!(result, Some("1".to_string()));
     }
 
     #[test]
@@ -393,15 +406,15 @@ mod tests {
         let mut hybrid = HybridIndex::new(1, 2, 10);
 
         let static_data = vec![
-            (vec![0.0], 0),
-            (vec![1.0], 1),
+            (vec![0.0], "0".to_string()),
+            (vec![1.0], "1".to_string()),
         ];
         hybrid.build_static(static_data).unwrap();
 
         // Add dynamic updates
-        hybrid.insert(vec![2.0], 2).unwrap();
+        hybrid.insert(vec![2.0], "2".to_string()).unwrap();
 
-        assert_eq!(hybrid.search(&[2.0]).unwrap(), Some(2));
-        assert_eq!(hybrid.search(&[0.0]).unwrap(), Some(0));
+        assert_eq!(hybrid.search(&[2.0]).unwrap(), Some("2".to_string()));
+        assert_eq!(hybrid.search(&[0.0]).unwrap(), Some("0".to_string()));
     }
 }

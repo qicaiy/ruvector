@@ -8,10 +8,13 @@
 use anyhow::Result;
 use clap::Parser;
 use ruvector_bench::{
-    create_progress_bar, BenchmarkResult, DatasetGenerator, MemoryProfiler,
-    ResultWriter, VectorDistribution,
+    create_progress_bar, BenchmarkResult, DatasetGenerator, MemoryProfiler, ResultWriter,
+    VectorDistribution,
 };
-use ruvector_core::{DbOptions, DistanceMetric, HnswConfig, QuantizationConfig, VectorDB, VectorEntry};
+use ruvector_core::{
+    types::{DbOptions, HnswConfig, QuantizationConfig},
+    DistanceMetric, VectorDB, VectorEntry,
+};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -51,24 +54,24 @@ fn main() -> Result<()> {
 
     // Test 1: Memory usage at different scales
     for &scale in &scales {
-        println!("\n{'=':<60}");
+        println!("\n{}", "=".repeat(60));
         println!("Test: Memory at {} vectors", scale);
-        println!("{'=':<60}\n");
+        println!("{}\n", "=".repeat(60));
         let result = bench_memory_scale(&args, scale)?;
         all_results.push(result);
     }
 
     // Test 2: Effect of quantization on memory
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test: Effect of Quantization on Memory");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let results = bench_quantization_memory(&args)?;
     all_results.extend(results);
 
     // Test 3: Index overhead analysis
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test: Index Overhead Analysis");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let result = bench_index_overhead(&args)?;
     all_results.push(result);
 
@@ -80,7 +83,10 @@ fn main() -> Result<()> {
 
     print_summary(&all_results);
 
-    println!("\n✓ Memory benchmark complete! Results saved to: {}", args.output.display());
+    println!(
+        "\n✓ Memory benchmark complete! Results saved to: {}",
+        args.output.display()
+    );
     Ok(())
 }
 
@@ -105,10 +111,13 @@ fn bench_memory_scale(args: &Args, num_vectors: usize) -> Result<BenchmarkResult
     let build_start = Instant::now();
     let db = VectorDB::new(options)?;
 
-    let gen = DatasetGenerator::new(args.dimensions, VectorDistribution::Normal {
-        mean: 0.0,
-        std_dev: 1.0,
-    });
+    let gen = DatasetGenerator::new(
+        args.dimensions,
+        VectorDistribution::Normal {
+            mean: 0.0,
+            std_dev: 1.0,
+        },
+    );
 
     let pb = create_progress_bar(num_vectors as u64, "Indexing");
 
@@ -123,7 +132,11 @@ fn bench_memory_scale(args: &Args, num_vectors: usize) -> Result<BenchmarkResult
         // Sample memory every 10%
         if i % (num_vectors / 10).max(1) == 0 {
             let current_mb = mem_profiler.current_usage_mb();
-            println!("  Progress: {}%, Memory: {:.2} MB", (i * 100) / num_vectors, current_mb);
+            println!(
+                "  Progress: {}%, Memory: {:.2} MB",
+                (i * 100) / num_vectors,
+                current_mb
+            );
         }
         pb.inc(1);
     }
@@ -162,9 +175,18 @@ fn bench_memory_scale(args: &Args, num_vectors: usize) -> Result<BenchmarkResult
         memory_mb: final_mb,
         build_time_secs: build_time.as_secs_f64(),
         metadata: vec![
-            ("memory_per_vector_kb".to_string(), format!("{:.2}", memory_per_vector_kb)),
-            ("theoretical_mb".to_string(), format!("{:.2}", theoretical_mb)),
-            ("overhead_ratio".to_string(), format!("{:.2}", overhead_ratio)),
+            (
+                "memory_per_vector_kb".to_string(),
+                format!("{:.2}", memory_per_vector_kb),
+            ),
+            (
+                "theoretical_mb".to_string(),
+                format!("{:.2}", theoretical_mb),
+            ),
+            (
+                "overhead_ratio".to_string(),
+                format!("{:.2}", overhead_ratio),
+            ),
         ]
         .into_iter()
         .collect(),
@@ -199,10 +221,13 @@ fn bench_quantization_memory(args: &Args) -> Result<Vec<BenchmarkResult>> {
         let build_start = Instant::now();
         let db = VectorDB::new(options)?;
 
-        let gen = DatasetGenerator::new(args.dimensions, VectorDistribution::Normal {
-            mean: 0.0,
-            std_dev: 1.0,
-        });
+        let gen = DatasetGenerator::new(
+            args.dimensions,
+            VectorDistribution::Normal {
+                mean: 0.0,
+                std_dev: 1.0,
+            },
+        );
 
         let pb = create_progress_bar(num_vectors as u64, &format!("quant={}", name));
 
@@ -215,7 +240,7 @@ fn bench_quantization_memory(args: &Args) -> Result<Vec<BenchmarkResult>> {
             db.insert(entry)?;
             pb.inc(1);
         }
-        pb.finish_with_message(&format!("✓ {} complete", name));
+        pb.finish_with_message(format!("✓ {} complete", name));
 
         let build_time = build_start.elapsed();
         let memory_mb = mem_profiler.current_usage_mb();
@@ -224,7 +249,10 @@ fn bench_quantization_memory(args: &Args) -> Result<Vec<BenchmarkResult>> {
         let theoretical_mb = (num_vectors * vector_size_bytes) as f64 / 1_048_576.0;
         let compression_ratio = theoretical_mb / memory_mb;
 
-        println!("  Memory: {:.2} MB, Compression: {:.2}x", memory_mb, compression_ratio);
+        println!(
+            "  Memory: {:.2} MB, Compression: {:.2}x",
+            memory_mb, compression_ratio
+        );
 
         results.push(BenchmarkResult {
             name: format!("quantization_{}", name),
@@ -245,8 +273,14 @@ fn bench_quantization_memory(args: &Args) -> Result<Vec<BenchmarkResult>> {
             build_time_secs: build_time.as_secs_f64(),
             metadata: vec![
                 ("quantization".to_string(), name.to_string()),
-                ("compression_ratio".to_string(), format!("{:.2}", compression_ratio)),
-                ("theoretical_mb".to_string(), format!("{:.2}", theoretical_mb)),
+                (
+                    "compression_ratio".to_string(),
+                    format!("{:.2}", compression_ratio),
+                ),
+                (
+                    "theoretical_mb".to_string(),
+                    format!("{:.2}", theoretical_mb),
+                ),
             ]
             .into_iter()
             .collect(),
@@ -281,10 +315,13 @@ fn bench_index_overhead(args: &Args) -> Result<BenchmarkResult> {
     let build_start = Instant::now();
     let db = VectorDB::new(options)?;
 
-    let gen = DatasetGenerator::new(args.dimensions, VectorDistribution::Normal {
-        mean: 0.0,
-        std_dev: 1.0,
-    });
+    let gen = DatasetGenerator::new(
+        args.dimensions,
+        VectorDistribution::Normal {
+            mean: 0.0,
+            std_dev: 1.0,
+        },
+    );
 
     let pb = create_progress_bar(num_vectors as u64, "Building index");
 
@@ -309,7 +346,10 @@ fn bench_index_overhead(args: &Args) -> Result<BenchmarkResult> {
 
     println!("\nMemory Breakdown:");
     println!("  Vector data: {:.2} MB", vector_data_mb);
-    println!("  Index overhead: {:.2} MB ({:.1}%)", index_overhead_mb, overhead_percentage);
+    println!(
+        "  Index overhead: {:.2} MB ({:.1}%)",
+        index_overhead_mb, overhead_percentage
+    );
     println!("  Total: {:.2} MB", total_memory_mb);
 
     Ok(BenchmarkResult {
@@ -330,9 +370,18 @@ fn bench_index_overhead(args: &Args) -> Result<BenchmarkResult> {
         memory_mb: total_memory_mb,
         build_time_secs: build_time.as_secs_f64(),
         metadata: vec![
-            ("vector_data_mb".to_string(), format!("{:.2}", vector_data_mb)),
-            ("index_overhead_mb".to_string(), format!("{:.2}", index_overhead_mb)),
-            ("overhead_percentage".to_string(), format!("{:.1}", overhead_percentage)),
+            (
+                "vector_data_mb".to_string(),
+                format!("{:.2}", vector_data_mb),
+            ),
+            (
+                "index_overhead_mb".to_string(),
+                format!("{:.2}", index_overhead_mb),
+            ),
+            (
+                "overhead_percentage".to_string(),
+                format!("{:.1}", overhead_percentage),
+            ),
         ]
         .into_iter()
         .collect(),

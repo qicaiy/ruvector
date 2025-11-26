@@ -5,13 +5,14 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
 description = "NAPI-RS bindings for ruvector-router-core vector database"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-ruvector-router-core = { version = "0.1.1", path = "../ruvector-router-core" }
+ruvector-router-core = { version = "0.1.2", path = "../ruvector-router-core" }
 
 # NAPI-RS dependencies
 napi = { workspace = true }

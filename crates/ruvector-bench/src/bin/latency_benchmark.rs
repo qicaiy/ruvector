@@ -9,10 +9,13 @@ use anyhow::Result;
 use clap::Parser;
 use rayon::prelude::*;
 use ruvector_bench::{
-    create_progress_bar, BenchmarkResult, DatasetGenerator, LatencyStats,
-    MemoryProfiler, ResultWriter, VectorDistribution,
+    create_progress_bar, BenchmarkResult, DatasetGenerator, LatencyStats, MemoryProfiler,
+    ResultWriter, VectorDistribution,
 };
-use ruvector_core::{DbOptions, DistanceMetric, HnswConfig, QuantizationConfig, SearchQuery, VectorDB, VectorEntry};
+use ruvector_core::{
+    types::{DbOptions, HnswConfig, QuantizationConfig},
+    DistanceMetric, SearchQuery, VectorDB, VectorEntry,
+};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -53,9 +56,9 @@ fn main() -> Result<()> {
     let mut all_results = Vec::new();
 
     // Test 1: Single-threaded latency
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test 1: Single-threaded Latency");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let result = bench_single_threaded(&args)?;
     all_results.push(result);
 
@@ -67,24 +70,24 @@ fn main() -> Result<()> {
         .collect();
 
     for &num_threads in &thread_counts {
-        println!("\n{'=':<60}");
+        println!("\n{}", "=".repeat(60));
         println!("Test 2: Multi-threaded Latency ({} threads)", num_threads);
-        println!("{'=':<60}\n");
+        println!("{}\n", "=".repeat(60));
         let result = bench_multi_threaded(&args, num_threads)?;
         all_results.push(result);
     }
 
     // Test 3: Effect of efSearch
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test 3: Effect of efSearch on Latency");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let result = bench_ef_search_latency(&args)?;
     all_results.extend(result);
 
     // Test 4: Effect of quantization
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test 4: Effect of Quantization on Latency");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let result = bench_quantization_latency(&args)?;
     all_results.extend(result);
 
@@ -96,7 +99,10 @@ fn main() -> Result<()> {
 
     print_summary(&all_results);
 
-    println!("\n✓ Latency benchmark complete! Results saved to: {}", args.output.display());
+    println!(
+        "\n✓ Latency benchmark complete! Results saved to: {}",
+        args.output.display()
+    );
     Ok(())
 }
 
@@ -149,7 +155,11 @@ fn bench_multi_threaded(args: &Args, num_threads: usize) -> Result<BenchmarkResu
     let (db, queries) = setup_database(args, QuantizationConfig::Scalar)?;
     let db = Arc::new(db);
 
-    println!("Running {} queries ({} threads)...", queries.len(), num_threads);
+    println!(
+        "Running {} queries ({} threads)...",
+        queries.len(),
+        num_threads
+    );
 
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
@@ -167,7 +177,8 @@ fn bench_multi_threaded(args: &Args, num_threads: usize) -> Result<BenchmarkResu
                 k: 10,
                 filter: None,
                 ef_search: None,
-            }).ok();
+            })
+            .ok();
             query_start.elapsed().as_secs_f64() * 1000.0
         })
         .collect();
@@ -229,7 +240,7 @@ fn bench_ef_search_latency(args: &Args) -> Result<Vec<BenchmarkResult>> {
             latency_stats.record(query_start.elapsed())?;
             pb.inc(1);
         }
-        pb.finish_with_message(&format!("✓ ef={} complete", ef_search));
+        pb.finish_with_message(format!("✓ ef={} complete", ef_search));
 
         let total_time = search_start.elapsed();
         let qps = queries.len() as f64 / total_time.as_secs_f64();
@@ -288,7 +299,7 @@ fn bench_quantization_latency(args: &Args) -> Result<Vec<BenchmarkResult>> {
             latency_stats.record(query_start.elapsed())?;
             pb.inc(1);
         }
-        pb.finish_with_message(&format!("✓ {} complete", name));
+        pb.finish_with_message(format!("✓ {} complete", name));
 
         let total_time = search_start.elapsed();
         let qps = queries.len() as f64 / total_time.as_secs_f64();
@@ -319,7 +330,10 @@ fn bench_quantization_latency(args: &Args) -> Result<Vec<BenchmarkResult>> {
     Ok(results)
 }
 
-fn setup_database(args: &Args, quantization: QuantizationConfig) -> Result<(VectorDB, Vec<Vec<f32>>)> {
+fn setup_database(
+    args: &Args,
+    quantization: QuantizationConfig,
+) -> Result<(VectorDB, Vec<Vec<f32>>)> {
     let temp_dir = tempfile::tempdir()?;
     let db_path = temp_dir.path().join("latency.db");
 
@@ -334,10 +348,13 @@ fn setup_database(args: &Args, quantization: QuantizationConfig) -> Result<(Vect
     let db = VectorDB::new(options)?;
 
     // Generate and index data
-    let gen = DatasetGenerator::new(args.dimensions, VectorDistribution::Normal {
-        mean: 0.0,
-        std_dev: 1.0,
-    });
+    let gen = DatasetGenerator::new(
+        args.dimensions,
+        VectorDistribution::Normal {
+            mean: 0.0,
+            std_dev: 1.0,
+        },
+    );
 
     println!("Indexing {} vectors...", args.num_vectors);
     let pb = create_progress_bar(args.num_vectors as u64, "Indexing");

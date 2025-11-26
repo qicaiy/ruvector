@@ -3,9 +3,13 @@ name = "ruvector-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "High-performance REST API server for Ruvector vector databases"
 
 [dependencies]
-ruvector-core = { path = "../ruvector-core" }
+ruvector-core = { version = "0.1.2", path = "../ruvector-core" }
 axum = { version = "0.7", features = ["json", "multipart"] }
 tokio = { workspace = true, features = ["full"] }
 tower = "0.5"

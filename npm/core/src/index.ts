@@ -162,12 +162,132 @@ export interface VectorDBConstructor {
 }
 
 /**
+ * Filter for metadata-based search
+ */
+export interface Filter {
+  /** Field name to filter on */
+  field: string;
+  /** Operator: "eq", "ne", "gt", "gte", "lt", "lte", "in", "match" */
+  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'match';
+  /** Value to compare against (JSON string) */
+  value: string;
+}
+
+/**
+ * Collection configuration
+ */
+export interface CollectionConfig {
+  /** Vector dimensions */
+  dimensions: number;
+  /** Distance metric */
+  distanceMetric?: DistanceMetric;
+  /** HNSW configuration */
+  hnswConfig?: HnswConfig;
+  /** Quantization configuration */
+  quantization?: QuantizationConfig;
+}
+
+/**
+ * Collection statistics
+ */
+export interface CollectionStats {
+  /** Number of vectors in the collection */
+  vectorsCount: number;
+  /** Disk space used in bytes */
+  diskSizeBytes: number;
+  /** RAM space used in bytes */
+  ramSizeBytes: number;
+}
+
+/**
+ * Collection alias
+ */
+export interface Alias {
+  /** Alias name */
+  alias: string;
+  /** Collection name */
+  collection: string;
+}
+
+/**
+ * Health response
+ */
+export interface HealthResponse {
+  /** Status: "healthy", "degraded", or "unhealthy" */
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  /** Version string */
+  version: string;
+  /** Uptime in seconds */
+  uptimeSeconds: number;
+}
+
+/**
+ * Collection manager for multi-collection support
+ */
+export interface CollectionManager {
+  /**
+   * Create a new collection
+   * @param name Collection name
+   * @param config Collection configuration
+   */
+  createCollection(name: string, config: CollectionConfig): Promise<void>;
+
+  /**
+   * List all collections
+   * @returns Array of collection names
+   */
+  listCollections(): Promise<string[]>;
+
+  /**
+   * Delete a collection
+   * @param name Collection name to delete
+   */
+  deleteCollection(name: string): Promise<void>;
+
+  /**
+   * Get collection statistics
+   * @param name Collection name
+   * @returns Collection statistics
+   */
+  getStats(name: string): Promise<CollectionStats>;
+
+  /**
+   * Create an alias for a collection
+   * @param alias Alias name
+   * @param collection Collection name
+   */
+  createAlias(alias: string, collection: string): Promise<void>;
+
+  /**
+   * Delete an alias
+   * @param alias Alias name to delete
+   */
+  deleteAlias(alias: string): Promise<void>;
+
+  /**
+   * List all aliases
+   * @returns Array of alias mappings
+   */
+  listAliases(): Promise<Alias[]>;
+}
+
+/**
+ * CollectionManager constructor interface
+ */
+export interface CollectionManagerConstructor {
+  new(basePath?: string): CollectionManager;
+}
+
+/**
  * Native binding interface
  */
 export interface NativeBinding {
   VectorDB: VectorDBConstructor;
+  CollectionManager: CollectionManagerConstructor;
   version(): string;
   hello(): string;
+  getMetrics(): string;
+  getHealth(): HealthResponse;
 }
 
 /**
@@ -243,14 +363,21 @@ function loadNativeBinding(): NativeBinding {
 const nativeBinding = loadNativeBinding();
 
 // Re-export the VectorDB class and utility functions
-export const VectorDB = nativeBinding.VectorDB;
+// Note: NAPI-RS exports as VectorDb (lowercase d), we re-export as VectorDB for consistency
+export const VectorDB = (nativeBinding as any).VectorDb || nativeBinding.VectorDB;
+export const CollectionManager = nativeBinding.CollectionManager;
 export const version = nativeBinding.version;
 export const hello = nativeBinding.hello;
+export const getMetrics = nativeBinding.getMetrics;
+export const getHealth = nativeBinding.getHealth;
 
 // Default export
 export default {
   VectorDB,
+  CollectionManager,
   version,
   hello,
+  getMetrics,
+  getHealth,
   DistanceMetric
 };

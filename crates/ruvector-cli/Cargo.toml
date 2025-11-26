@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+readme = "README.md"
 description = "CLI and MCP server for Ruvector"
 
 [[bin]]
@@ -17,7 +18,7 @@ name = "ruvector-mcp"
 path = "src/mcp_server.rs"
 
 [dependencies]
-ruvector-core = { version = "0.1.1", path = "../ruvector-core" }
+ruvector-core = { version = "0.1.2", path = "../ruvector-core" }
 
 # CLI
 clap = { workspace = true }
@@ -48,6 +49,7 @@ ndarray = { workspace = true }
 
 # Terminal colors
 colored = "2.1"
+prettytable-rs = "0.10"
 
 # HTTP for MCP SSE transport
 hyper = { version = "1.5", features = ["full"] }

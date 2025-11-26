@@ -6,8 +6,13 @@ set -e
 
 echo "🔍 Checking package-lock.json sync..."
 
-# Change to npm directory
-cd "$(dirname "$0")/../npm"
+# Change to npm directory (if it exists)
+NPM_DIR="$(dirname "$0")/../npm"
+if [ ! -d "$NPM_DIR" ]; then
+    echo "✅ No npm directory found, skipping sync"
+    exit 0
+fi
+cd "$NPM_DIR"
 
 # Check if package.json or any workspace package.json changed
 CHANGED_PACKAGES=$(git diff --cached --name-only | grep -E 'package\.json$' || true)

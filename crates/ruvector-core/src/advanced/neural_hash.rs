@@ -3,12 +3,12 @@
 //! Learn similarity-preserving binary projections for extreme compression.
 //! Achieves 32-128x compression with 90-95% recall preservation.
 
-use crate::types::VectorId;
 use crate::error::{Result, RuvectorError};
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use rand::Rng;
+use crate::types::VectorId;
 use ndarray::{Array1, Array2};
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Neural hash function for similarity-preserving binary codes
 pub trait NeuralHash {
@@ -171,7 +171,8 @@ impl NeuralHash for DeepHashEmbedding {
     }
 
     fn hamming_distance(&self, code_a: &[u8], code_b: &[u8]) -> u32 {
-        code_a.iter()
+        code_a
+            .iter()
             .zip(code_b.iter())
             .map(|(a, b)| (a ^ b).count_ones())
             .sum()
@@ -199,9 +200,8 @@ impl SimpleLSH {
         let mut rng = rand::thread_rng();
 
         // Random Gaussian projections
-        let projections = Array2::from_shape_fn((num_bits, input_dims), |_| {
-            rng.gen::<f32>() * 2.0 - 1.0
-        });
+        let projections =
+            Array2::from_shape_fn((num_bits, input_dims), |_| rng.gen::<f32>() * 2.0 - 1.0);
 
         Self {
             projections,
@@ -229,7 +229,8 @@ impl NeuralHash for SimpleLSH {
     }
 
     fn hamming_distance(&self, code_a: &[u8], code_b: &[u8]) -> u32 {
-        code_a.iter()
+        code_a
+            .iter()
             .zip(code_b.iter())
             .map(|(a, b)| (a ^ b).count_ones())
             .sum()
@@ -308,7 +309,9 @@ impl<H: NeuralHash + Clone> HashIndex<H> {
             return 0.0;
         }
 
-        let original_size: usize = self.vectors.values()
+        let original_size: usize = self
+            .vectors
+            .values()
             .map(|v| v.len() * std::mem::size_of::<f32>())
             .sum();
 
@@ -400,9 +403,9 @@ mod tests {
         let mut index = HashIndex::new(lsh, 8);
 
         // Insert vectors
-        index.insert(0, vec![1.0, 0.0, 0.0]);
-        index.insert(1, vec![0.9, 0.1, 0.0]);
-        index.insert(2, vec![0.0, 1.0, 0.0]);
+        index.insert("0".to_string(), vec![1.0, 0.0, 0.0]);
+        index.insert("1".to_string(), vec![0.9, 0.1, 0.0]);
+        index.insert("2".to_string(), vec![0.0, 1.0, 0.0]);
 
         // Search
         let results = index.search(&[1.0, 0.0, 0.0], 2, 4);
@@ -419,7 +422,7 @@ mod tests {
 
         for i in 0..10 {
             let vec: Vec<f32> = (0..128).map(|j| (i + j) as f32 / 128.0).collect();
-            index.insert(i, vec);
+            index.insert(i.to_string(), vec);
         }
 
         let ratio = index.compression_ratio();

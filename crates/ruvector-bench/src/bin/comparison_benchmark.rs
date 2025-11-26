@@ -9,11 +9,11 @@
 use anyhow::Result;
 use clap::Parser;
 use ruvector_bench::{
-    create_progress_bar, BenchmarkResult, DatasetGenerator, LatencyStats,
-    MemoryProfiler, ResultWriter, VectorDistribution,
+    create_progress_bar, BenchmarkResult, DatasetGenerator, LatencyStats, MemoryProfiler,
+    ResultWriter, VectorDistribution,
 };
-use ruvector_core::{DistanceMetric, SearchQuery, VectorDB, VectorEntry};
 use ruvector_core::types::{DbOptions, HnswConfig, QuantizationConfig};
+use ruvector_core::{DistanceMetric, SearchQuery, VectorDB, VectorEntry};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -49,30 +49,30 @@ fn main() -> Result<()> {
     let mut all_results = Vec::new();
 
     // Test 1: Ruvector (optimized)
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test 1: Ruvector (SIMD + Quantization + HNSW)");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let result = bench_ruvector_optimized(&args)?;
     all_results.push(result);
 
     // Test 2: Ruvector (no quantization)
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test 2: Ruvector (No Quantization)");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let result = bench_ruvector_no_quant(&args)?;
     all_results.push(result);
 
     // Test 3: Simulated Python baseline
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test 3: Simulated Python Baseline");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let result = simulate_python_baseline(&args)?;
     all_results.push(result);
 
     // Test 4: Simulated naive brute-force
-    println!("\n{'=':<60}");
+    println!("\n{}", "=".repeat(60));
     println!("Test 4: Simulated Brute-Force Search");
-    println!("{'=':<60}\n");
+    println!("{}\n", "=".repeat(60));
     let result = simulate_brute_force(&args)?;
     all_results.push(result);
 
@@ -84,7 +84,10 @@ fn main() -> Result<()> {
 
     print_comparison_table(&all_results);
 
-    println!("\n✓ Comparison benchmark complete! Results saved to: {}", args.output.display());
+    println!(
+        "\n✓ Comparison benchmark complete! Results saved to: {}",
+        args.output.display()
+    );
     Ok(())
 }
 
@@ -297,7 +300,10 @@ fn simulate_brute_force(args: &Args) -> Result<BenchmarkResult> {
     })
 }
 
-fn setup_ruvector(args: &Args, quantization: QuantizationConfig) -> Result<(VectorDB, Vec<Vec<f32>>)> {
+fn setup_ruvector(
+    args: &Args,
+    quantization: QuantizationConfig,
+) -> Result<(VectorDB, Vec<Vec<f32>>)> {
     let temp_dir = tempfile::tempdir()?;
     let db_path = temp_dir.path().join("comparison.db");
 
@@ -311,10 +317,13 @@ fn setup_ruvector(args: &Args, quantization: QuantizationConfig) -> Result<(Vect
 
     let db = VectorDB::new(options)?;
 
-    let gen = DatasetGenerator::new(args.dimensions, VectorDistribution::Normal {
-        mean: 0.0,
-        std_dev: 1.0,
-    });
+    let gen = DatasetGenerator::new(
+        args.dimensions,
+        VectorDistribution::Normal {
+            mean: 0.0,
+            std_dev: 1.0,
+        },
+    );
 
     println!("Indexing {} vectors...", args.num_vectors);
     let pb = create_progress_bar(args.num_vectors as u64, "Indexing");

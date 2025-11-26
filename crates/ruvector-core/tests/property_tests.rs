@@ -14,12 +14,15 @@ use ruvector_core::types::DistanceMetric;
 
 // Strategy to generate valid vectors
 fn vector_strategy(dim: usize) -> impl Strategy<Value = Vec<f32>> {
-    prop::collection::vec(any::<f32>().prop_filter("Must be finite", |x| x.is_finite()), dim)
+    prop::collection::vec(
+        any::<f32>().prop_filter("Must be finite", |x| x.is_finite()),
+        dim,
+    )
 }
 
 // Strategy for normalized vectors (for cosine similarity)
 fn normalized_vector_strategy(dim: usize) -> impl Strategy<Value = Vec<f32>> {
-    vector_strategy(dim).prop_map(|v| {
+    vector_strategy(dim).prop_map(move |v| {
         let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
         if norm > 0.0 {
             v.iter().map(|x| x / norm).collect()

@@ -4,15 +4,63 @@
  * rUvector CLI
  *
  * Beautiful command-line interface for vector database operations
+ * Includes: Vector Search, Graph/Cypher, GNN, Compression, and more
  */
 
 const { Command } = require('commander');
 const chalk = require('chalk');
 const ora = require('ora');
 const Table = require('cli-table3');
-const { VectorIndex, getBackendInfo, Utils } = require('../dist/index.js');
 const fs = require('fs').promises;
 const path = require('path');
+
+// Lazy load backends to improve startup time
+let vectorBackend = null;
+let graphBackend = null;
+let gnnBackend = null;
+
+function getVectorBackend() {
+  if (!vectorBackend) {
+    try {
+      const { VectorIndex, getBackendInfo, Utils } = require('../dist/index.js');
+      vectorBackend = { VectorIndex, getBackendInfo, Utils };
+    } catch (e) {
+      console.error(chalk.red('Vector backend not available:', e.message));
+      process.exit(1);
+    }
+  }
+  return vectorBackend;
+}
+
+function getGraphBackend() {
+  if (!graphBackend) {
+    try {
+      graphBackend = require('@ruvector/graph-node');
+    } catch (e) {
+      try {
+        graphBackend = require('@ruvector/graph-wasm');
+      } catch (e2) {
+        return null;
+      }
+    }
+  }
+  return graphBackend;
+}
+
+function getGnnBackend() {
+  if (!gnnBackend) {
+    try {
+      gnnBackend = require('@ruvector/gnn-node');
+    } catch (e) {
+      try {
+        gnnBackend = require('@ruvector/gnn-wasm');
+      } catch (e2) {
+        return null;
+      }
+    }
+  }
+  return gnnBackend;
+}
 
 const program = new Command();
 
@@ -46,14 +94,182 @@ function formatDuration(ms) {
   return `${ms.toFixed(2)}ms`;
 }
 
+// Doctor command - diagnose installation
+program
+  .command('doctor')
+  .description('Diagnose installation and check all dependencies')
+  .action(async () => {
+    console.log(chalk.bold.cyan('\n🩺 rUvector Doctor - Diagnosing Installation\n'));
+
+    const checks = [];
+
+    // Check Node.js version
+    const nodeVersion = process.version;
+    const nodeMajor = parseInt(nodeVersion.slice(1).split('.')[0]);
+    checks.push({
+      name: 'Node.js Version',
+      status: nodeMajor >= 16 ? 'pass' : 'fail',
+      message: nodeVersion,
+      hint: nodeMajor < 16 ? 'Requires Node.js >= 16.0.0' : null
+    });
+
+    // Check core package
+    let coreVersion = null;
+    try {
+      const core = require('@ruvector/core');
+      coreVersion = typeof core.version === 'function' ? core.version() : (core.version || 'installed');
+      checks.push({
+        name: '@ruvector/core',
+        status: 'pass',
+        message: coreVersion
+      });
+    } catch (e) {
+      checks.push({
+        name: '@ruvector/core',
+        status: 'warn',
+        message: 'Not installed (using fallback)',
+        hint: 'npm install @ruvector/core'
+      });
+    }
+
+    // Check graph package (Node.js native)
+    try {
+      const graph = require('@ruvector/graph-node');
+      checks.push({
+        name: '@ruvector/graph-node',
+        status: 'pass',
+        message: graph.version || 'installed'
+      });
+    } catch (e) {
+      // Check WASM fallback
+      try {
+        const graphWasm = require('@ruvector/graph-wasm');
+        checks.push({
+          name: '@ruvector/graph-wasm',
+          status: 'pass',
+          message: graphWasm.version || 'installed (WASM)'
+        });
+      } catch (e2) {
+        checks.push({
+          name: 'Graph Module',
+          status: 'warn',
+          message: 'Not installed',
+          hint: 'npm install @ruvector/graph-node'
+        });
+      }
+    }
+
+    // Check GNN package (Node.js native)
+    try {
+      const gnn = require('@ruvector/gnn-node');
+      checks.push({
+        name: '@ruvector/gnn-node',
+        status: 'pass',
+        message: gnn.version || 'installed'
+      });
+    } catch (e) {
+      // Check WASM fallback
+      try {
+        const gnnWasm = require('@ruvector/gnn-wasm');
+        checks.push({
+          name: '@ruvector/gnn-wasm',
+          status: 'pass',
+          message: gnnWasm.version || 'installed (WASM)'
+        });
+      } catch (e2) {
+        checks.push({
+          name: 'GNN Module',
+          status: 'warn',
+          message: 'Not installed',
+          hint: 'npm install @ruvector/gnn-node'
+        });
+      }
+    }
+
+    // Check dist files
+    const distPath = require('path').join(__dirname, '..', 'dist', 'index.js');
+    try {
+      require('fs').accessSync(distPath);
+      checks.push({
+        name: 'Built dist files',
+        status: 'pass',
+        message: 'Found'
+      });
+    } catch (e) {
+      checks.push({
+        name: 'Built dist files',
+        status: 'fail',
+        message: 'Not found',
+        hint: 'Run npm run build in the ruvector package'
+      });
+    }
+
+    // Display results
+    const table = new Table({
+      head: ['Check', 'Status', 'Details'],
+      colWidths: [25, 10, 40]
+    });
+
+    let hasErrors = false;
+    let hasWarnings = false;
+
+    checks.forEach(check => {
+      let statusIcon;
+      if (check.status === 'pass') {
+        statusIcon = chalk.green('✓ Pass');
+      } else if (check.status === 'warn') {
+        statusIcon = chalk.yellow('○ Warn');
+        hasWarnings = true;
+      } else {
+        statusIcon = chalk.red('✗ Fail');
+        hasErrors = true;
+      }
+
+      table.push([
+        check.name,
+        statusIcon,
+        check.message + (check.hint ? chalk.gray(` (${check.hint})`) : '')
+      ]);
+    });
+
+    console.log(table.toString());
+    console.log();
+
+    // Summary
+    if (hasErrors) {
+      console.log(chalk.red('✗ Some required checks failed. Please fix the issues above.'));
+    } else if (hasWarnings) {
+      console.log(chalk.yellow('○ All required checks passed, but some optional modules are missing.'));
+      console.log(chalk.cyan('  Install optional modules for full functionality.'));
+    } else {
+      console.log(chalk.green('✓ All checks passed! rUvector is ready to use.'));
+    }
+
+    // Show available features
+    console.log(chalk.bold.cyan('\n📦 Available Commands:\n'));
+    console.log(chalk.white('  Core:  ') + chalk.green('info, init, stats, insert, search, benchmark'));
+    if (getGraphBackend()) {
+      console.log(chalk.white('  Graph: ') + chalk.green('graph query, graph create-node'));
+    } else {
+      console.log(chalk.white('  Graph: ') + chalk.gray('(install @ruvector/graph-node)'));
+    }
+    if (getGnnBackend()) {
+      console.log(chalk.white('  GNN:   ') + chalk.green('gnn layer, gnn compress'));
+    } else {
+      console.log(chalk.white('  GNN:   ') + chalk.gray('(install @ruvector/gnn-node)'));
+    }
+    console.log();
+  });
+
 // Info command
 program
   .command('info')
-  .description('Show backend information')
+  .description('Show backend information and available modules')
   .action(() => {
+    const { getBackendInfo } = getVectorBackend();
     const info = getBackendInfo();
 
-    console.log(chalk.bold.cyan('\n🚀 rUvector Backend Information\n'));
+    console.log(chalk.bold.cyan('\n🚀 rUvector - All-in-One Vector Database\n'));
 
     const table = new Table({
       chars: { 'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' }
@@ -67,6 +283,50 @@ program
 
     console.log(table.toString());
     console.log();
+
+    // Show available modules
+    console.log(chalk.bold.cyan('📦 Available Modules:\n'));
+    const modulesTable = new Table({
+      head: ['Module', 'Status', 'Description'],
+      colWidths: [20, 12, 45]
+    });
+
+    // Check vector
+    modulesTable.push(['Vector Search', chalk.green('✓ Ready'), 'HNSW index, similarity search']);
+
+    // Check graph
+    const graphAvailable = getGraphBackend() !== null;
+    modulesTable.push([
+      'Graph/Cypher',
+      graphAvailable ? chalk.green('✓ Ready') : chalk.yellow('○ Optional'),
+      'Neo4j-compatible queries, hyperedges'
+    ]);
+
+    // Check GNN
+    const gnnAvailable = getGnnBackend() !== null;
+    modulesTable.push([
+      'GNN Layers',
+      gnnAvailable ? chalk.green('✓ Ready') : chalk.yellow('○ Optional'),
+      'Neural network on graph topology'
+    ]);
+
+    // Built-in features
+    modulesTable.push(['Compression', chalk.green('✓ Built-in'), 'f32→f16→PQ8→PQ4→Binary (2-32x)']);
+    modulesTable.push(['WASM/Browser', chalk.green('✓ Built-in'), 'Client-side vector search']);
+
+    console.log(modulesTable.toString());
+    console.log();
+
+    if (!graphAvailable || !gnnAvailable) {
+      console.log(chalk.cyan('💡 Install optional modules:'));
+      if (!graphAvailable) {
+        console.log(chalk.white('   npm install @ruvector/graph-node'));
+      }
+      if (!gnnAvailable) {
+        console.log(chalk.white('   npm install @ruvector/gnn-node'));
+      }
+      console.log();
+    }
   });
 
 // Init command
@@ -82,6 +342,7 @@ program
     const spinner = ora('Initializing vector index...').start();
 
     try {
+      const { VectorIndex } = getVectorBackend();
       const index = new VectorIndex({
         dimension: parseInt(options.dimension),
         metric: options.metric,
@@ -124,6 +385,7 @@ program
     const spinner = ora('Loading index...').start();
 
     try {
+      const { VectorIndex } = getVectorBackend();
       const index = await VectorIndex.load(indexPath);
       const stats = await index.stats();
 
@@ -160,6 +422,7 @@ program
     let spinner = ora('Loading index...').start();
 
     try {
+      const { VectorIndex } = getVectorBackend();
       const index = await VectorIndex.load(indexPath);
       spinner.succeed();
 
@@ -215,6 +478,7 @@ program
     const spinner = ora('Loading index...').start();
 
     try {
+      const { VectorIndex } = getVectorBackend();
       const index = await VectorIndex.load(indexPath);
       spinner.succeed();
 
@@ -265,6 +529,7 @@ program
   .option('-n, --num-vectors <number>', 'Number of vectors', '10000')
   .option('-q, --num-queries <number>', 'Number of queries', '100')
   .action(async (options) => {
+    const { VectorIndex, Utils } = getVectorBackend();
     const dimension = parseInt(options.dimension);
     const numVectors = parseInt(options.numVectors);
     const numQueries = parseInt(options.numQueries);
@@ -354,6 +619,7 @@ program
       console.log();
 
       // Backend info
+      const { getBackendInfo } = getVectorBackend();
       const info = getBackendInfo();
       console.log(chalk.cyan(`Backend: ${chalk.white(info.type)}`));
       console.log();
@@ -364,19 +630,171 @@ program
     }
   });
 
+// ============================================================================
+// GRAPH COMMANDS
+// ============================================================================
+
+const graphCmd = program
+  .command('graph')
+  .description('Graph database commands (Cypher queries, nodes, edges)');
+
+graphCmd
+  .command('query <cypher>')
+  .description('Execute a Cypher query')
+  .option('-f, --format <type>', 'Output format (table|json)', 'table')
+  .action(async (cypher, options) => {
+    const graph = getGraphBackend();
+    if (!graph) {
+      console.error(chalk.red('Graph module not installed. Run: npm install @ruvector/graph-node'));
+      process.exit(1);
+    }
+
+    const spinner = ora('Executing Cypher query...').start();
+    try {
+      const db = new graph.GraphDB();
+      const results = await db.query(cypher);
+      spinner.succeed(chalk.green(`Query returned ${results.length} results`));
+
+      if (options.format === 'json') {
+        console.log(JSON.stringify(results, null, 2));
+      } else {
+        if (results.length > 0) {
+          const table = new Table({
+            head: Object.keys(results[0]).map(k => chalk.cyan(k))
+          });
+          results.forEach(row => {
+            table.push(Object.values(row).map(v =>
+              typeof v === 'object' ? JSON.stringify(v) : String(v)
+            ));
+          });
+          console.log(table.toString());
+        }
+      }
+    } catch (error) {
+      spinner.fail(chalk.red('Query failed'));
+      console.error(chalk.red(error.message));
+      process.exit(1);
+    }
+  });
+
+graphCmd
+  .command('create-node')
+  .description('Create a new node')
+  .requiredOption('-l, --label <label>', 'Node label')
+  .requiredOption('-p, --properties <json>', 'Node properties as JSON')
+  .action(async (options) => {
+    const graph = getGraphBackend();
+    if (!graph) {
+      console.error(chalk.red('Graph module not installed. Run: npm install @ruvector/graph-node'));
+      process.exit(1);
+    }
+
+    try {
+      const db = new graph.GraphDB();
+      const props = JSON.parse(options.properties);
+      const nodeId = await db.createNode(options.label, props);
+      console.log(chalk.green(`✓ Created node: ${nodeId}`));
+    } catch (error) {
+      console.error(chalk.red('Failed to create node:', error.message));
+      process.exit(1);
+    }
+  });
+
+// ============================================================================
+// GNN COMMANDS
+// ============================================================================
+
+const gnnCmd = program
+  .command('gnn')
+  .description('Graph Neural Network commands');
+
+gnnCmd
+  .command('layer')
+  .description('Create and test a GNN layer')
+  .option('-i, --input-dim <number>', 'Input dimension', '128')
+  .option('-h, --hidden-dim <number>', 'Hidden dimension', '256')
+  .option('--heads <number>', 'Attention heads', '4')
+  .action(async (options) => {
+    const gnn = getGnnBackend();
+    if (!gnn) {
+      console.error(chalk.red('GNN module not installed. Run: npm install @ruvector/gnn-node'));
+      process.exit(1);
+    }
+
+    try {
+      const layer = new gnn.RuvectorLayer(
+        parseInt(options.inputDim),
+        parseInt(options.hiddenDim),
+        parseInt(options.heads),
+        0.1 // dropout
+      );
+      console.log(chalk.green('✓ GNN Layer created'));
+      console.log(chalk.cyan('Configuration:'));
+      console.log(`  Input dim: ${options.inputDim}`);
+      console.log(`  Hidden dim: ${options.hiddenDim}`);
+      console.log(`  Attention heads: ${options.heads}`);
+    } catch (error) {
+      console.error(chalk.red('Failed to create GNN layer:', error.message));
+      process.exit(1);
+    }
+  });
+
+gnnCmd
+  .command('compress')
+  .description('Compress a vector using adaptive compression')
+  .requiredOption('-v, --vector <json>', 'Vector as JSON array')
+  .option('-f, --frequency <number>', 'Access frequency (0-1)', '0.5')
+  .action(async (options) => {
+    const gnn = getGnnBackend();
+    if (!gnn) {
+      console.error(chalk.red('GNN module not installed. Run: npm install @ruvector/gnn-node'));
+      process.exit(1);
+    }
+
+    try {
+      const vector = JSON.parse(options.vector);
+      const freq = parseFloat(options.frequency);
+      const compressor = new gnn.TensorCompress();
+      const compressed = compressor.compress(vector, freq);
+
+      console.log(chalk.green('✓ Vector compressed'));
+      console.log(chalk.cyan('Compression info:'));
+      console.log(`  Original size: ${vector.length * 4} bytes`);
+      console.log(`  Compressed: ${JSON.stringify(compressed).length} bytes`);
+      console.log(`  Access frequency: ${freq}`);
+      console.log(`  Level: ${gnn.getCompressionLevel(freq)}`);
+    } catch (error) {
+      console.error(chalk.red('Compression failed:', error.message));
+      process.exit(1);
+    }
+  });
+
 // Version
 program.version(require('../package.json').version, '-v, --version', 'Show version');
 
 // Help customization
 program.on('--help', () => {
   console.log('');
-  console.log(chalk.cyan('Examples:'));
-  console.log('  $ ruvector info');
-  console.log('  $ ruvector init my-index.bin --dimension 384 --type hnsw');
-  console.log('  $ ruvector insert my-index.bin vectors.json');
-  console.log('  $ ruvector search my-index.bin --query "[0.1, 0.2, ...]" -k 10');
-  console.log('  $ ruvector stats my-index.bin');
-  console.log('  $ ruvector benchmark --dimension 384 --num-vectors 10000');
+  console.log(chalk.bold.cyan('Diagnostics:'));
+  console.log('  $ ruvector doctor                                  Diagnose installation');
+  console.log('  $ ruvector info                                    Show backend info');
+  console.log('');
+  console.log(chalk.bold.cyan('Vector Commands:'));
+  console.log('  $ ruvector init my-index.bin -d 384                Initialize index');
+  console.log('  $ ruvector stats my-index.bin                      Show index statistics');
+  console.log('  $ ruvector insert my-index.bin vectors.json        Insert vectors');
+  console.log('  $ ruvector search my-index.bin -q "[0.1,...]" -k 10');
+  console.log('  $ ruvector benchmark -d 384 -n 10000               Run benchmarks');
+  console.log('');
+  console.log(chalk.bold.cyan('Graph Commands (requires @ruvector/graph-node):'));
+  console.log('  $ ruvector graph query "MATCH (n) RETURN n"        Execute Cypher');
+  console.log('  $ ruvector graph create-node -l Person -p \'{"name":"Alice"}\'');
+  console.log('');
+  console.log(chalk.bold.cyan('GNN Commands (requires @ruvector/gnn-node):'));
+  console.log('  $ ruvector gnn layer -i 128 -h 256 --heads 4       Create GNN layer');
+  console.log('  $ ruvector gnn compress -v "[0.1,...]" -f 0.5      Compress vector');
+  console.log('');
+  console.log(chalk.cyan('For more info: https://github.com/ruvnet/ruvector'));
   console.log('');
 });
 

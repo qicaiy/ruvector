@@ -6,11 +6,12 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+readme = "README.md"
 description = "Data replication and synchronization for ruvector"
 
 [dependencies]
-ruvector-core = { path = "../ruvector-core" }
-tokio = { workspace = true }
+ruvector-core = { version = "0.1.2", path = "../ruvector-core" }
+tokio = { workspace = true, features = ["time"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -18,7 +19,7 @@ tracing = { workspace = true }
 dashmap = { workspace = true }
 parking_lot = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
 rand = { workspace = true }
 bincode = { workspace = true }

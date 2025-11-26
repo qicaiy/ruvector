@@ -14,7 +14,15 @@
     "test:reliability": "ts-node benchmark-runner.ts group reliability_suite",
     "test:full": "ts-node benchmark-runner.ts group full_suite",
     "dashboard": "python -m http.server 8000 || python3 -m http.server 8000 || npx http-server",
-    "clean": "rm -rf results/*"
+    "clean": "rm -rf results/*",
+    "graph:generate": "ts-node graph/graph-data-generator.ts",
+    "graph:bench": "cd ../crates/ruvector-graph && cargo bench --bench graph_bench",
+    "graph:compare": "ts-node graph/comparison-runner.ts",
+    "graph:compare:social": "ts-node graph/comparison-runner.ts social_network",
+    "graph:compare:knowledge": "ts-node graph/comparison-runner.ts knowledge_graph",
+    "graph:compare:temporal": "ts-node graph/comparison-runner.ts temporal_events",
+    "graph:report": "ts-node graph/results-report.ts",
+    "graph:all": "npm run graph:generate && npm run graph:bench && npm run graph:compare && npm run graph:report"
   },
   "keywords": [
     "benchmark",
@@ -26,6 +34,9 @@
   ],
   "author": "RuVector Team",
   "license": "MIT",
+  "dependencies": {
+    "@ruvector/agentic-synth": "workspace:*"
+  },
   "devDependencies": {
     "@types/k6": "^0.52.0",
     "@types/node": "^20.10.0",

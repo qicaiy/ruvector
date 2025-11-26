@@ -6,15 +6,16 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+readme = "README.md"
 description = "WASM bindings for Ruvector for browser deployment"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-ruvector-core = { version = "0.1.1", path = "../ruvector-core", default-features = false, features = ["memory-only", "uuid-support"] }
-ruvector-collections = { path = "../ruvector-collections", optional = true }
-ruvector-filter = { path = "../ruvector-filter", optional = true }
+ruvector-core = { version = "0.1.2", path = "../ruvector-core", default-features = false, features = ["memory-only", "uuid-support"] }
+ruvector-collections = { version = "0.1.2", path = "../ruvector-collections", optional = true }
+ruvector-filter = { version = "0.1.2", path = "../ruvector-filter", optional = true }
 parking_lot = { workspace = true }
 getrandom = { workspace = true }
 

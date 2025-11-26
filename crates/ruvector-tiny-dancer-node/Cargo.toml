@@ -6,13 +6,14 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+readme = "README.md"
 description = "Node.js bindings for Tiny Dancer neural routing via NAPI-RS"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-ruvector-tiny-dancer-core = { version = "0.1.1", path = "../ruvector-tiny-dancer-core" }
+ruvector-tiny-dancer-core = { version = "0.1.2", path = "../ruvector-tiny-dancer-core" }
 
 # Node.js bindings
 napi = { workspace = true }
