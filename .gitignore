@@ -57,9 +57,14 @@ coordination/orchestration/*
 *.db
 *.db-journal
 *.db-wal
+*.db.agentic
 *.sqlite
 *.sqlite-journal
 *.sqlite-wal
+
+# Generated analysis outputs
+kuiper_analysis
+kuiper_analysis.db
 claude-flow
 # Removed Windows wrapper files per user request
 hive-mind-prompt-*.txt
