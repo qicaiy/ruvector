@@ -321,21 +321,43 @@ All crates are published to [crates.io](https://crates.io) under the `ruvector-*
 
 ### npm Packages
 
+#### ✅ Published
+
 | Package | Description | npm |
 |---------|-------------|-----|
-| [ruvector](https://www.npmjs.com/package/ruvector) | All-in-one Node.js package (vectors, graphs, GNN) | [![npm](https://img.shields.io/npm/v/ruvector.svg)](https://www.npmjs.com/package/ruvector) |
-| [@ruvector/wasm](https://www.npmjs.com/package/@ruvector/wasm) | WASM bindings for browsers | [![npm](https://img.shields.io/npm/v/@ruvector/wasm.svg)](https://www.npmjs.com/package/@ruvector/wasm) |
-| [@ruvector/graph](https://www.npmjs.com/package/@ruvector/graph) | Graph database with Cypher queries | [![npm](https://img.shields.io/npm/v/@ruvector/graph.svg)](https://www.npmjs.com/package/@ruvector/graph) |
-| [@ruvector/gnn](https://www.npmjs.com/package/@ruvector/gnn) | Graph Neural Network layers | [![npm](https://img.shields.io/npm/v/@ruvector/gnn.svg)](https://www.npmjs.com/package/@ruvector/gnn) |
-| [@ruvector/tiny-dancer](https://www.npmjs.com/package/@ruvector/tiny-dancer) | AI agent routing (FastGRNN) | [![npm](https://img.shields.io/npm/v/@ruvector/tiny-dancer.svg)](https://www.npmjs.com/package/@ruvector/tiny-dancer) |
-| [@ruvector/router](https://www.npmjs.com/package/@ruvector/router) | Semantic routing engine | [![npm](https://img.shields.io/npm/v/@ruvector/router.svg)](https://www.npmjs.com/package/@ruvector/router) |
+| [ruvector](https://www.npmjs.com/package/ruvector) | All-in-one CLI & package (vectors, graphs, GNN) | [![npm](https://img.shields.io/npm/v/ruvector.svg)](https://www.npmjs.com/package/ruvector) |
+| [@ruvector/core](https://www.npmjs.com/package/@ruvector/core) | Core vector database with native Rust bindings | [![npm](https://img.shields.io/npm/v/@ruvector/core.svg)](https://www.npmjs.com/package/@ruvector/core) |
+| [@ruvector/gnn](https://www.npmjs.com/package/@ruvector/gnn) | Graph Neural Network layers & tensor compression | [![npm](https://img.shields.io/npm/v/@ruvector/gnn.svg)](https://www.npmjs.com/package/@ruvector/gnn) |
+| [@ruvector/graph-node](https://www.npmjs.com/package/@ruvector/graph-node) | Hypergraph database with Cypher queries | [![npm](https://img.shields.io/npm/v/@ruvector/graph-node.svg)](https://www.npmjs.com/package/@ruvector/graph-node) |
+| [@ruvector/agentic-synth](https://www.npmjs.com/package/@ruvector/agentic-synth) | Synthetic data generator for AI/ML | [![npm](https://img.shields.io/npm/v/@ruvector/agentic-synth.svg)](https://www.npmjs.com/package/@ruvector/agentic-synth) |
+
+**Platform-specific native bindings** (auto-detected):
+- `@ruvector/node-linux-x64-gnu`, `@ruvector/node-linux-arm64-gnu`, `@ruvector/node-darwin-x64`, `@ruvector/node-darwin-arm64`, `@ruvector/node-win32-x64-msvc`
+- `@ruvector/gnn-linux-x64-gnu`, `@ruvector/gnn-linux-arm64-gnu`, `@ruvector/gnn-darwin-x64`, `@ruvector/gnn-darwin-arm64`, `@ruvector/gnn-win32-x64-msvc`
+
+#### 🚧 Coming Soon
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| @ruvector/tiny-dancer | Tracing & observability (FastGRNN inference) | Node bindings ready |
+| @ruvector/router | AI agent routing & semantic orchestration | WASM/FFI bindings ready |
+| @ruvector/wasm | WASM fallback for core vector DB | Crate ready |
+| @ruvector/gnn-wasm | WASM fallback for GNN | Crate ready |
+| @ruvector/graph-wasm | WASM fallback for graph DB | Crate ready |
+| @ruvector/cluster | Distributed clustering | Crate ready |
+| @ruvector/server | HTTP/gRPC server mode | Crate ready |
+
+See [GitHub Issue #20](https://github.com/ruvnet/ruvector/issues/20) for multi-platform npm package roadmap.
 
 ```bash
 # Install all-in-one package
 npm install ruvector
 
 # Or install individual packages
-npm install @ruvector/graph @ruvector/gnn
+npm install @ruvector/core @ruvector/gnn @ruvector/graph-node
+
+# List all available packages
+npx ruvector install
 ```
 
 ## Project Structure
