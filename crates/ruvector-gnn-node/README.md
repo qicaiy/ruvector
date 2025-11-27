@@ -2,6 +2,9 @@
 
 High-performance Graph Neural Network (GNN) capabilities for Ruvector, powered by Rust and NAPI-RS.
 
+[![npm version](https://img.shields.io/npm/v/@ruvector/gnn.svg)](https://www.npmjs.com/package/@ruvector/gnn)
+[![CI](https://github.com/ruvnet/ruvector/actions/workflows/build-gnn.yml/badge.svg)](https://github.com/ruvnet/ruvector/actions/workflows/build-gnn.yml)
+
 ## Features
 
 - **GNN Layers**: Multi-head attention, layer normalization, GRU cells
