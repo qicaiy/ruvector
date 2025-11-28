@@ -34,6 +34,18 @@ path = "src/bin/comparison_benchmark.rs"
 name = "profiling-benchmark"
 path = "src/bin/profiling_benchmark.rs"
 
+[[bin]]
+name = "gnn-ablation-benchmark"
+path = "src/bin/gnn_ablation_benchmark.rs"
+
+[[bin]]
+name = "beir-benchmark"
+path = "src/bin/beir_benchmark.rs"
+
+[[bin]]
+name = "ann-benchmarks-export"
+path = "src/bin/ann_benchmarks_export.rs"
+
 [dependencies]
 ruvector-core = { version = "0.1.2", path = "../ruvector-core" }
 
