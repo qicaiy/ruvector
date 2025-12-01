@@ -1,0 +1,42 @@
+{
+  "name": "@ruvector/dynamic-attention-example",
+  "version": "1.0.0",
+  "description": "FastGRNN + Attention integration example with SIMD optimization and benchmarks",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/index.ts",
+    "benchmark": "tsx benchmarks/run-benchmarks.ts",
+    "benchmark:attention": "tsx benchmarks/attention-benchmark.ts",
+    "benchmark:fastgrnn": "tsx benchmarks/fastgrnn-benchmark.ts",
+    "benchmark:simd": "tsx benchmarks/simd-benchmark.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo:routing": "tsx src/examples/routing-demo.ts",
+    "demo:attention": "tsx src/examples/attention-demo.ts",
+    "demo:combined": "tsx src/examples/combined-pipeline.ts"
+  },
+  "dependencies": {
+    "@ruvector/core": "workspace:*",
+    "@ruvector/attention": "workspace:*",
+    "@ruvector/tiny-dancer": "workspace:*",
+    "@ruvector/gnn": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "keywords": [
+    "fastgrnn",
+    "attention",
+    "simd",
+    "neural-routing",
+    "vector-search",
+    "gnn"
+  ],
+  "license": "MIT"
+}
