@@ -44,6 +44,20 @@ hybrid-search = []
 filtered-search = []
 neon-compat = []  # Neon-specific optimizations
 
+# Advanced AI features (opt-in)
+learning = []       # Self-learning / ReasoningBank
+attention = []      # 39 attention mechanisms
+gnn = []            # GNN layers (GCN, GraphSAGE, GAT, GIN)
+hyperbolic = []     # Hyperbolic embeddings (Poincaré, Lorentz)
+sparse = []         # Sparse vectors (BM25, SPLADE)
+graph = []          # Graph operations & Cypher
+routing = []        # Tiny Dancer AI routing
+
+# Feature bundles
+ai-complete = ["learning", "attention", "gnn", "routing"]
+graph-complete = ["hyperbolic", "sparse", "graph"]
+all-features = ["ai-complete", "graph-complete"]
+
 [dependencies]
 # PostgreSQL extension framework
 pgrx = "0.12"
@@ -89,6 +103,10 @@ thiserror = "1.0"
 
 # Logging
 tracing = "0.1"
+
+# Lazy static initialization
+lazy_static = "1.4"
+once_cell = "1.19"
 
 # Optional: Use ruvector-core for shared implementations
 # Uncomment to link with existing ruvector-core crate
