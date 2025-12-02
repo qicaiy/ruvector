@@ -32,13 +32,11 @@ ENV PGRX_HOME=/root/.pgrx
 # Set working directory
 WORKDIR /app
 
-# Copy the entire workspace (needed for workspace dependencies)
-COPY Cargo.toml Cargo.lock ./
-COPY crates/ crates/
+# Copy only what's needed for the build - no workspace dependencies
+COPY crates/ruvector-postgres/ ./
 
-# Build the extension with all features
-RUN cd crates/ruvector-postgres && \
-    cargo pgrx package \
+# Build the extension with all features (no workspace)
+RUN cargo pgrx package \
     --pg-config /usr/lib/postgresql/16/bin/pg_config \
     --features pg16
 
