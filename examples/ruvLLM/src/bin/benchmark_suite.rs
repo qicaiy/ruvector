@@ -606,7 +606,9 @@ mod tests {
     #[test]
     fn test_percentile() {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-        assert_eq!(percentile(&data, 50.0), 5.0);
+        // P50 with 10 items: index = (10-1) * 0.5 = 4.5 → rounds to 5 → data[5] = 6
+        assert_eq!(percentile(&data, 50.0), 6.0);
+        // P90 with 10 items: index = (10-1) * 0.9 = 8.1 → rounds to 8 → data[8] = 9
         assert_eq!(percentile(&data, 90.0), 9.0);
     }
 
