@@ -196,23 +196,8 @@ impl HnswIndex {
             return id;
         }
 
-        // For non-empty index, we need to search with the vector, then store it
-        // Clone once for search operations (required since we need both search and store)
-        let query_vec = vector.clone();
-
-        // Create and insert node with the original vector
-        let mut neighbors_vec = Vec::with_capacity(level + 1);
-        for _ in 0..=level {
-            neighbors_vec.push(RwLock::new(Vec::new()));
-        }
-
-        let node = HnswNode {
-            vector, // Move original into node
-            neighbors: neighbors_vec,
-            max_layer: level,
-        };
-        self.nodes.insert(id, node);
-
+        // For non-empty index: search FIRST with borrowed vector, then insert
+        // This avoids cloning the vector entirely - zero-copy insert path
         let entry_point_id = current_entry.unwrap();
         let current_max_layer = self.max_layer.load(AtomicOrdering::Relaxed);
 
@@ -221,13 +206,16 @@ impl HnswIndex {
 
         // Descend through layers above the new node's max layer
         for layer in (level + 1..=current_max_layer).rev() {
-            curr_id = self.search_layer_single(&query_vec, curr_id, layer);
+            curr_id = self.search_layer_single(&vector, curr_id, layer);
         }
 
-        // Insert at each layer from the node's max layer down to 0
+        // Collect all neighbor selections before inserting the node
+        // This allows us to search with borrowed vector, then move it
+        let mut layer_neighbors: Vec<Vec<NodeId>> =
+            Vec::with_capacity(level.min(current_max_layer) + 1);
+
         for layer in (0..=level.min(current_max_layer)).rev() {
-            let neighbors =
-                self.search_layer(&query_vec, curr_id, self.config.ef_construction, layer);
+            let neighbors = self.search_layer(&vector, curr_id, self.config.ef_construction, layer);
 
             // Select best neighbors
             let max_connections = if layer == 0 {
@@ -241,6 +229,34 @@ impl HnswIndex {
                 .map(|n| n.id)
                 .collect();
 
+            // Update curr_id for next layer
+            if !selected.is_empty() {
+                curr_id = selected[0];
+            }
+
+            layer_neighbors.push(selected);
+        }
+
+        // Reverse since we collected in reverse order
+        layer_neighbors.reverse();
+
+        // NOW create and insert the node (moving the vector - no clone needed)
+        let mut neighbors_vec = Vec::with_capacity(level + 1);
+        for _ in 0..=level {
+            neighbors_vec.push(RwLock::new(Vec::new()));
+        }
+
+        let node = HnswNode {
+            vector, // Move original into node - zero copy!
+            neighbors: neighbors_vec,
+            max_layer: level,
+        };
+        self.nodes.insert(id, node);
+
+        // Apply the pre-computed neighbor connections
+        for (layer_idx, selected) in layer_neighbors.iter().enumerate() {
+            let layer = layer_idx;
+
             // Set neighbors for new node
             if let Some(node) = self.nodes.get(&id) {
                 if layer < node.neighbors.len() {
@@ -249,13 +265,8 @@ impl HnswIndex {
             }
 
             // Add bidirectional connections
-            for &neighbor_id in &selected {
+            for &neighbor_id in selected {
                 self.connect(neighbor_id, id, layer);
-            }
-
-            // Update curr_id for next layer
-            if !selected.is_empty() {
-                curr_id = selected[0];
             }
         }
 

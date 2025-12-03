@@ -1,6 +1,6 @@
 [package]
 name = "ruvector-postgres"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 description = "High-performance PostgreSQL vector database extension - pgvector drop-in replacement with 53+ SQL functions, SIMD acceleration, hyperbolic embeddings, GNN layers, and self-learning capabilities"
@@ -44,8 +44,7 @@ quantization-all = ["quantization-scalar", "quantization-product", "quantization
 quant-all = ["quantization-all"]  # Alias for convenience
 
 # Optional features
-hybrid-search = []
-filtered-search = []
+# Note: hybrid-search and filtered-search are planned for future releases
 neon-compat = []  # Neon-specific optimizations
 
 # Advanced AI features (opt-in)
