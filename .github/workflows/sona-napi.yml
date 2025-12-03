@@ -89,10 +89,6 @@ jobs:
       - name: Install napi-rs CLI
         run: npm install -g @napi-rs/cli
 
-      - name: Install dev dependencies only
-        working-directory: npm/packages/sona
-        run: npm install --ignore-optional --no-save @napi-rs/cli
-
       - name: Build native module
         working-directory: npm/packages/sona
         env:
