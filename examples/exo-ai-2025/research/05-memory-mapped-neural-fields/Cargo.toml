@@ -1,3 +1,6 @@
+# Standalone workspace for isolated compilation
+[workspace]
+
 [package]
 name = "demand-paged-cognition"
 version = "0.1.0"

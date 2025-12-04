@@ -329,17 +329,21 @@ impl LazyNetwork {
 
     /// Forward pass through entire network
     pub fn forward(&mut self, mut input: Vec<f32>) -> std::io::Result<Vec<f32>> {
-        // Check memory pressure before each layer
+        // Check memory pressure before processing
         self.manage_memory();
 
-        for layer in &mut self.layers {
-            input = layer.forward(&input)?;
+        // Process each layer
+        let num_layers = self.layers.len();
+        for i in 0..num_layers {
+            input = self.layers[i].forward(&input)?;
 
             // Optionally apply activation function (e.g., ReLU)
             input.iter_mut().for_each(|x| *x = x.max(0.0));
 
-            // Check memory after each layer
-            self.manage_memory();
+            // Check memory after each layer (every 3 layers to reduce overhead)
+            if i % 3 == 0 {
+                self.manage_memory();
+            }
         }
 
         Ok(input)
@@ -350,13 +354,18 @@ impl LazyNetwork {
     pub fn forward_simd(&mut self, mut input: Vec<f32>) -> std::io::Result<Vec<f32>> {
         self.manage_memory();
 
-        for layer in &mut self.layers {
-            input = layer.forward_simd(&input)?;
+        // Process each layer
+        let num_layers = self.layers.len();
+        for i in 0..num_layers {
+            input = self.layers[i].forward_simd(&input)?;
 
             // ReLU activation
             input.iter_mut().for_each(|x| *x = x.max(0.0));
 
-            self.manage_memory();
+            // Check memory periodically
+            if i % 3 == 0 {
+                self.manage_memory();
+            }
         }
 
         Ok(input)
@@ -367,15 +376,23 @@ impl LazyNetwork {
         let total_memory: usize = self.layers.iter().map(|l| l.memory_usage()).sum();
 
         if total_memory > self.max_memory {
-            // Evict least recently used layers
-            let mut layers_by_lru: Vec<_> = self.layers.iter_mut().enumerate().collect();
-            layers_by_lru.sort_by_key(|(_, l)| std::cmp::Reverse(l.age()));
+            // Collect layer indices and ages
+            let mut layer_ages: Vec<_> = self.layers
+                .iter()
+                .enumerate()
+                .map(|(i, l)| (i, l.age()))
+                .collect();
 
-            for (_, layer) in layers_by_lru {
-                if self.total_memory() <= self.max_memory {
+            // Sort by age (descending - oldest first)
+            layer_ages.sort_by_key(|(_, age)| std::cmp::Reverse(*age));
+
+            // Evict oldest layers until under memory limit
+            for (idx, _) in layer_ages {
+                let current_total: usize = self.layers.iter().map(|l| l.memory_usage()).sum();
+                if current_total <= self.max_memory {
                     break;
                 }
-                layer.evict();
+                self.layers[idx].evict();
             }
         }
     }

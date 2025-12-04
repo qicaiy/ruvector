@@ -8,7 +8,7 @@
 //! 4. SIMD vectorization (4-16x multiplier)
 //! 5. Multi-core parallelism (12x on M3 Ultra)
 
-use crate::closed_form_phi::{ClosedFormPhi, ErgodicPhiResult};
+use crate::closed_form_phi::ClosedFormPhi;
 use crate::hierarchical_phi::{HierarchicalPhiBatcher, ConsciousnessParameterSpace};
 use crate::ergodic_consciousness::{ErgodicityAnalyzer, ErgodicityResult};
 

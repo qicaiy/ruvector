@@ -50,6 +50,7 @@
 pub mod quantum_cognitive_state;
 pub mod interference_decision;
 pub mod collapse_attention;
+pub mod simd_ops;
 
 // Re-export main types
 pub use quantum_cognitive_state::{

@@ -17,6 +17,7 @@
 /// - Scalar: ~50M operations
 /// - AVX-512: ~3.1M operations (16x faster)
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use std::arch::x86_64::*;
 
 /// Point in d-dimensional space

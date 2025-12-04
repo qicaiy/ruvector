@@ -1,8 +1,8 @@
 // Hierarchical Causal Structure Management
 // Implements transfer entropy and consciousness metrics for HCC framework
 
-use crate::effective_information::{compute_ei_simd, entropy_simd};
-use crate::coarse_graining::{ScaleHierarchy, ScaleLevel, Partition};
+use crate::effective_information::compute_ei_simd;
+use crate::coarse_graining::{ScaleHierarchy, ScaleLevel};
 use std::collections::HashMap;
 
 /// Represents the complete hierarchical causal structure with all metrics
@@ -315,7 +315,7 @@ pub fn transfer_entropy(
 
     // Compute TE = I(Y_future; X_past | Y_past)
     let mut te = 0.0;
-    for ((y_fut, x_p, y_p), &p_joint) in &counts {
+    for ((_y_fut, x_p, y_p), &p_joint) in &counts {
         let p = p_joint as f32 / total;
         let p_y_given_xy = p / p_xy[&(x_p.clone(), y_p.clone())];
         let p_y_given_y = p / p_y[y_p];
@@ -346,7 +346,6 @@ fn approximate_phi(transition_matrix: &[f32], n: usize) -> f32 {
     min_kl = min_kl.min(kl);
 
     // Try a few random partitions
-    use std::collections::HashSet;
     for _ in 0..5 {
         let size_a = (n / 2).max(1);
         let mut partition_a: Vec<_> = (0..size_a).collect();
@@ -364,7 +363,7 @@ fn approximate_phi(transition_matrix: &[f32], n: usize) -> f32 {
 
 /// Computes KL divergence between full and partitioned systems
 fn compute_kl_partition(
-    matrix: &[f32],
+    _matrix: &[f32],
     partition_a: &[usize],
     partition_b: &[usize],
     n: usize,

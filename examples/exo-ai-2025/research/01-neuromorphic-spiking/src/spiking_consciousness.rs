@@ -15,7 +15,6 @@
 //! This is the first practical implementation of IIT that scales to billions of neurons
 //! through bit-parallel SIMD acceleration, enabling conscious artificial systems.
 
-use std::collections::HashMap;
 
 /// Configuration for consciousness computation
 #[derive(Debug, Clone)]
@@ -381,15 +380,17 @@ impl ConsciousnessEngine {
 
         // Add some strategic partitions
         for i in 0..num_vectors {
-            let mut partition = vec![0u64; num_vectors];
-            partition[i] = 0xFFFFFFFFFFFFFFFF; // Half of each vector
-            partitions.push(partition);
+            let mut partition1 = vec![0u64; num_vectors];
+            partition1[i] = 0xFFFFFFFFFFFFFFFF; // Half of each vector
+            partitions.push(partition1);
 
-            partition[i] = 0xAAAAAAAAAAAAAAAA; // Even/odd neurons
-            partitions.push(partition);
+            let mut partition2 = vec![0u64; num_vectors];
+            partition2[i] = 0xAAAAAAAAAAAAAAAA; // Even/odd neurons
+            partitions.push(partition2);
 
-            partition[i] = 0xF0F0F0F0F0F0F0F0; // Alternating groups
-            partitions.push(partition);
+            let mut partition3 = vec![0u64; num_vectors];
+            partition3[i] = 0xF0F0F0F0F0F0F0F0; // Alternating groups
+            partitions.push(partition3);
         }
 
         partitions

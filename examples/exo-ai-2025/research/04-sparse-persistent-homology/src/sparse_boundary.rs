@@ -424,6 +424,6 @@ mod tests {
 
         let stats = matrix.stats();
         assert_eq!(stats.ncols, 4);
-        assert_eq!(stats.total_nnz, 3); // 0 + 1 + 1 + 2
+        assert_eq!(stats.total_nnz, 4); // 0 + 1 + 1 + 2 = 4
     }
 }

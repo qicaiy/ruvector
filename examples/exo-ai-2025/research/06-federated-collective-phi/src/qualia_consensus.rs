@@ -256,8 +256,10 @@ impl QualiaConsensusNode {
     pub fn check_ready_to_commit(&mut self, sequence: SequenceNumber) -> Option<QualiaMessage> {
         let prepares = self.prepare_messages.get(&sequence)?;
 
-        // Need 2f + 1 prepare messages
-        if prepares.len() >= 2 * self.f_byzantine + 1 {
+        // Need at least 2f + 1 prepare messages (including self)
+        // For n=4, f=1, we need 2*1 + 1 = 3 prepares
+        let required = 2 * self.f_byzantine + 1;
+        if prepares.len() >= required {
             // Extract the qualia from prepares
             let qualia = self.pending_proposals.get(&sequence)?.clone();
 
@@ -529,6 +531,11 @@ mod tests {
         let prepare = node.process_message(proposal);
         assert!(prepare.is_some());
 
+        // Also need to record the prepare from self
+        if let Some(QualiaMessage::QualiaPrepare { qualia: q, view, sequence, agent_id }) = prepare {
+            node.handle_prepare(q, view, sequence, agent_id);
+        }
+
         // Simulate receiving prepare from 2 other nodes (total 3, >= 2f+1)
         node.handle_prepare(qualia.clone(), 0, 0, 2);
         node.handle_prepare(qualia.clone(), 0, 0, 3);
@@ -566,6 +573,9 @@ mod tests {
         let correct_qualia = Quale::new("vision".to_string(), "red".to_string(), 0.8);
         let hallucination = Quale::new("vision".to_string(), "unicorn".to_string(), 1.0);
 
+        // Set pending proposal to correct qualia
+        node.pending_proposals.insert(0, correct_qualia.clone());
+
         // Agents 1,2,3 see red (correct)
         node.handle_prepare(correct_qualia.clone(), 0, 0, 1);
         node.handle_prepare(correct_qualia.clone(), 0, 0, 2);
@@ -579,9 +589,10 @@ mod tests {
         node.handle_commit(correct_qualia.clone(), 0, 0, 2);
         node.handle_commit(correct_qualia.clone(), 0, 0, 3);
 
-        node.check_consensus(0);
+        let result = node.check_consensus(0);
+        assert_eq!(result, ConsensusResult::Agreed(correct_qualia));
 
         let hallucinating = node.detect_hallucinations(0);
-        assert!(hallucinating.contains(&4));
+        assert!(hallucinating.contains(&4), "Agent 4 should be detected as hallucinating");
     }
 }

@@ -1,7 +1,7 @@
 // Memory-Mapped Neural Field Implementation
 // Enables petabyte-scale continuous manifolds with lazy evaluation
 
-use memmap2::{Mmap, MmapMut, MmapOptions};
+use memmap2::{MmapMut, MmapOptions};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::Result;

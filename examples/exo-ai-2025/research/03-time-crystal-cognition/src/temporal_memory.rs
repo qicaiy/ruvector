@@ -507,7 +507,7 @@ impl WorkingMemoryTask {
 
         // Retrieval phase: test recall
         let mut correct = 0;
-        for (i, query) in self.queries.iter().enumerate() {
+        for query in self.queries.iter() {
             if let Some(retrieved) = self.memory.retrieve(query) {
                 let similarity = cosine_similarity(query, &retrieved.content);
                 if similarity > 0.8 {
@@ -552,9 +552,11 @@ mod tests {
 
     #[test]
     fn test_encode_retrieve() {
-        let mut memory = TemporalMemory::new(TemporalMemoryConfig::default());
+        let mut config = TemporalMemoryConfig::default();
+        let mut memory = TemporalMemory::new(config);
 
-        let item = Array1::from_vec(vec![1.0, 0.5, -0.3, 0.8]);
+        // Create item with correct dimension (64)
+        let item = Array1::from_vec(vec![1.0; 64]);
         memory.encode(item.clone()).unwrap();
 
         // Maintain for a while

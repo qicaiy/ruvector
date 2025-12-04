@@ -15,8 +15,6 @@
 ///
 /// Active inference extends this: agents act to minimize *expected* free energy.
 
-use std::collections::HashMap;
-
 /// Generative model: p(x, s) = p(s|x) p(x)
 #[derive(Debug, Clone)]
 pub struct GenerativeModel {
@@ -377,7 +375,7 @@ impl ActiveInferenceLoop {
     /// One step of perception-action cycle
     pub fn step(&mut self, observation: &[f64]) -> Vec<f64> {
         // Perception: minimize free energy w.r.t. beliefs
-        let fe_reduction = self.agent.perceive(observation);
+        let _fe_reduction = self.agent.perceive(observation);
 
         // Action: minimize expected free energy
         let action = self.agent.act(observation);

@@ -155,7 +155,6 @@ impl BitParallelSpikeNetwork {
 
         // Process 4 vectors (256 neurons) at a time with AVX2
         let simd_chunks = num_vectors / 4;
-        let remainder = num_vectors % 4;
 
         // For each active neuron
         for neuron_id in 0..self.num_neurons {

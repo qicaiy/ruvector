@@ -147,6 +147,11 @@ impl DPNC {
         self.memory.migrate_background();
         let _ = self.storage.flush();
     }
+
+    /// Get configuration
+    pub fn config(&self) -> &DPNCConfig {
+        &self.config
+    }
 }
 
 /// System-wide statistics

@@ -21,7 +21,7 @@
 /// - Cohen-Steiner, Edelsbrunner, Harer (2006): "Stability of Persistence Diagrams"
 /// - Kerber, Sharathkumar (2013): "Approximate Čech Complex in Low and High Dimensions"
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 /// Persistence feature (birth-death pair)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -378,7 +378,8 @@ mod tests {
         });
 
         assert_eq!(diagram.get_dimension(1).len(), 2);
-        assert_eq!(diagram.total_persistence(1), 0.5 + 0.7);
+        let total_pers = diagram.total_persistence(1);
+        assert!((total_pers - 1.2).abs() < 1e-10); // Floating point comparison
     }
 
     #[test]

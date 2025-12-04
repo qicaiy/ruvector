@@ -11,7 +11,7 @@
 /// This is a physics-based alternative to backpropagation that can be
 /// implemented in analog hardware with natural thermodynamic dynamics.
 
-use std::f64::consts::E;
+// Physical constants available from std::f64
 
 /// Energy-based neural network for equilibrium propagation
 #[derive(Debug, Clone)]
@@ -165,7 +165,7 @@ impl EnergyBasedNetwork {
 
         for iter in 0..max_iters {
             let gradient = self.energy_gradient();
-            let mut max_change = 0.0;
+            let mut max_change: f64 = 0.0;
 
             // Update states: ds/dt = -∂E/∂s / τ
             for layer in 1..self.n_layers { // Don't update input layer
@@ -196,7 +196,7 @@ impl EnergyBasedNetwork {
 
         for iter in 0..max_iters {
             let gradient = self.energy_gradient();
-            let mut max_change = 0.0;
+            let mut max_change: f64 = 0.0;
 
             // Update hidden layers
             for layer in 1..self.n_layers - 1 {
@@ -327,7 +327,7 @@ impl ThermodynamicNeuralNet {
 
         for iter in 0..max_iters {
             let gradient = self.network.energy_gradient();
-            let mut max_change = 0.0;
+            let mut max_change: f64 = 0.0;
 
             for layer in 1..self.network.n_layers {
                 for i in 0..self.network.layer_sizes[layer] {

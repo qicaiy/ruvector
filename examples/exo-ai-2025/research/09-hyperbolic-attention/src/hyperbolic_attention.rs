@@ -254,7 +254,6 @@ impl MultiHeadHyperbolicAttention {
         keys: &[Vec<f32>],
         values: &[Vec<f32>],
     ) -> Vec<Vec<f32>> {
-        let seq_len = queries.len();
         let head_dim = self.config.dim / self.config.num_heads;
 
         // Split into heads

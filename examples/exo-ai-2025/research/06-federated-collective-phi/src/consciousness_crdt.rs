@@ -260,7 +260,20 @@ impl VectorClock {
     /// Check if this clock happened before other
     pub fn happens_before(&self, other: &VectorClock) -> bool {
         let mut strictly_less = false;
+        let mut all_less_or_equal = true;
 
+        // Check all agents in self
+        for (&agent_id, &self_time) in &self.clocks {
+            let other_time = other.clocks.get(&agent_id).copied().unwrap_or(0);
+            if self_time > other_time {
+                all_less_or_equal = false;
+            }
+            if self_time < other_time {
+                strictly_less = true;
+            }
+        }
+
+        // Check all agents in other
         for (&agent_id, &other_time) in &other.clocks {
             let self_time = self.clocks.get(&agent_id).copied().unwrap_or(0);
             if self_time > other_time {
@@ -271,7 +284,7 @@ impl VectorClock {
             }
         }
 
-        strictly_less
+        all_less_or_equal && strictly_less
     }
 
     /// Check if concurrent (neither happens before the other)

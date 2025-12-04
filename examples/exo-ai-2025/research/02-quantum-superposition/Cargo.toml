@@ -1,3 +1,6 @@
+[workspace]
+# This allows the crate to be compiled standalone
+
 [package]
 name = "quantum-cognitive-superposition"
 version = "0.1.0"

@@ -13,7 +13,7 @@
 //!
 //! With closed-form Φ, each batch operation is O(N³) instead of O(Bell(N))
 
-use crate::closed_form_phi::{ClosedFormPhi, ErgodicPhiResult};
+use crate::closed_form_phi::ClosedFormPhi;
 
 /// Hierarchical Φ batch processor
 #[repr(align(64))]

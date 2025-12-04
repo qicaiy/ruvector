@@ -44,6 +44,7 @@ pub mod closed_form_phi;
 pub mod ergodic_consciousness;
 pub mod hierarchical_phi;
 pub mod meta_sim_awareness;
+pub mod simd_ops;
 
 // Re-export main types
 pub use closed_form_phi::{ClosedFormPhi, ErgodicPhiResult, shannon_entropy};
@@ -58,6 +59,10 @@ pub use hierarchical_phi::{
 pub use meta_sim_awareness::{
     MetaConsciousnessSimulator, MetaSimConfig,
     MetaSimulationResults, ConsciousnessHotspot,
+};
+pub use simd_ops::{
+    simd_matvec_multiply, simd_batch_entropy, simd_entropy,
+    SimdCounterfactualBrancher, SimulationTreeExplorer,
 };
 
 /// Library version

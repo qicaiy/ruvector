@@ -5,7 +5,7 @@
 // continuous weak measurement, Zeno effect, and entropy dynamics.
 
 use num_complex::Complex64;
-use crate::quantum_cognitive_state::{CognitiveState, Amplitude};
+use crate::quantum_cognitive_state::{CognitiveState, Amplitude, SuperpositionBuilder};
 use std::collections::VecDeque;
 
 /// Attention mechanism implementing measurement-induced collapse

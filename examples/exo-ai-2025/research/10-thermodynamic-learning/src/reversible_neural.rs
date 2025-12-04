@@ -10,7 +10,7 @@
 /// - Orthogonal weight constraints
 /// - Energy tracking for reversible operations
 
-use std::f64::consts::{E, LN_2, PI};
+use std::f64::consts::{LN_2, PI};
 
 /// Reversible layer trait - must be bijective
 pub trait ReversibleLayer {
@@ -114,13 +114,17 @@ pub struct CouplingLayer {
     /// Split point
     pub split: usize,
 
-    /// Scale network parameters
-    pub scale_weights: Vec<Vec<f64>>,
-    pub scale_bias: Vec<f64>,
+    /// Scale network: two layers [layer1, layer2]
+    pub scale_weights_1: Vec<Vec<f64>>,
+    pub scale_bias_1: Vec<f64>,
+    pub scale_weights_2: Vec<Vec<f64>>,
+    pub scale_bias_2: Vec<f64>,
 
-    /// Translation network parameters
-    pub translate_weights: Vec<Vec<f64>>,
-    pub translate_bias: Vec<f64>,
+    /// Translation network: two layers [layer1, layer2]
+    pub translate_weights_1: Vec<Vec<f64>>,
+    pub translate_bias_1: Vec<f64>,
+    pub translate_weights_2: Vec<Vec<f64>>,
+    pub translate_bias_2: Vec<f64>,
 
     /// Activation function
     pub activation: InvertibleActivation,
@@ -134,67 +138,75 @@ impl CouplingLayer {
         let dim2 = dim - split;
 
         // Initialize scale network: dim1 -> hidden -> dim2
-        let scale_weights = vec![
-            vec![vec![(rand::random::<f64>() - 0.5) * 0.1; dim1]; hidden_dim],
-            vec![vec![(rand::random::<f64>() - 0.5) * 0.1; hidden_dim]; dim2],
-        ];
-        let scale_bias = vec![vec![0.0; hidden_dim], vec![0.0; dim2]];
+        // Layer 1: dim1 -> hidden_dim
+        let scale_weights_1 = vec![vec![(rand::random::<f64>() - 0.5) * 0.1; dim1]; hidden_dim];
+        let scale_bias_1 = vec![0.0; hidden_dim];
+
+        // Layer 2: hidden_dim -> dim2
+        let scale_weights_2 = vec![vec![(rand::random::<f64>() - 0.5) * 0.1; hidden_dim]; dim2];
+        let scale_bias_2 = vec![0.0; dim2];
 
         // Initialize translation network
-        let translate_weights = vec![
-            vec![vec![(rand::random::<f64>() - 0.5) * 0.1; dim1]; hidden_dim],
-            vec![vec![(rand::random::<f64>() - 0.5) * 0.1; hidden_dim]; dim2],
-        ];
-        let translate_bias = vec![vec![0.0; hidden_dim], vec![0.0; dim2]];
+        // Layer 1: dim1 -> hidden_dim
+        let translate_weights_1 = vec![vec![(rand::random::<f64>() - 0.5) * 0.1; dim1]; hidden_dim];
+        let translate_bias_1 = vec![0.0; hidden_dim];
+
+        // Layer 2: hidden_dim -> dim2
+        let translate_weights_2 = vec![vec![(rand::random::<f64>() - 0.5) * 0.1; hidden_dim]; dim2];
+        let translate_bias_2 = vec![0.0; dim2];
 
         Self {
             split,
-            scale_weights,
-            scale_bias,
-            translate_weights,
-            translate_bias,
+            scale_weights_1,
+            scale_bias_1,
+            scale_weights_2,
+            scale_bias_2,
+            translate_weights_1,
+            translate_bias_1,
+            translate_weights_2,
+            translate_bias_2,
             activation: InvertibleActivation::LeakyReLU { alpha: 0.1 },
         }
     }
 
     fn scale_network(&self, x1: &[f64]) -> Vec<f64> {
         // Two-layer network
-        let mut hidden = vec![0.0; self.scale_bias[0].len()];
+        let mut hidden = vec![0.0; self.scale_bias_1.len()];
         for i in 0..hidden.len() {
             for j in 0..x1.len() {
-                hidden[i] += self.scale_weights[0][i][j] * x1[j];
+                hidden[i] += self.scale_weights_1[i][j] * x1[j];
             }
-            hidden[i] += self.scale_bias[0][i];
+            hidden[i] += self.scale_bias_1[i];
             hidden[i] = self.activation.activate(hidden[i]);
         }
 
-        let mut output = vec![0.0; self.scale_bias[1].len()];
+        let mut output = vec![0.0; self.scale_bias_2.len()];
         for i in 0..output.len() {
             for j in 0..hidden.len() {
-                output[i] += self.scale_weights[1][i][j] * hidden[j];
+                output[i] += self.scale_weights_2[i][j] * hidden[j];
             }
-            output[i] += self.scale_bias[1][i];
+            output[i] += self.scale_bias_2[i];
         }
 
         output
     }
 
     fn translate_network(&self, x1: &[f64]) -> Vec<f64> {
-        let mut hidden = vec![0.0; self.translate_bias[0].len()];
+        let mut hidden = vec![0.0; self.translate_bias_1.len()];
         for i in 0..hidden.len() {
             for j in 0..x1.len() {
-                hidden[i] += self.translate_weights[0][i][j] * x1[j];
+                hidden[i] += self.translate_weights_1[i][j] * x1[j];
             }
-            hidden[i] += self.translate_bias[0][i];
+            hidden[i] += self.translate_bias_1[i];
             hidden[i] = self.activation.activate(hidden[i]);
         }
 
-        let mut output = vec![0.0; self.translate_bias[1].len()];
+        let mut output = vec![0.0; self.translate_bias_2.len()];
         for i in 0..output.len() {
             for j in 0..hidden.len() {
-                output[i] += self.translate_weights[1][i][j] * hidden[j];
+                output[i] += self.translate_weights_2[i][j] * hidden[j];
             }
-            output[i] += self.translate_bias[1][i];
+            output[i] += self.translate_bias_2[i];
         }
 
         output
@@ -347,7 +359,6 @@ impl ReversibleLayer for OrthogonalLayer {
 }
 
 /// Reversible neural network (stack of reversible layers)
-#[derive(Debug)]
 pub struct ReversibleNetwork {
     pub layers: Vec<Box<dyn ReversibleLayer>>,
     pub dim: usize,

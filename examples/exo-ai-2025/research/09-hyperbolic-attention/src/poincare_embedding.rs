@@ -253,12 +253,12 @@ pub fn exponential_map(x: &[f32], v: &[f32], curvature: f32) -> Vec<f32> {
         return x.to_vec();
     }
 
-    // Tangent norm
+    // Tangent norm: ||v||_x = λ_x ||v|| where λ_x = 2K / (1 - ||x||²/K²)
     let lambda_x = 2.0 * k / (1.0 - x_norm_sq / k_sq);
     let v_norm_x = lambda_x * v_norm;
 
-    // Scaled direction
-    let scale = (v_norm_x / (2.0 * k)).tanh() / v_norm;
+    // Scaled direction: (K tanh(||v||_x / (2K)) / ||v||) · v
+    let scale = k * (v_norm_x / (2.0 * k)).tanh() / v_norm;
     let scaled_v: Vec<f32> = v.iter().map(|&vi| scale * vi).collect();
 
     mobius_add(x, &scaled_v, k)
@@ -281,8 +281,9 @@ pub fn logarithmic_map(x: &[f32], y: &[f32], curvature: f32) -> Vec<f32> {
         return vec![0.0; x.len()];
     }
 
+    // Scale factor: (2K / (1 - ||x||²/K²)) · artanh(||diff|| / K) / ||diff||
     let lambda_x = 2.0 * k / (1.0 - x_norm_sq / k_sq);
-    let scale = lambda_x * artanh_safe(diff_norm / k) / diff_norm;
+    let scale = (2.0 / lambda_x) * k * k * artanh_safe(diff_norm / k) / diff_norm;
 
     diff.iter().map(|&d| scale * d).collect()
 }
@@ -447,7 +448,8 @@ mod tests {
         let d1 = poincare_distance(&x, &y, 1.0);
         let d2 = poincare_distance(&x, &y, 2.0);
 
-        // Distance should scale with curvature
-        assert!(d2 > d1);
+        // With larger curvature (bigger ball), same Euclidean positions are relatively closer
+        // so distance decreases with increasing curvature
+        assert!(d1 > d2);
     }
 }

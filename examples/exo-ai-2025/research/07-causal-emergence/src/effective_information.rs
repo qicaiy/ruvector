@@ -2,6 +2,7 @@
 // Implements Hoel's causal emergence framework for O(log n) hierarchical analysis
 
 use std::simd::prelude::*;
+use std::simd::StdFloat;
 
 /// Computes effective information using SIMD acceleration
 ///
@@ -279,16 +280,20 @@ mod tests {
     #[test]
     fn test_multi_scale_computation() {
         // Test computing EI for multiple scales
-        let matrix1 = vec![0.5; 16]; // 4×4
-        let matrix2 = vec![0.25; 16]; // 2×2 but wrong size
+        let matrix1 = vec![0.25; 16]; // 4×4 matrix
+        let matrix2 = vec![0.5; 4]; // 2×2 matrix (correctly sized)
 
         let matrices = vec![matrix1, matrix2];
-        let counts = vec![4, 2]; // This won't work as matrix2 is wrong size
+        let counts = vec![4, 2]; // Correct sizes
 
-        // This test just checks the function doesn't crash
-        // In real usage, matrices should be correctly sized
+        // Compute EI for both scales
         let results = compute_ei_multi_scale(&matrices, &counts);
         assert_eq!(results.len(), 2);
+
+        // Results should be non-negative
+        for ei in &results {
+            assert!(*ei >= 0.0);
+        }
     }
 }
 

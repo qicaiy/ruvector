@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 /// Storage tier levels with latency characteristics
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Tier {
     L1Dram,      // ~80 ns, 64 GB
     L2Cxl,       // ~350 ns, 512 GB

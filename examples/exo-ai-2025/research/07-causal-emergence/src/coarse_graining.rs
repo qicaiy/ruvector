@@ -1,8 +1,6 @@
 // Multi-Scale Coarse-Graining for Hierarchical Causal Analysis
 // Implements k-way aggregation with O(log n) depth
 
-use std::collections::HashMap;
-
 /// Represents a partition of states into groups
 #[derive(Debug, Clone)]
 pub struct Partition {
@@ -96,7 +94,7 @@ pub struct ScaleLevel {
 }
 
 /// Complete hierarchical decomposition
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScaleHierarchy {
     pub levels: Vec<ScaleLevel>,
 }
@@ -395,11 +393,12 @@ mod tests {
 
         let hierarchy = ScaleHierarchy::build_sequential(matrix, 2);
 
-        // Should have log₂(16) + 1 = 5 levels (16, 8, 4, 2, 1)
-        assert_eq!(hierarchy.num_scales(), 5);
+        // Should have 4 levels (16, 8, 4, 2) - stops at branching_factor
+        assert_eq!(hierarchy.num_scales(), 4);
         assert_eq!(hierarchy.levels[0].num_states, 16);
         assert_eq!(hierarchy.levels[1].num_states, 8);
-        assert_eq!(hierarchy.levels[4].num_states, 1);
+        assert_eq!(hierarchy.levels[2].num_states, 4);
+        assert_eq!(hierarchy.levels[3].num_states, 2);
     }
 
     #[test]

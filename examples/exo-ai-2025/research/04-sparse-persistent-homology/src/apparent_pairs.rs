@@ -19,7 +19,7 @@
 use std::collections::HashMap;
 
 /// Simplex in a filtration
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Simplex {
     /// Vertex indices (sorted)
     pub vertices: Vec<usize>,

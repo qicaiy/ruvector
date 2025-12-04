@@ -177,7 +177,7 @@ impl DiscreteTimeCrystal {
         let n = self.config.n_oscillators;
 
         trajectory.iter().enumerate().map(|(step, positions)| {
-            let t = step as f64 * self.config.dt;
+            let _t = step as f64 * self.config.dt;
 
             // Compute phases relative to drive
             let mut sum_real = 0.0;
@@ -245,15 +245,15 @@ impl DiscreteTimeCrystal {
         // Find power at these frequencies (within tolerance)
         let tol = 0.5; // Hz tolerance
 
-        let p_drive = freqs.iter().zip(&power)
-            .filter(|(f, _)| (f - drive_freq).abs() < tol)
+        let p_drive: f64 = freqs.iter().zip(&power)
+            .filter(|(f, _)| (*f - drive_freq).abs() < tol)
             .map(|(_, p)| p)
-            .fold(0.0, |acc, &p| acc.max(p));
+            .fold(0.0_f64, |acc, &p| acc.max(p));
 
-        let p_half = freqs.iter().zip(&power)
-            .filter(|(f, _)| (f - half_freq).abs() < tol)
+        let p_half: f64 = freqs.iter().zip(&power)
+            .filter(|(f, _)| (*f - half_freq).abs() < tol)
             .map(|(_, p)| p)
-            .fold(0.0, |acc, &p| acc.max(p));
+            .fold(0.0_f64, |acc, &p| acc.max(p));
 
         // Period-doubling if power at f/2 exceeds power at f
         let ratio = p_half / p_drive.max(1e-10);
@@ -270,7 +270,6 @@ impl DiscreteTimeCrystal {
 
 /// Analysis utilities for DTC
 pub mod analysis {
-    use super::*;
 
     /// Compute temporal autocorrelation
     pub fn autocorrelation(signal: &[f64], max_lag: usize) -> Vec<f64> {
