@@ -138,7 +138,7 @@ impl DistributedPhiCalculator {
             return 0.0;
         }
 
-        let mut max_coupling = 0.0;
+        let mut max_coupling: f64 = 0.0;
 
         // Try different balanced partitions to find maximum cross-coupling
         let mid = n / 2;
