@@ -43,6 +43,8 @@ pub use ios_learning::{
     HealthMetric, HealthState, HealthLearner,
     LocationCategory, LocationState, LocationLearner,
     CommEventType, CommPattern, CommLearner,
+    CalendarEventType, CalendarEvent, CalendarLearner, TimeSlotPattern,
+    AppCategory, AppUsageSession, AppUsageLearner, AppUsagePattern,
     iOSContext, iOSLearner, ContextRecommendations, ActivitySuggestion,
 };
 pub use embeddings::{ContentEmbedder, ContentMetadata, VibeState};

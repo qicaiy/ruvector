@@ -544,6 +544,448 @@ impl Default for CommLearner {
 }
 
 // ============================================
+// Calendar & Schedule Learning
+// ============================================
+
+/// Calendar event type
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u8)]
+pub enum CalendarEventType {
+    /// Meeting with others
+    Meeting = 0,
+    /// Focus/work time
+    FocusTime = 1,
+    /// Personal appointment
+    Personal = 2,
+    /// Travel/commute
+    Travel = 3,
+    /// Break/lunch
+    Break = 4,
+    /// Workout/exercise
+    Exercise = 5,
+    /// Social event
+    Social = 6,
+    /// Deadline/reminder
+    Deadline = 7,
+}
+
+/// Calendar event (privacy-preserving - no titles/descriptions)
+#[derive(Clone, Debug)]
+pub struct CalendarEvent {
+    /// Event type
+    pub event_type: CalendarEventType,
+    /// Start hour (0-23)
+    pub start_hour: u8,
+    /// Duration in minutes
+    pub duration_minutes: u16,
+    /// Day of week (0=Sun, 6=Sat)
+    pub day_of_week: u8,
+    /// Is recurring
+    pub is_recurring: bool,
+    /// Has attendees (meeting indicator)
+    pub has_attendees: bool,
+}
+
+/// Calendar pattern for time slot
+#[derive(Clone, Debug, Default)]
+pub struct TimeSlotPattern {
+    /// Probability of being busy (0-1)
+    pub busy_probability: f32,
+    /// Most common event type
+    pub typical_event: Option<CalendarEventType>,
+    /// Average meeting duration
+    pub avg_duration: f32,
+    /// Focus time score (0-1, higher = good for deep work)
+    pub focus_score: f32,
+}
+
+/// Calendar pattern learner
+pub struct CalendarLearner {
+    /// Patterns by hour and day: [day][hour]
+    slot_patterns: Vec<Vec<TimeSlotPattern>>,
+    /// Meeting frequency by hour
+    meeting_frequency: Vec<u32>,
+    /// Focus block patterns (consecutive free hours)
+    focus_blocks: Vec<(u8, u8, f32)>, // (start_hour, duration, score)
+    /// Total events learned
+    total_events: u64,
+}
+
+impl CalendarLearner {
+    pub fn new() -> Self {
+        Self {
+            slot_patterns: vec![vec![TimeSlotPattern::default(); 24]; 7],
+            meeting_frequency: vec![0; 24],
+            focus_blocks: Vec::new(),
+            total_events: 0,
+        }
+    }
+
+    /// Learn from a calendar event
+    pub fn learn_event(&mut self, event: &CalendarEvent) {
+        let day = event.day_of_week as usize % 7;
+        let hour = event.start_hour as usize % 24;
+
+        // Update slot pattern
+        let pattern = &mut self.slot_patterns[day][hour];
+        pattern.busy_probability = (pattern.busy_probability * self.total_events as f32 + 1.0)
+            / (self.total_events as f32 + 1.0);
+        pattern.typical_event = Some(event.event_type);
+        pattern.avg_duration = (pattern.avg_duration * self.total_events as f32
+            + event.duration_minutes as f32)
+            / (self.total_events as f32 + 1.0);
+
+        // Update focus score (inverse of meeting probability)
+        if event.has_attendees {
+            pattern.focus_score = pattern.focus_score * 0.9;
+            self.meeting_frequency[hour] += 1;
+        } else if event.event_type == CalendarEventType::FocusTime {
+            pattern.focus_score = (pattern.focus_score + 0.2).min(1.0);
+        }
+
+        self.total_events += 1;
+    }
+
+    /// Predict if a time slot is likely busy
+    pub fn is_likely_busy(&self, hour: u8, day_of_week: u8) -> f32 {
+        let day = day_of_week as usize % 7;
+        let hour = hour as usize % 24;
+        self.slot_patterns[day][hour].busy_probability
+    }
+
+    /// Get best focus time windows for a day
+    pub fn best_focus_times(&self, day_of_week: u8) -> Vec<(u8, u8, f32)> {
+        let day = day_of_week as usize % 7;
+        let mut windows = Vec::new();
+
+        let mut start: Option<u8> = None;
+        let mut score_sum = 0.0;
+
+        for hour in 0..24u8 {
+            let pattern = &self.slot_patterns[day][hour as usize];
+            if pattern.focus_score > 0.5 && pattern.busy_probability < 0.3 {
+                if start.is_none() {
+                    start = Some(hour);
+                    score_sum = pattern.focus_score;
+                } else {
+                    score_sum += pattern.focus_score;
+                }
+            } else if let Some(s) = start {
+                let duration = hour - s;
+                if duration >= 1 {
+                    windows.push((s, duration, score_sum / duration as f32));
+                }
+                start = None;
+                score_sum = 0.0;
+            }
+        }
+
+        // Handle end of day
+        if let Some(s) = start {
+            let duration = 24 - s;
+            if duration >= 1 {
+                windows.push((s, duration, score_sum / duration as f32));
+            }
+        }
+
+        windows.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+        windows
+    }
+
+    /// Suggest optimal meeting times
+    pub fn suggest_meeting_times(&self, duration_minutes: u16, day_of_week: u8) -> Vec<u8> {
+        let day = day_of_week as usize % 7;
+        let duration_hours = (duration_minutes as f32 / 60.0).ceil() as usize;
+
+        let mut candidates: Vec<(u8, f32)> = Vec::new();
+
+        for hour in 9..17usize {
+            // Business hours
+            if hour + duration_hours > 18 {
+                continue;
+            }
+
+            let mut score = 0.0;
+            let mut valid = true;
+
+            for h in hour..hour + duration_hours {
+                let pattern = &self.slot_patterns[day][h];
+                if pattern.busy_probability > 0.7 {
+                    valid = false;
+                    break;
+                }
+                // Prefer times with low focus score (not disrupting deep work)
+                score += 1.0 - pattern.focus_score;
+            }
+
+            if valid {
+                candidates.push((hour as u8, score / duration_hours as f32));
+            }
+        }
+
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        candidates.into_iter().take(5).map(|(h, _)| h).collect()
+    }
+}
+
+impl Default for CalendarLearner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================
+// App Usage Learning
+// ============================================
+
+/// App category (privacy-preserving - no app names)
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u8)]
+pub enum AppCategory {
+    /// Social media
+    Social = 0,
+    /// Productivity/work
+    Productivity = 1,
+    /// Entertainment (video, music)
+    Entertainment = 2,
+    /// News/reading
+    News = 3,
+    /// Communication (messaging, email)
+    Communication = 4,
+    /// Health/fitness
+    Health = 5,
+    /// Navigation/maps
+    Navigation = 6,
+    /// Shopping
+    Shopping = 7,
+    /// Gaming
+    Gaming = 8,
+    /// Education
+    Education = 9,
+    /// Finance
+    Finance = 10,
+    /// Utilities
+    Utilities = 11,
+}
+
+/// App usage session (privacy-preserving)
+#[derive(Clone, Debug)]
+pub struct AppUsageSession {
+    /// App category
+    pub category: AppCategory,
+    /// Duration in seconds
+    pub duration_secs: u32,
+    /// Hour of day
+    pub hour: u8,
+    /// Day of week
+    pub day_of_week: u8,
+    /// Screen time type (active vs passive)
+    pub is_active: bool,
+}
+
+/// App usage pattern
+#[derive(Clone, Debug, Default)]
+pub struct AppUsagePattern {
+    /// Usage duration by category (in minutes per day)
+    pub daily_usage: Vec<f32>,
+    /// Peak usage hours by category
+    pub peak_hours: Vec<u8>,
+    /// Usage probability by hour
+    pub hourly_probability: Vec<f32>,
+}
+
+/// App usage learner
+pub struct AppUsageLearner {
+    /// Usage by hour and category: [hour][category]
+    usage_matrix: Vec<Vec<u32>>,
+    /// Total duration by category (seconds)
+    total_duration: Vec<u64>,
+    /// Session counts by category
+    session_counts: Vec<u32>,
+    /// Time of last usage by category
+    last_usage: Vec<Option<(u8, u8)>>, // (hour, day)
+    /// Total sessions
+    total_sessions: u64,
+}
+
+impl AppUsageLearner {
+    pub fn new() -> Self {
+        Self {
+            usage_matrix: vec![vec![0; 12]; 24], // 24 hours x 12 categories
+            total_duration: vec![0; 12],
+            session_counts: vec![0; 12],
+            last_usage: vec![None; 12],
+            total_sessions: 0,
+        }
+    }
+
+    /// Learn from an app usage session
+    pub fn learn_session(&mut self, session: &AppUsageSession) {
+        let hour = session.hour as usize % 24;
+        let cat = session.category as usize % 12;
+
+        self.usage_matrix[hour][cat] += session.duration_secs;
+        self.total_duration[cat] += session.duration_secs as u64;
+        self.session_counts[cat] += 1;
+        self.last_usage[cat] = Some((session.hour, session.day_of_week));
+        self.total_sessions += 1;
+    }
+
+    /// Get usage pattern for a category
+    pub fn get_pattern(&self, category: AppCategory) -> AppUsagePattern {
+        let cat = category as usize % 12;
+
+        // Calculate hourly probability
+        let hourly_usage: Vec<u32> = (0..24).map(|h| self.usage_matrix[h][cat]).collect();
+        let total: u32 = hourly_usage.iter().sum();
+        let hourly_probability = if total > 0 {
+            hourly_usage
+                .iter()
+                .map(|&u| u as f32 / total as f32)
+                .collect()
+        } else {
+            vec![0.0; 24]
+        };
+
+        // Find peak hour
+        let peak_hour = hourly_usage
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, &v)| v)
+            .map(|(i, _)| i as u8)
+            .unwrap_or(12);
+
+        // Daily usage in minutes
+        let days_tracked = (self.total_sessions / 10).max(1) as f32; // Rough estimate
+        let daily_minutes = self.total_duration[cat] as f32 / 60.0 / days_tracked;
+
+        AppUsagePattern {
+            daily_usage: vec![daily_minutes],
+            peak_hours: vec![peak_hour],
+            hourly_probability,
+        }
+    }
+
+    /// Predict likely app category for current context
+    pub fn predict_category(&self, hour: u8, day_of_week: u8) -> Vec<(AppCategory, f32)> {
+        let hour = hour as usize % 24;
+        let total: u32 = self.usage_matrix[hour].iter().sum();
+
+        if total == 0 {
+            return vec![(AppCategory::Productivity, 0.5)];
+        }
+
+        let mut predictions: Vec<(AppCategory, f32)> = (0..12)
+            .map(|cat| {
+                let category = match cat {
+                    0 => AppCategory::Social,
+                    1 => AppCategory::Productivity,
+                    2 => AppCategory::Entertainment,
+                    3 => AppCategory::News,
+                    4 => AppCategory::Communication,
+                    5 => AppCategory::Health,
+                    6 => AppCategory::Navigation,
+                    7 => AppCategory::Shopping,
+                    8 => AppCategory::Gaming,
+                    9 => AppCategory::Education,
+                    10 => AppCategory::Finance,
+                    _ => AppCategory::Utilities,
+                };
+                let prob = self.usage_matrix[hour][cat] as f32 / total as f32;
+                (category, prob)
+            })
+            .filter(|(_, p)| *p > 0.05)
+            .collect();
+
+        predictions.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        // Adjust for day of week (weekday vs weekend)
+        let _is_weekend = day_of_week == 0 || day_of_week == 6;
+        // Could add weekend-specific adjustments here
+
+        predictions
+    }
+
+    /// Get screen time summary
+    pub fn screen_time_summary(&self) -> (f32, AppCategory) {
+        let total_minutes: f32 = self.total_duration.iter().sum::<u64>() as f32 / 60.0;
+        let days_tracked = (self.total_sessions / 10).max(1) as f32;
+        let daily_avg = total_minutes / days_tracked;
+
+        // Find most used category
+        let top_cat = self
+            .total_duration
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, &v)| v)
+            .map(|(i, _)| match i {
+                0 => AppCategory::Social,
+                1 => AppCategory::Productivity,
+                2 => AppCategory::Entertainment,
+                3 => AppCategory::News,
+                4 => AppCategory::Communication,
+                5 => AppCategory::Health,
+                6 => AppCategory::Navigation,
+                7 => AppCategory::Shopping,
+                8 => AppCategory::Gaming,
+                9 => AppCategory::Education,
+                10 => AppCategory::Finance,
+                _ => AppCategory::Utilities,
+            })
+            .unwrap_or(AppCategory::Productivity);
+
+        (daily_avg, top_cat)
+    }
+
+    /// Suggest digital wellbeing insights
+    pub fn wellbeing_insights(&self) -> Vec<&'static str> {
+        let mut insights = Vec::new();
+
+        let (daily_screen_time, top_category) = self.screen_time_summary();
+
+        // Screen time insights
+        if daily_screen_time > 360.0 {
+            insights.push("Consider reducing daily screen time (>6 hours)");
+        }
+
+        // Category-specific insights
+        let social_time = self.total_duration[AppCategory::Social as usize] as f32
+            / self.total_duration.iter().sum::<u64>().max(1) as f32;
+        if social_time > 0.4 {
+            insights.push("Social media usage is high (>40% of screen time)");
+        }
+
+        let entertainment_time = self.total_duration[AppCategory::Entertainment as usize] as f32
+            / self.total_duration.iter().sum::<u64>().max(1) as f32;
+        if entertainment_time > 0.3 {
+            insights.push("Entertainment usage is significant");
+        }
+
+        // Late night usage
+        let late_night: u32 = (22..24)
+            .chain(0..6)
+            .map(|h| self.usage_matrix[h].iter().sum::<u32>())
+            .sum();
+        let total: u32 = self.usage_matrix.iter().flatten().sum();
+        if total > 0 && late_night as f32 / total as f32 > 0.2 {
+            insights.push("High late-night phone usage detected");
+        }
+
+        if insights.is_empty() {
+            insights.push("Screen time patterns look healthy");
+        }
+
+        insights
+    }
+}
+
+impl Default for AppUsageLearner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================
 // Context Fusion & Master Learner
 // ============================================
 
@@ -1003,6 +1445,130 @@ pub extern "C" fn ios_learner_iterations() -> u64 {
 }
 
 // ============================================
+// Calendar Native Exports
+// ============================================
+
+static mut CALENDAR_LEARNER: Option<CalendarLearner> = None;
+
+/// Initialize calendar learner
+#[no_mangle]
+pub extern "C" fn calendar_init() -> i32 {
+    unsafe {
+        CALENDAR_LEARNER = Some(CalendarLearner::new());
+    }
+    0
+}
+
+/// Learn a calendar event
+#[no_mangle]
+pub extern "C" fn calendar_learn_event(
+    event_type: u8,
+    start_hour: u8,
+    duration_minutes: u16,
+    day_of_week: u8,
+    is_recurring: u8,
+    has_attendees: u8,
+) {
+    unsafe {
+        if let Some(learner) = CALENDAR_LEARNER.as_mut() {
+            let evt_type = match event_type {
+                0 => CalendarEventType::Meeting,
+                1 => CalendarEventType::FocusTime,
+                2 => CalendarEventType::Personal,
+                3 => CalendarEventType::Travel,
+                4 => CalendarEventType::Break,
+                5 => CalendarEventType::Exercise,
+                6 => CalendarEventType::Social,
+                _ => CalendarEventType::Deadline,
+            };
+            let event = CalendarEvent {
+                event_type: evt_type,
+                start_hour,
+                duration_minutes,
+                day_of_week,
+                is_recurring: is_recurring != 0,
+                has_attendees: has_attendees != 0,
+            };
+            learner.learn_event(&event);
+        }
+    }
+}
+
+/// Check if time slot is likely busy
+#[no_mangle]
+pub extern "C" fn calendar_is_busy(hour: u8, day_of_week: u8) -> f32 {
+    unsafe {
+        CALENDAR_LEARNER
+            .as_ref()
+            .map(|l| l.is_likely_busy(hour, day_of_week))
+            .unwrap_or(0.0)
+    }
+}
+
+// ============================================
+// App Usage Native Exports
+// ============================================
+
+static mut APP_USAGE_LEARNER: Option<AppUsageLearner> = None;
+
+/// Initialize app usage learner
+#[no_mangle]
+pub extern "C" fn app_usage_init() -> i32 {
+    unsafe {
+        APP_USAGE_LEARNER = Some(AppUsageLearner::new());
+    }
+    0
+}
+
+/// Learn from app usage session
+#[no_mangle]
+pub extern "C" fn app_usage_learn(
+    category: u8,
+    duration_secs: u32,
+    hour: u8,
+    day_of_week: u8,
+    is_active: u8,
+) {
+    unsafe {
+        if let Some(learner) = APP_USAGE_LEARNER.as_mut() {
+            let cat = match category {
+                0 => AppCategory::Social,
+                1 => AppCategory::Productivity,
+                2 => AppCategory::Entertainment,
+                3 => AppCategory::News,
+                4 => AppCategory::Communication,
+                5 => AppCategory::Health,
+                6 => AppCategory::Navigation,
+                7 => AppCategory::Shopping,
+                8 => AppCategory::Gaming,
+                9 => AppCategory::Education,
+                10 => AppCategory::Finance,
+                _ => AppCategory::Utilities,
+            };
+            let session = AppUsageSession {
+                category: cat,
+                duration_secs,
+                hour,
+                day_of_week,
+                is_active: is_active != 0,
+            };
+            learner.learn_session(&session);
+        }
+    }
+}
+
+/// Get daily screen time in minutes
+#[no_mangle]
+pub extern "C" fn app_usage_screen_time() -> f32 {
+    unsafe {
+        APP_USAGE_LEARNER
+            .as_ref()
+            .map(|l| l.screen_time_summary().0)
+            .unwrap_or(0.0)
+    }
+}
+
+// ============================================
 // Browser Bindings (wasm-bindgen)
 // ============================================
 
@@ -1336,6 +1902,236 @@ pub mod browser {
     impl Default for CommLearnerJS {
         fn default() -> Self {
             Self::new()
+        }
+    }
+
+    /// Calendar Learner for browser
+    #[wasm_bindgen]
+    pub struct CalendarLearnerJS {
+        learner: CalendarLearner,
+    }
+
+    #[wasm_bindgen]
+    impl CalendarLearnerJS {
+        #[wasm_bindgen(constructor)]
+        pub fn new() -> Self {
+            Self {
+                learner: CalendarLearner::new(),
+            }
+        }
+
+        /// Learn a calendar event
+        #[wasm_bindgen(js_name = "learnEvent")]
+        pub fn learn_event(
+            &mut self,
+            event_type: u8,
+            start_hour: u8,
+            duration_minutes: u16,
+            day_of_week: u8,
+            is_recurring: bool,
+            has_attendees: bool,
+        ) {
+            let evt_type = calendar_event_from_u8(event_type);
+            let event = CalendarEvent {
+                event_type: evt_type,
+                start_hour,
+                duration_minutes,
+                day_of_week,
+                is_recurring,
+                has_attendees,
+            };
+            self.learner.learn_event(&event);
+        }
+
+        /// Check if time is likely busy
+        #[wasm_bindgen(js_name = "isLikelyBusy")]
+        pub fn is_likely_busy(&self, hour: u8, day_of_week: u8) -> f32 {
+            self.learner.is_likely_busy(hour, day_of_week)
+        }
+
+        /// Get best focus time windows (returns array of [start_hour, duration, score])
+        #[wasm_bindgen(js_name = "bestFocusTimes")]
+        pub fn best_focus_times(&self, day_of_week: u8) -> JsValue {
+            let windows = self.learner.best_focus_times(day_of_week);
+            serde_wasm_bindgen::to_value(&windows).unwrap_or(JsValue::NULL)
+        }
+
+        /// Suggest optimal meeting times (returns array of hours)
+        #[wasm_bindgen(js_name = "suggestMeetingTimes")]
+        pub fn suggest_meeting_times(&self, duration_minutes: u16, day_of_week: u8) -> JsValue {
+            let times = self.learner.suggest_meeting_times(duration_minutes, day_of_week);
+            serde_wasm_bindgen::to_value(&times).unwrap_or(JsValue::NULL)
+        }
+    }
+
+    impl Default for CalendarLearnerJS {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    /// App Usage Learner for browser
+    #[wasm_bindgen]
+    pub struct AppUsageLearnerJS {
+        learner: AppUsageLearner,
+    }
+
+    #[wasm_bindgen]
+    impl AppUsageLearnerJS {
+        #[wasm_bindgen(constructor)]
+        pub fn new() -> Self {
+            Self {
+                learner: AppUsageLearner::new(),
+            }
+        }
+
+        /// Learn from an app usage session
+        #[wasm_bindgen(js_name = "learnSession")]
+        pub fn learn_session(
+            &mut self,
+            category: u8,
+            duration_secs: u32,
+            hour: u8,
+            day_of_week: u8,
+            is_active: bool,
+        ) {
+            let cat = app_category_from_u8(category);
+            let session = AppUsageSession {
+                category: cat,
+                duration_secs,
+                hour,
+                day_of_week,
+                is_active,
+            };
+            self.learner.learn_session(&session);
+        }
+
+        /// Get screen time summary (returns {dailyAvg: f32, topCategory: string})
+        #[wasm_bindgen(js_name = "screenTimeSummary")]
+        pub fn screen_time_summary(&self) -> JsValue {
+            let (daily_avg, top_cat) = self.learner.screen_time_summary();
+            #[derive(Serialize)]
+            struct Summary {
+                daily_avg_minutes: f32,
+                top_category: String,
+            }
+            let summary = Summary {
+                daily_avg_minutes: daily_avg,
+                top_category: format!("{:?}", top_cat),
+            };
+            serde_wasm_bindgen::to_value(&summary).unwrap_or(JsValue::NULL)
+        }
+
+        /// Predict likely app category (returns array of [category, probability])
+        #[wasm_bindgen(js_name = "predictCategory")]
+        pub fn predict_category(&self, hour: u8, day_of_week: u8) -> JsValue {
+            let predictions = self.learner.predict_category(hour, day_of_week);
+            let result: Vec<(u8, f32)> = predictions
+                .iter()
+                .map(|(c, p)| (*c as u8, *p))
+                .collect();
+            serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
+        }
+
+        /// Get digital wellbeing insights (returns array of strings)
+        #[wasm_bindgen(js_name = "wellbeingInsights")]
+        pub fn wellbeing_insights(&self) -> JsValue {
+            let insights = self.learner.wellbeing_insights();
+            serde_wasm_bindgen::to_value(&insights).unwrap_or(JsValue::NULL)
+        }
+    }
+
+    impl Default for AppUsageLearnerJS {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    /// Calendar event type constants
+    #[wasm_bindgen]
+    pub struct CalendarEventTypes;
+
+    #[wasm_bindgen]
+    impl CalendarEventTypes {
+        #[wasm_bindgen(getter)]
+        pub fn meeting() -> u8 { 0 }
+        #[wasm_bindgen(getter)]
+        pub fn focus_time() -> u8 { 1 }
+        #[wasm_bindgen(getter)]
+        pub fn personal() -> u8 { 2 }
+        #[wasm_bindgen(getter)]
+        pub fn travel() -> u8 { 3 }
+        #[wasm_bindgen(getter)]
+        pub fn break_time() -> u8 { 4 }
+        #[wasm_bindgen(getter)]
+        pub fn exercise() -> u8 { 5 }
+        #[wasm_bindgen(getter)]
+        pub fn social() -> u8 { 6 }
+        #[wasm_bindgen(getter)]
+        pub fn deadline() -> u8 { 7 }
+    }
+
+    /// App category constants
+    #[wasm_bindgen]
+    pub struct AppCategories;
+
+    #[wasm_bindgen]
+    impl AppCategories {
+        #[wasm_bindgen(getter)]
+        pub fn social() -> u8 { 0 }
+        #[wasm_bindgen(getter)]
+        pub fn productivity() -> u8 { 1 }
+        #[wasm_bindgen(getter)]
+        pub fn entertainment() -> u8 { 2 }
+        #[wasm_bindgen(getter)]
+        pub fn news() -> u8 { 3 }
+        #[wasm_bindgen(getter)]
+        pub fn communication() -> u8 { 4 }
+        #[wasm_bindgen(getter)]
+        pub fn health() -> u8 { 5 }
+        #[wasm_bindgen(getter)]
+        pub fn navigation() -> u8 { 6 }
+        #[wasm_bindgen(getter)]
+        pub fn shopping() -> u8 { 7 }
+        #[wasm_bindgen(getter)]
+        pub fn gaming() -> u8 { 8 }
+        #[wasm_bindgen(getter)]
+        pub fn education() -> u8 { 9 }
+        #[wasm_bindgen(getter)]
+        pub fn finance() -> u8 { 10 }
+        #[wasm_bindgen(getter)]
+        pub fn utilities() -> u8 { 11 }
+    }
+
+    // Helper function for calendar event type conversion
+    fn calendar_event_from_u8(val: u8) -> CalendarEventType {
+        match val {
+            0 => CalendarEventType::Meeting,
+            1 => CalendarEventType::FocusTime,
+            2 => CalendarEventType::Personal,
+            3 => CalendarEventType::Travel,
+            4 => CalendarEventType::Break,
+            5 => CalendarEventType::Exercise,
+            6 => CalendarEventType::Social,
+            _ => CalendarEventType::Deadline,
+        }
+    }
+
+    // Helper function for app category conversion
+    fn app_category_from_u8(val: u8) -> AppCategory {
+        match val {
+            0 => AppCategory::Social,
+            1 => AppCategory::Productivity,
+            2 => AppCategory::Entertainment,
+            3 => AppCategory::News,
+            4 => AppCategory::Communication,
+            5 => AppCategory::Health,
+            6 => AppCategory::Navigation,
+            7 => AppCategory::Shopping,
+            8 => AppCategory::Gaming,
+            9 => AppCategory::Education,
+            10 => AppCategory::Finance,
+            _ => AppCategory::Utilities,
         }
     }
 
