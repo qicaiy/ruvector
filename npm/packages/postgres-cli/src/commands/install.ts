@@ -16,7 +16,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 
 // Constants
-const DOCKER_IMAGE = 'ruvector-postgres';
+const DOCKER_IMAGE = 'ruvnet/ruvector-postgres';
 const DOCKER_IMAGE_VERSION = '0.2.5';
 const RUVECTOR_CRATE_VERSION = '0.2.5';
 const PGRX_VERSION = '0.12.6';
@@ -641,36 +641,28 @@ pub use ruvector_postgres::*;
       existingSpinner.succeed('No existing installation found');
     }
 
-    // Check for local image first, then try to pull, then build
+    // Check for local image first, then try to pull from Docker Hub
     const pullSpinner = ora(`Checking for ${DOCKER_IMAGE}:${version}...`).start();
     try {
       // Check if image exists locally
       execSync(`docker image inspect ${DOCKER_IMAGE}:${version}`, { stdio: 'pipe' });
       pullSpinner.succeed(`Found local image ${DOCKER_IMAGE}:${version}`);
     } catch {
-      // Try pulling from Docker Hub
-      pullSpinner.text = `Pulling ${DOCKER_IMAGE}:${version}...`;
+      // Try pulling from Docker Hub (ruvnet/ruvector-postgres)
+      pullSpinner.text = `Pulling ${DOCKER_IMAGE}:${version} from Docker Hub...`;
       try {
         execSync(`docker pull ${DOCKER_IMAGE}:${version}`, { stdio: 'pipe' });
         pullSpinner.succeed(`Pulled ${DOCKER_IMAGE}:${version}`);
       } catch {
-        // Try ruvector/postgres from Docker Hub
-        pullSpinner.text = 'Trying ruvector/postgres from Docker Hub...';
-        try {
-          execSync(`docker pull ruvector/postgres:${version}`, { stdio: 'pipe' });
-          execSync(`docker tag ruvector/postgres:${version} ${DOCKER_IMAGE}:${version}`, { stdio: 'pipe' });
-          pullSpinner.succeed(`Pulled ruvector/postgres:${version}`);
-        } catch {
-          pullSpinner.fail('Image not found locally or on Docker Hub');
-          console.log(chalk.yellow('\n📦 To build the image locally, run:'));
-          console.log(chalk.gray('   git clone https://github.com/ruvnet/ruvector.git'));
-          console.log(chalk.gray('   cd ruvector'));
-          console.log(chalk.gray('   docker build -f crates/ruvector-postgres/docker/Dockerfile -t ruvector-postgres:0.2.5 .'));
-          console.log(chalk.yellow('\n   Then run this install command again.'));
-          console.log(chalk.yellow('\n💡 Or use native installation:'));
-          console.log(chalk.gray('   npx @ruvector/postgres-cli install --method native\n'));
-          throw new Error(`RuVector Docker image not available. Build it first or use native installation.`);
-        }
+        pullSpinner.fail('Image not found locally or on Docker Hub');
+        console.log(chalk.yellow('\n📦 To build the image locally, run:'));
+        console.log(chalk.gray('   git clone https://github.com/ruvnet/ruvector.git'));
+        console.log(chalk.gray('   cd ruvector'));
+        console.log(chalk.gray(`   docker build -f crates/ruvector-postgres/docker/Dockerfile -t ${DOCKER_IMAGE}:${version} .`));
+        console.log(chalk.yellow('\n   Then run this install command again.'));
+        console.log(chalk.yellow('\n💡 Or use native installation:'));
+        console.log(chalk.gray('   npx @ruvector/postgres-cli install --method native\n'));
+        throw new Error(`RuVector Docker image not available. Build it first or use native installation.`);
       }
     }
 
