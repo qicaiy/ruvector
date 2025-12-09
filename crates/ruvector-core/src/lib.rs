@@ -10,10 +10,14 @@
 //! - **Persistence**: REDB-based storage with config persistence
 //! - **Search**: ~2.5K queries/sec on 10K vectors (benchmarked)
 //!
-//! ## Experimental/Incomplete Features
+//! ## ⚠️ Experimental/Incomplete Features - READ BEFORE USE
 //!
-//! - **AgenticDB**: Uses placeholder hash-based embeddings (NOT semantic)
-//!   - Replace `generate_text_embedding` with real model for production use
+//! - **AgenticDB**: ⚠️⚠️⚠️ **CRITICAL WARNING** ⚠️⚠️⚠️
+//!   - Uses PLACEHOLDER hash-based embeddings, NOT real semantic embeddings
+//!   - "dog" and "cat" will NOT be similar (different characters)
+//!   - "dog" and "god" WILL be similar (same characters) - **This is wrong!**
+//!   - **MUST integrate real embedding model for production** (ONNX, Candle, or API)
+//!   - See [`agenticdb`] module docs and `/examples/onnx-embeddings` for integration
 //! - **Advanced Features**: Conformal prediction, hybrid search - functional but less tested
 //!
 //! ## What This Is NOT
@@ -66,6 +70,18 @@ pub use advanced_features::{
 
 #[cfg(feature = "storage")]
 pub use agenticdb::AgenticDB;
+
+// Compile-time warning about AgenticDB limitations
+#[cfg(feature = "storage")]
+const _: () = {
+    // This will appear in cargo build output as a note
+    #[deprecated(
+        since = "0.1.0",
+        note = "AgenticDB uses placeholder hash-based embeddings. For semantic search, integrate a real embedding model (ONNX, Candle, or API). See /examples/onnx-embeddings for production setup."
+    )]
+    const AGENTICDB_EMBEDDING_WARNING: () = ();
+    let _ = AGENTICDB_EMBEDDING_WARNING;
+};
 
 pub use error::{Result, RuvectorError};
 pub use types::{DistanceMetric, SearchQuery, SearchResult, VectorEntry, VectorId};

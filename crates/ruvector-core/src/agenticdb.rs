@@ -1,5 +1,22 @@
 //! AgenticDB API Compatibility Layer
 //!
+//! # ⚠️ CRITICAL WARNING: PLACEHOLDER EMBEDDINGS
+//!
+//! **THIS MODULE USES HASH-BASED PLACEHOLDER EMBEDDINGS - NOT REAL SEMANTIC EMBEDDINGS**
+//!
+//! The `generate_text_embedding()` function creates embeddings using a simple hash function
+//! that does NOT understand semantic meaning. Similarity is based on character overlap, NOT meaning.
+//!
+//! **For Production Use:**
+//! - Integrate a real embedding model (sentence-transformers, OpenAI, Anthropic, Cohere)
+//! - Use ONNX Runtime, candle, or Python bindings for inference
+//! - See `/examples/onnx-embeddings` for a production-ready integration example
+//!
+//! **What This Means:**
+//! - "dog" and "cat" will NOT be similar (different characters)
+//! - "dog" and "god" WILL be similar (same characters, different order)
+//! - Semantic search will not work as expected
+//!
 //! Provides a drop-in replacement for agenticDB with 5-table schema:
 //! - vectors_table: Core embeddings + metadata
 //! - reflexion_episodes: Self-critique memories
@@ -658,20 +675,68 @@ impl AgenticDB {
 
     /// Generate text embedding from text.
     ///
-    /// # ⚠️ WARNING: PLACEHOLDER IMPLEMENTATION
+    /// # ⚠️⚠️⚠️ CRITICAL WARNING: THIS IS A PLACEHOLDER - NOT REAL EMBEDDINGS ⚠️⚠️⚠️
     ///
-    /// This uses a simple hash-based embedding that does NOT understand
-    /// semantic meaning. Text similarity will be based on character overlap,
-    /// not actual meaning.
+    /// **THIS FUNCTION DOES NOT CREATE SEMANTIC EMBEDDINGS!**
     ///
-    /// For real semantic search, integrate an actual embedding model:
-    /// - `sentence-transformers` via Python bindings
-    /// - `candle` for native Rust inference
-    /// - ONNX Runtime for cross-platform models
-    /// - OpenAI/Anthropic embedding APIs
+    /// This uses a simple hash-based embedding that does NOT understand semantic meaning.
+    /// Text similarity will be based on character overlap, NOT actual meaning.
+    ///
+    /// ## Why This Exists
+    /// This placeholder allows the AgenticDB API to work for testing and demonstration,
+    /// but it will NOT provide meaningful semantic search results.
+    ///
+    /// ## Examples of What Won't Work
+    /// - "dog" and "cat" will NOT be similar (different characters)
+    /// - "happy" and "joyful" will NOT be similar (different characters)
+    /// - "car" and "automobile" will NOT be similar (different characters)
+    /// - But "dog" and "god" WILL be similar (same characters, different order) ❌
+    ///
+    /// ## For Production Use - Choose ONE:
+    ///
+    /// ### Option 1: ONNX Runtime (Recommended)
+    /// ```rust
+    /// // See /examples/onnx-embeddings for complete example
+    /// use ort::{Session, Environment, Value};
+    /// let session = Session::builder()?
+    ///     .with_model_from_file("all-MiniLM-L6-v2.onnx")?;
+    /// ```
+    ///
+    /// ### Option 2: Candle (Pure Rust)
+    /// ```rust
+    /// use candle_core::{Device, Tensor};
+    /// use candle_transformers::models::bert;
+    /// ```
+    ///
+    /// ### Option 3: API-based (OpenAI, Cohere, Anthropic)
+    /// ```rust
+    /// use reqwest;
+    /// let response = client.post("https://api.openai.com/v1/embeddings")
+    ///     .json(&json!({ "model": "text-embedding-3-small", "input": text }))
+    ///     .send().await?;
+    /// ```
+    ///
+    /// ### Option 4: Python Bindings
+    /// ```rust
+    /// use pyo3::prelude::*;
+    /// let embeddings = Python::with_gil(|py| {
+    ///     let sentence_transformers = py.import("sentence_transformers")?;
+    ///     let model = sentence_transformers.getattr("SentenceTransformer")?
+    ///         .call1(("all-MiniLM-L6-v2",))?;
+    ///     model.call_method1("encode", (text,))
+    /// });
+    /// ```
+    ///
+    /// ## Replace This Function
+    /// To use real embeddings, replace this entire function implementation with
+    /// one of the above options. The function signature should remain the same.
     fn generate_text_embedding(&self, text: &str) -> Result<Vec<f32>> {
-        // ⚠️ PLACEHOLDER: Hash-based embedding - NOT semantic
-        // This is for demonstration and testing only
+        // ⚠️⚠️⚠️ PLACEHOLDER IMPLEMENTATION - NOT SEMANTIC EMBEDDINGS ⚠️⚠️⚠️
+        //
+        // This is a hash-based embedding for demonstration and testing ONLY.
+        // DO NOT use in production for semantic search!
+        //
+        // This will be replaced with a compile-time warning in future versions.
         let mut embedding = vec![0.0; self.dimensions];
         let bytes = text.as_bytes();
 
