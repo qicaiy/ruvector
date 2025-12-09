@@ -2,7 +2,19 @@
 
 ## Executive Summary
 
-**RuvDLLM** is a Rust-native, SIMD/GPU-accelerated diffusion language model framework with real-time self-learning capabilities. It combines QLoRA-based AR→Diffusion model conversion with federated MicroLoRA adaptation for continuous improvement while preserving privacy.
+**RuvDLLM** is a diffusion language model extension for **ruvLLM**, leveraging the existing SIMD infrastructure, SONA learning loops, MicroLoRA adapters, and RuVector integration. It adds diffusion-specific capabilities while reusing proven components.
+
+### Building on Existing Infrastructure
+
+| Existing Component | Location | Reused For |
+|-------------------|----------|------------|
+| **MicroLoRA/BaseLoRA** | `sona/lora.rs` | Foundation for TALoRA |
+| **SIMD Ops** | `simd_inference.rs` | Dot products, softmax, RMSNorm |
+| **Q4 Quantization** | `simd_inference.rs` | `Q4Weights` for diffusion model |
+| **SONA Loops** | `sona/loops/` | Instant/background/deep learning |
+| **RuVector Core** | `ruvector-core` | HNSW index for pattern storage |
+| **SimSIMD** | Cargo.toml | Similarity computations |
+| **Candle** | Cargo.toml | Model loading (optional) |
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -99,47 +111,60 @@
 ```
 examples/ruvLLM/
 ├── src/
-│   ├── diffusion/                 # NEW: Diffusion LLM module
+│   ├── sona/                      # EXISTING: SONA self-learning
+│   │   ├── lora.rs                # ✓ MicroLoRA, BaseLoRA, LoRAEngine
+│   │   ├── engine.rs              # ✓ SONA orchestration
+│   │   ├── ewc.rs                 # ✓ Elastic Weight Consolidation
+│   │   ├── reasoning_bank.rs      # ✓ Pattern storage
+│   │   └── loops/                 # ✓ Instant/Background/Coordinator
+│   │
+│   ├── simd_inference.rs          # EXISTING: SIMD operations
+│   │   # ✓ SimdOps (dot_product_avx2, softmax_avx2, rms_norm_avx2)
+│   │   # ✓ Q4Weights quantization
+│   │   # ✓ TransformerLayer, KvCache
+│   │
+│   ├── diffusion/                 # NEW: Diffusion extensions
 │   │   ├── mod.rs                 # Module exports
-│   │   ├── model.rs               # Q4 diffusion model
+│   │   ├── model.rs               # Diffusion model (uses Q4Weights)
 │   │   ├── sampler.rs             # MDLM/BD3LM samplers
 │   │   ├── scheduler.rs           # Noise schedules
 │   │   ├── qlora_convert.rs       # AR→Diffusion conversion
-│   │   ├── talora.rs              # Timestep-Aware LoRA (NOVEL)
-│   │   ├── dgr.rs                 # Denoising-Guided Retrieval (NOVEL)
-│   │   └── simd/                  # SIMD kernels
-│   │       ├── mod.rs
-│   │       ├── denoise.rs
-│   │       └── attention.rs
+│   │   ├── talora.rs              # TALoRA (wraps MicroLoRA) [NOVEL]
+│   │   └── dgr.rs                 # DGR (uses RuVector) [NOVEL]
 │   │
 │   ├── federation/                # NEW: Federated learning
 │   │   ├── mod.rs
-│   │   ├── daf.rs                 # Diffusion-Aware Federation (NOVEL)
-│   │   ├── aggregation.rs
-│   │   ├── gossip.rs
-│   │   ├── privacy.rs
-│   │   └── tiers.rs
-│   │
-│   ├── micro_lora/                # NEW: Real-time adaptation
-│   │   ├── mod.rs
-│   │   ├── bank.rs                # LoRA pattern bank
-│   │   ├── retrieval.rs           # Pattern retrieval
-│   │   ├── composition.rs         # LoRA merging
-│   │   └── simd.rs                # SIMD-optimized ops
+│   │   ├── daf.rs                 # DAF protocol [NOVEL]
+│   │   ├── gossip.rs              # Gossip protocol
+│   │   └── privacy.rs             # Privacy tiers
 │   │
 │   └── gpu/                       # NEW: GPU acceleration
 │       ├── mod.rs
-│       ├── cuda.rs                # CUDA kernels
-│       ├── metal.rs               # Metal (Apple)
-│       └── vulkan.rs              # Vulkan compute
+│       ├── cuda.rs                # CUDA (via cudarc)
+│       └── metal.rs               # Metal (via candle)
 │
-├── docs/
-│   └── diffusion/                 # This documentation
-│       ├── 00-OVERVIEW.md
-│       ├── 01-ARCHITECTURE.md
-│       ├── ...
+├── Cargo.toml                     # EXISTING: Already has most deps
+│   # ✓ ruvector-core, ruvector-gnn, ruvector-attention
+│   # ✓ simsimd, candle-*, tokio
+│   # + Add: quinn, cudarc (optional)
 │
-└── Cargo.toml                     # Updated with new features
+└── docs/diffusion/                # This documentation
+```
+
+### Dependency on Existing Code
+
+```rust
+// TALoRA wraps existing MicroLoRA
+use crate::sona::lora::{MicroLoRA, BaseLoRA, LoRAEngine};
+
+// Uses existing SIMD infrastructure
+use crate::simd_inference::{SimdOps, Q4Weights};
+
+// Integrates with existing SONA loops
+use crate::sona::loops::{InstantLoop, BackgroundLoop};
+
+// Uses RuVector for pattern storage
+use ruvector_core::HnswIndex;
 ```
 
 ## Key Differentiators
