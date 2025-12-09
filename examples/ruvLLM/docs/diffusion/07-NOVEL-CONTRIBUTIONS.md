@@ -4,6 +4,19 @@
 
 RuvDLLM introduces three genuinely novel contributions to the field of diffusion language models. While individual components like diffusion LLMs, LoRA adapters, and federated learning exist separately, our specific combinations and implementations are new.
 
+### What's Existing vs What's Novel
+
+| Component | Status | Location | Description |
+|-----------|--------|----------|-------------|
+| MicroLoRA | ✅ **EXISTING** | `sona/lora.rs` | Rank 1-2 LoRA with AVX2 SIMD |
+| HnswIndex | ✅ **EXISTING** | `ruvector-core/index/hnsw.rs` | Pattern retrieval |
+| FederatedCoordinator | ✅ **EXISTING** | `crates/sona/training/federated.rs` | Base federation |
+| FlashAttention | ✅ **EXISTING** | `ruvector-attention/sparse/flash.rs` | Memory-efficient attention |
+| Q4Weights | ✅ **EXISTING** | `simd_inference.rs` | 4-bit quantization |
+| **TALoRA routing** | ⭐ **NOVEL** | *extends MicroLoRA* | Timestep-aware adapter selection |
+| **DGR retrieval** | ⭐ **NOVEL** | *uses HnswIndex* | Uncertainty-guided retrieval |
+| **DAF aggregation** | ⭐ **NOVEL** | *extends FederatedCoordinator* | Schedule-aligned federation |
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        Novel Contributions Summary                          │
@@ -51,13 +64,19 @@ Standard LoRA applies the same adapter across all timesteps, ignoring this seman
 | T2I-Adapter (images) | Partial | No (images) | No |
 | **TALoRA (ours)** | **Full** | **Yes** | **Yes** |
 
-### Implementation
+### Implementation (Wrapping Existing MicroLoRA)
 
 ```rust
-/// TALoRA: Timestep-Aware LoRA
+// Import EXISTING infrastructure
+use crate::sona::lora::MicroLoRA;  // EXISTING from sona/lora.rs
+use ruvector_core::index::HnswIndex;  // EXISTING from ruvector-core
+
+/// TALoRA: Timestep-Aware LoRA - WRAPS existing MicroLoRA
 pub struct TALoRA {
-    /// Adapter banks for each timestep group
-    banks: [LoRABank; 3],  // Coarse, Domain, Fine
+    /// Adapter banks for each timestep group (contains EXISTING MicroLoRA)
+    banks: [Vec<MicroLoRA>; 3],  // Uses existing MicroLoRA from sona/lora.rs
+    /// HNSW indices for retrieval (uses EXISTING HnswIndex)
+    indices: [HnswIndex; 3],  // Uses existing HnswIndex from ruvector-core
     /// Timestep boundaries
     boundaries: [u32; 2],  // [700, 300]
     /// Transition smoothing
@@ -230,13 +249,16 @@ DGR uses this uncertainty signal to dynamically retrieve relevant adapters for u
 | Entropy-based AR | Yes | Yes | No (AR only) |
 | **DGR (ours)** | **Yes** | **Yes** | **Yes** |
 
-### Implementation
+### Implementation (Using Existing HnswIndex)
 
 ```rust
-/// DGR: Denoising-Guided Retrieval
+// Import EXISTING infrastructure
+use ruvector_core::index::HnswIndex;  // EXISTING from ruvector-core
+
+/// DGR: Denoising-Guided Retrieval - USES existing HnswIndex
 pub struct DGR {
-    /// Retrieval index
-    index: HNSWIndex,
+    /// Retrieval index (EXISTING from ruvector-core)
+    index: HnswIndex,  // Uses existing ruvector_core::index::HnswIndex
     /// Uncertainty threshold for retrieval
     uncertainty_threshold: f32,
     /// Retrieval budget per step
@@ -461,12 +483,17 @@ DAF aggregates updates with awareness of their semantic role.
 | FedEx-LoRA | LLM (AR) | No | No |
 | **DAF (ours)** | **Diffusion** | **Yes** | **Yes** |
 
-### Implementation
+### Implementation (Extending Existing FederatedCoordinator)
 
 ```rust
-/// DAF: Diffusion-Aware Federation
+// Import EXISTING infrastructure
+use ruvector_sona::training::federated::{FederatedCoordinator, EphemeralAgent};
+
+/// DAF: Diffusion-Aware Federation - EXTENDS existing FederatedCoordinator
 pub struct DAF {
-    /// Per-timestep-group aggregation strategies
+    /// Base coordinator (EXISTING from crates/sona)
+    base: FederatedCoordinator,  // Uses existing federation infrastructure
+    /// Per-timestep-group aggregation strategies (NOVEL)
     strategies: [AggregationStrategy; 3],
     /// Semantic importance weights
     semantic_weights: [f32; 3],

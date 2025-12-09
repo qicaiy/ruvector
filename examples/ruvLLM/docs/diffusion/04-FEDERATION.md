@@ -4,6 +4,32 @@
 
 RuvDLLM introduces **Diffusion-Aware Federation (DAF)**, a novel federated learning protocol designed specifically for diffusion language models. Unlike standard FedAvg, DAF understands the semantic meaning of different timesteps in the denoising process and aligns aggregation accordingly.
 
+### ⚠️ Important: Extending Existing FederatedCoordinator
+
+**DAF extends the existing federation infrastructure** in `crates/sona/training/federated.rs` rather than reimplementing. The existing code already provides:
+
+```rust
+// EXISTING in crates/sona/training/federated.rs:
+pub struct FederatedCoordinator {
+    topology: FederatedTopology,      // Star, Hierarchical, PeerToPeer
+    min_agents_for_aggregation: usize,
+    aggregation_threshold: f32,
+    global_weights: Vec<f32>,
+}
+
+impl FederatedCoordinator {
+    pub fn aggregate(&mut self, export: AgentExport) -> AggregationResult { ... }
+}
+
+pub struct EphemeralAgent {
+    pub agent_id: Uuid,
+    pub local_weights: Vec<f32>,
+    pub trajectories: Vec<TrajectoryExport>,
+}
+```
+
+**DAF wraps and extends this** with timestep-aware aggregation strategies:
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        DAF Federation Architecture                          │
@@ -54,13 +80,23 @@ Standard FedAvg treats all model parameters equally. For diffusion models, this 
 
 Averaging weights across nodes without timestep awareness loses this semantic structure.
 
-### DAF Algorithm
+### DAF Algorithm (Extends FederatedCoordinator)
 
 ```rust
-/// Diffusion-Aware Federation aggregation
+// Import EXISTING federation infrastructure
+use ruvector_sona::training::federated::{FederatedCoordinator, EphemeralAgent, AgentExport};
+
+/// Diffusion-Aware Federation - EXTENDS existing FederatedCoordinator
+pub struct DAFCoordinator {
+    /// EXISTING base coordinator from crates/sona
+    base: FederatedCoordinator,  // Reuse existing aggregation logic
+    /// Per-timestep-group aggregation strategies (NEW)
+    strategies: [AggregationStrategy; 3],
+}
+
+/// DAF aggregation engine (NEW timestep-aware logic)
 pub struct DAFAggregator {
     /// Timestep groupings for semantic alignment
-    timestep_groups: Vec<TimestepGroup>,
     /// Per-group aggregation weights
     group_weights: HashMap<TimestepGroupId, Vec<f32>>,
     /// Noise schedule for semantic mapping

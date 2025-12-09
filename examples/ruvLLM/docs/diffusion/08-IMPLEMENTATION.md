@@ -4,6 +4,21 @@
 
 This document provides a detailed step-by-step implementation plan for RuvDLLM. The plan is organized into phases with clear milestones, dependencies, and deliverables.
 
+### Key Principle: Extend, Don't Rebuild
+
+**RuvDLLM leverages existing ruvector infrastructure.** All implementations should import and extend existing components:
+
+```rust
+// REQUIRED IMPORTS - use existing infrastructure
+use crate::sona::lora::{MicroLoRA, BaseLoRA, LoRAEngine};           // From sona/lora.rs
+use crate::simd_inference::{SimdOps, Q4Weights, TransformerLayer};  // From simd_inference.rs
+use crate::sona::loops::{InstantLoop, BackgroundLoop};              // From sona/loops/
+use ruvector_core::index::HnswIndex;                                 // From crates/ruvector-core
+use ruvector_attention::sparse::FlashAttention;                      // From crates/ruvector-attention
+use ruvector_sona::training::federated::{FederatedCoordinator, EphemeralAgent}; // From crates/sona
+use ruvector_gnn::ewc::Ewc;                                          // From crates/ruvector-gnn
+```
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        Implementation Timeline                              │
@@ -100,8 +115,11 @@ memmap2 = "0.9"  # Memory-mapped model loading
 
 ```rust
 //! Core diffusion language model with Q4 quantization
+//! EXTENDS existing SIMD infrastructure from simd_inference.rs
 
-use crate::simd_inference::{Q4Weights, dot_product_avx2};
+// Use EXISTING infrastructure
+use crate::simd_inference::{Q4Weights, SimdOps, TransformerLayer, dot_product_avx2};
+use crate::sona::lora::MicroLoRA;  // For adapter application
 
 /// Quantized diffusion language model
 pub struct DiffusionModel {
@@ -486,12 +504,15 @@ pub unsafe fn bidirectional_attention_avx2(
 
 ### 2.1 TALoRA Implementation
 
-**File: `src/micro_lora/talora.rs`**
+**File: `src/diffusion/talora.rs`**
 
 ```rust
 //! TALoRA: Timestep-Aware LoRA
+//! WRAPS existing MicroLoRA from sona/lora.rs
 
-use super::{MicroLoRA, LoRABank};
+// Use EXISTING infrastructure - DO NOT reimplement
+use crate::sona::lora::{MicroLoRA, BaseLoRA, LoRAEngine};  // EXISTING
+use ruvector_core::index::{HnswIndex, DistanceMetric};      // EXISTING
 
 /// TALoRA manager with timestep-specific adapter banks
 pub struct TALoRAManager {
@@ -594,11 +615,14 @@ impl TALoRAManager {
 
 ### 2.2 DGR Implementation
 
-**File: `src/micro_lora/dgr.rs`**
+**File: `src/diffusion/dgr.rs`**
 
 ```rust
 //! DGR: Denoising-Guided Retrieval
+//! USES existing HnswIndex from ruvector-core
 
+// Use EXISTING infrastructure
+use ruvector_core::index::HnswIndex;  // EXISTING - do not reimplement
 use super::TALoRAManager;
 
 /// Denoising-Guided Retrieval system
@@ -688,12 +712,15 @@ impl DGRSystem {
 
 ### 2.3 RuVector Integration
 
-**File: `src/micro_lora/ruvector_integration.rs`**
+**File: `src/diffusion/ruvector_integration.rs`**
 
 ```rust
 //! Integration with RuVector for pattern storage
+//! USES existing HnswIndex from ruvector-core
 
-use ruvector::{VectorDb, HNSWConfig, SearchResult};
+// Use EXISTING infrastructure from ruvector-core
+use ruvector_core::index::{HnswIndex, HnswConfig, DistanceMetric};
+use crate::sona::lora::MicroLoRA;
 
 /// RuVector-backed adapter storage
 pub struct RuVectorAdapterStore {
@@ -784,8 +811,23 @@ impl RuVectorAdapterStore {
 
 ```rust
 //! DAF: Diffusion-Aware Federation
+//! EXTENDS existing FederatedCoordinator from crates/sona
 
-/// DAF aggregator with timestep-aware strategies
+// Use EXISTING infrastructure - DO NOT reimplement federation
+use ruvector_sona::training::federated::{
+    FederatedCoordinator, EphemeralAgent, AgentExport,
+    AggregationResult, FederatedTopology
+};
+
+/// DAF coordinator - WRAPS existing FederatedCoordinator
+pub struct DAFCoordinator {
+    /// Base coordinator (EXISTING from crates/sona)
+    base: FederatedCoordinator,
+    /// Per-timestep-group strategies (NOVEL)
+    strategies: [GroupStrategy; 3],
+}
+
+/// DAF aggregator with timestep-aware strategies (extends base aggregation)
 pub struct DAFAggregator {
     /// Per-group strategies
     strategies: [GroupStrategy; 3],

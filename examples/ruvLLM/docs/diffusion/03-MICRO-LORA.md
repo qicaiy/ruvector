@@ -4,6 +4,30 @@
 
 MicroLoRA enables per-request adaptation with sub-millisecond overhead by retrieving and composing small LoRA adapters from RuVector storage.
 
+### ⚠️ Important: Building on Existing MicroLoRA
+
+**RuvDLLM's TALoRA extends the existing MicroLoRA implementation** in `sona/lora.rs` rather than reimplementing. The existing code already provides:
+
+```rust
+// EXISTING in sona/lora.rs:
+pub struct MicroLoRA {
+    pub a: Vec<f32>,      // Low-rank A matrix
+    pub b: Vec<f32>,      // Low-rank B matrix
+    pub rank: usize,      // Typically 1-2
+    pub alpha: f32,       // Scaling factor
+    pub layer_indices: Vec<usize>,
+}
+
+impl MicroLoRA {
+    /// AVX2-optimized forward pass (ALREADY IMPLEMENTED)
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "avx2")]
+    pub unsafe fn forward_avx2(&self, x: &[f32], out: &mut [f32]) { ... }
+}
+```
+
+**TALoRA wraps this existing implementation** with timestep-aware routing:
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         MicroLoRA Architecture                               │
@@ -192,13 +216,18 @@ pub struct PatternMetrics {
 }
 ```
 
-## MicroLoRA Bank
+## MicroLoRA Bank (Uses Existing HnswIndex)
 
 ```rust
+// Uses EXISTING HnswIndex from ruvector-core
+use ruvector_core::index::{HnswIndex, DistanceMetric};
+use crate::sona::lora::MicroLoRA;
+
 /// Bank of MicroLoRA patterns organized by timestep range
+/// Uses existing HnswIndex and MicroLoRA implementations
 pub struct MicroLoraBank {
-    /// RuVector index for pattern retrieval
-    index: RuVectorIndex,
+    /// EXISTING HnswIndex for pattern retrieval (from ruvector-core)
+    index: HnswIndex,  // ruvector_core::index::HnswIndex
 
     /// Timestep range this bank covers
     timestep_range: (f32, f32),
@@ -402,13 +431,17 @@ impl LoraComposer {
 }
 ```
 
-## TALoRA Manager
+## TALoRA Manager (Wraps Existing MicroLoRA)
 
 ```rust
-/// Manages Timestep-Aware LoRA banks
+// Import EXISTING components
+use crate::sona::lora::{MicroLoRA, BaseLoRA, LoRAEngine};
+use ruvector_core::index::HnswIndex;
+
+/// Manages Timestep-Aware LoRA banks - WRAPS existing MicroLoRA
 pub struct TALoraManager {
-    /// Banks for different timestep ranges
-    banks: Vec<MicroLoraBank>,
+    /// Banks for different timestep ranges (each contains existing MicroLoRA)
+    banks: Vec<MicroLoraBank>,  // Banks contain Vec<MicroLoRA> from sona/lora.rs
 
     /// Timestep boundaries
     boundaries: Vec<f32>,

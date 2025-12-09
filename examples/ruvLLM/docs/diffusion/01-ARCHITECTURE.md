@@ -2,7 +2,18 @@
 
 ## System Overview
 
-RuvDLLM is built on a layered architecture that separates concerns while maintaining high performance through zero-cost abstractions.
+RuvDLLM is built on a layered architecture that **extends existing ruvector infrastructure** while adding diffusion-specific capabilities. It leverages proven components rather than rebuilding from scratch.
+
+### Building on Existing Infrastructure
+
+| Layer | Existing Component | Location | Extension |
+|-------|-------------------|----------|-----------|
+| **Core** | SimdOps, Q4Weights | `simd_inference.rs` | Diffusion kernels |
+| **Index** | HnswIndex | `ruvector-core/index/hnsw.rs` | TALoRA retrieval |
+| **Attention** | FlashAttention | `ruvector-attention/sparse/flash.rs` | Bidirectional mode |
+| **LoRA** | MicroLoRA, BaseLoRA | `sona/lora.rs` | TALoRA timestep routing |
+| **Federation** | FederatedCoordinator | `crates/sona/training/federated.rs` | DAF strategies |
+| **Memory** | EWC | `ruvector-gnn/ewc.rs` | Diffusion consolidation |
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -35,13 +46,16 @@ RuvDLLM is built on a layered architecture that separates concerns while maintai
 
 ## Core Components
 
-### 1. Diffusion Model Core
+### 1. Diffusion Model Core (Uses Existing Q4Weights)
 
 ```rust
-/// Core diffusion model with Q4 quantization
+// Uses existing Q4Weights from simd_inference.rs
+use crate::simd_inference::{Q4Weights, SimdOps, TransformerLayer};
+
+/// Core diffusion model with Q4 quantization (EXISTING infrastructure)
 pub struct DiffusionModel {
-    /// Frozen base weights (Q4 quantized)
-    base_weights: Q4Weights,
+    /// Frozen base weights (Q4 quantized) - uses existing Q4Weights
+    base_weights: Q4Weights,  // From simd_inference.rs
 
     /// QLoRA adapters (AR→Diffusion conversion)
     qlora: QLoraAdapters,
