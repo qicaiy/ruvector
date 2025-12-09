@@ -30,9 +30,12 @@ jobs:
         pg_version: [14, 15, 16, 17]
         rust: [stable]
         include:
-          # Test on macOS for pg16
+          # Test on macOS for pg16 and pg17
           - os: macos-latest
             pg_version: 16
+            rust: stable
+          - os: macos-latest
+            pg_version: 17
             rust: stable
 
     services:

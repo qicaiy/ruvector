@@ -17,6 +17,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { createRequire } from 'module';
 import { RuVectorClient } from './client.js';
 import { VectorCommands } from './commands/vector.js';
 import { AttentionCommands } from './commands/attention.js';
@@ -30,12 +31,16 @@ import { RoutingCommands } from './commands/routing.js';
 import { QuantizationCommands } from './commands/quantization.js';
 import { InstallCommands } from './commands/install.js';
 
+// Read version from package.json
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
+
 const program = new Command();
 
 program
   .name('ruvector-pg')
   .description('RuVector PostgreSQL CLI - Advanced AI Vector Database Extension')
-  .version('0.2.0')
+  .version(pkg.version)
   .option('-c, --connection <string>', 'PostgreSQL connection string', 'postgresql://localhost:5432/ruvector')
   .option('-v, --verbose', 'Enable verbose output');
 
@@ -937,7 +942,7 @@ program
 
 program
   .command('install')
-  .description('Install RuVector PostgreSQL (Docker or native)')
+  .description('Install RuVector PostgreSQL (Docker or native with full dependency installation)')
   .option('-m, --method <type>', 'Installation method: docker, native, auto', 'auto')
   .option('-p, --port <number>', 'PostgreSQL port', '5432')
   .option('-u, --user <name>', 'Database user', 'ruvector')
@@ -945,7 +950,10 @@ program
   .option('-d, --database <name>', 'Database name', 'ruvector')
   .option('--data-dir <path>', 'Persistent data directory')
   .option('--name <name>', 'Container name', 'ruvector-postgres')
-  .option('--version <version>', 'RuVector version', '0.2.3')
+  .option('--version <version>', 'RuVector version', '0.2.5')
+  .option('--pg-version <version>', 'PostgreSQL version for native install (14, 15, 16, 17)', '16')
+  .option('--skip-postgres', 'Skip PostgreSQL installation (use existing)')
+  .option('--skip-rust', 'Skip Rust installation (use existing)')
   .action(async (options) => {
     try {
       await InstallCommands.install({
@@ -957,6 +965,9 @@ program
         dataDir: options.dataDir,
         name: options.name,
         version: options.version,
+        pgVersion: options.pgVersion,
+        skipPostgres: options.skipPostgres,
+        skipRust: options.skipRust,
       });
     } catch (err) {
       console.error(chalk.red('Error:'), (err as Error).message);
