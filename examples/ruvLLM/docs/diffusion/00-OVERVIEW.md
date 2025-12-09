@@ -12,9 +12,27 @@
 | **SIMD Ops** | `simd_inference.rs` | Dot products, softmax, RMSNorm |
 | **Q4 Quantization** | `simd_inference.rs` | `Q4Weights` for diffusion model |
 | **SONA Loops** | `sona/loops/` | Instant/background/deep learning |
-| **RuVector Core** | `ruvector-core` | HNSW index for pattern storage |
+| **Federated Learning** | `crates/sona/training/federated.rs` | `FederatedCoordinator`, `EphemeralAgent` |
+| **HNSW Index** | `crates/ruvector-core/index/hnsw.rs` | Pattern retrieval |
+| **Flash Attention** | `crates/ruvector-attention/sparse/flash.rs` | Memory-efficient attention |
+| **EWC** | `crates/ruvector-gnn/ewc.rs` | Elastic Weight Consolidation |
 | **SimSIMD** | Cargo.toml | Similarity computations |
 | **Candle** | Cargo.toml | Model loading (optional) |
+
+### What Already Exists vs What's New
+
+```
+EXISTING (in ruvector ecosystem)              NEW (diffusion-specific)
+────────────────────────────────              ────────────────────────
+✓ MicroLoRA (rank 1-2, AVX2)                  ★ TALoRA timestep routing
+✓ FederatedCoordinator                        ★ DAF aggregation strategies
+✓ EphemeralAgent                              ★ Diffusion-aware privacy tiers
+✓ HnswIndex (cosine, euclidean)               ★ DGR uncertainty-guided retrieval
+✓ FlashAttention                              ★ MDLM/BD3LM samplers
+✓ Q4Weights quantization                      ★ Noise scheduler
+✓ SONA learning loops                         ★ Bidirectional attention for diffusion
+✓ EWC (Elastic Weight Consolidation)          ★ QLoRA conversion pipeline
+```
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -83,8 +101,8 @@
 │              │              │                   │                  │         │
 │              ▼              ▼                   ▼                  ▼         │
 │         ┌────────┐    ┌─────────┐        ┌──────────┐      ┌──────────┐    │
-│         │ SIMD   │    │ HNSW    │        │ Timestep │      │ MDLM/    │    │
-│         │ Embed  │    │ Index   │        │ Router   │      │ BD3LM    │    │
+│         │ SIMD   │    │ HnswIdx │        │ Timestep │      │ MDLM/    │    │
+│         │ Embed  │    │ (exist) │        │ Router   │      │ BD3LM    │    │
 │         └────────┘    └─────────┘        └──────────┘      └──────────┘    │
 │                                                                   │         │
 │                                                                   ▼         │
@@ -96,7 +114,7 @@
 │         │                                                                   │
 │         ▼                                                                   │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    SONA Learning Loops                               │   │
+│  │                    SONA Learning Loops (EXISTING)                   │   │
 │  ├─────────────────────────────────────────────────────────────────────┤   │
 │  │  Loop A (Instant): Record trajectory, update MicroLoRA bank         │   │
 │  │  Loop B (Background): Cluster patterns, train BaseLoRA (CPU SIMD)   │   │
@@ -130,13 +148,12 @@ examples/ruvLLM/
 │   │   ├── scheduler.rs           # Noise schedules
 │   │   ├── qlora_convert.rs       # AR→Diffusion conversion
 │   │   ├── talora.rs              # TALoRA (wraps MicroLoRA) [NOVEL]
-│   │   └── dgr.rs                 # DGR (uses RuVector) [NOVEL]
+│   │   └── dgr.rs                 # DGR (uses HnswIndex) [NOVEL]
 │   │
-│   ├── federation/                # NEW: Federated learning
+│   ├── federation/                # EXTEND: Build on existing
 │   │   ├── mod.rs
-│   │   ├── daf.rs                 # DAF protocol [NOVEL]
-│   │   ├── gossip.rs              # Gossip protocol
-│   │   └── privacy.rs             # Privacy tiers
+│   │   ├── daf.rs                 # DAF (extends FederatedCoordinator)
+│   │   └── privacy_tiers.rs       # Privacy tier extensions
 │   │
 │   └── gpu/                       # NEW: GPU acceleration
 │       ├── mod.rs
@@ -144,11 +161,21 @@ examples/ruvLLM/
 │       └── metal.rs               # Metal (via candle)
 │
 ├── Cargo.toml                     # EXISTING: Already has most deps
-│   # ✓ ruvector-core, ruvector-gnn, ruvector-attention
-│   # ✓ simsimd, candle-*, tokio
-│   # + Add: quinn, cudarc (optional)
 │
 └── docs/diffusion/                # This documentation
+
+crates/
+├── ruvector-core/                 # EXISTING: Reuse
+│   └── src/index/hnsw.rs          # ✓ HnswIndex for pattern retrieval
+│
+├── ruvector-attention/            # EXISTING: Reuse
+│   └── src/sparse/flash.rs        # ✓ FlashAttention
+│
+├── ruvector-gnn/                  # EXISTING: Reuse
+│   └── src/ewc.rs                 # ✓ EWC implementation
+│
+└── sona/                          # EXISTING: Reuse & Extend
+    └── src/training/federated.rs  # ✓ FederatedCoordinator, EphemeralAgent
 ```
 
 ### Dependency on Existing Code
@@ -158,13 +185,69 @@ examples/ruvLLM/
 use crate::sona::lora::{MicroLoRA, BaseLoRA, LoRAEngine};
 
 // Uses existing SIMD infrastructure
-use crate::simd_inference::{SimdOps, Q4Weights};
+use crate::simd_inference::{SimdOps, Q4Weights, TransformerLayer};
 
 // Integrates with existing SONA loops
 use crate::sona::loops::{InstantLoop, BackgroundLoop};
 
-// Uses RuVector for pattern storage
-use ruvector_core::HnswIndex;
+// Uses existing HNSW index
+use ruvector_core::index::HnswIndex;
+
+// Uses existing flash attention
+use ruvector_attention::sparse::FlashAttention;
+
+// Extends existing federated learning
+use ruvector_sona::training::federated::{FederatedCoordinator, EphemeralAgent};
+
+// Uses existing EWC
+use ruvector_gnn::ewc::Ewc;
+```
+
+### TALoRA: Extending MicroLoRA
+
+```rust
+/// TALoRA wraps existing MicroLoRA with timestep awareness
+pub struct TALoRA {
+    /// Reuse existing MicroLoRA for each bank
+    banks: [Vec<MicroLoRA>; 3],  // Uses crate::sona::lora::MicroLoRA
+    /// HNSW indices for retrieval (uses ruvector-core)
+    indices: [HnswIndex; 3],     // Uses ruvector_core::index::HnswIndex
+    /// Timestep boundaries
+    boundaries: [u32; 2],
+}
+
+impl TALoRA {
+    pub fn retrieve(&self, query: &[f32], timestep: u32, k: usize) -> Vec<&MicroLoRA> {
+        let bank_idx = self.get_bank_index(timestep);
+        // Use existing HnswIndex.search()
+        let results = self.indices[bank_idx].search(query, k).unwrap();
+        results.iter().map(|r| &self.banks[bank_idx][r.id.parse().unwrap()]).collect()
+    }
+}
+```
+
+### DAF: Extending FederatedCoordinator
+
+```rust
+/// DAF extends existing FederatedCoordinator with timestep awareness
+pub struct DAFCoordinator {
+    /// Base coordinator (from crates/sona)
+    base: FederatedCoordinator,  // Uses ruvector_sona::training::federated
+    /// Per-timestep-group aggregation strategies
+    strategies: [AggregationStrategy; 3],
+}
+
+impl DAFCoordinator {
+    /// Override aggregate to add timestep-aware logic
+    pub fn aggregate_with_daf(&mut self, export: AgentExport) -> AggregationResult {
+        // First use base coordinator's logic
+        let base_result = self.base.aggregate(export.clone());
+
+        // Then apply DAF-specific aggregation per timestep group
+        // ...
+        base_result
+    }
+}
 ```
 
 ## Key Differentiators
@@ -175,7 +258,7 @@ use ruvector_core::HnswIndex;
 | Language | Python | Rust |
 | Inference | PyTorch | Native SIMD/GPU |
 | Real-time adaptation | No | Yes (MicroLoRA) |
-| Federation | No | Yes (DAF) |
+| Federation | No | Yes (existing + DAF) |
 | Privacy tiers | No | Yes |
 | Memory | ~4GB overhead | ~500MB overhead |
 
@@ -183,36 +266,29 @@ use ruvector_core::HnswIndex;
 | Aspect | DiffuLLaMA | RuvDLLM |
 |--------|------------|---------|
 | Adaptation | Static | Dynamic (TALoRA) |
-| Retrieval | None | DGR |
-| Federation | None | DAF |
+| Retrieval | None | DGR (uses HnswIndex) |
+| Federation | None | DAF (extends existing) |
 | Deployment | GPU required | CPU viable |
-
-### vs. RAMoLE/LoraRetriever
-| Aspect | RAMoLE | RuvDLLM |
-|--------|--------|---------|
-| Model type | Autoregressive | Diffusion |
-| Timestep awareness | N/A | TALoRA |
-| Uncertainty guidance | No | DGR |
-| Implementation | Python | Rust |
 
 ## Development Phases
 
-### Phase 1: Foundation (Weeks 1-2)
-- [ ] Core diffusion model with Q4 quantization
-- [ ] MDLM sampler with SIMD optimization
-- [ ] Basic QLoRA conversion pipeline
+### Phase 1: Foundation
+- [ ] Diffusion sampler (MDLM) using existing Q4Weights
+- [ ] Noise scheduler
+- [ ] Bidirectional attention (adapt existing FlashAttention)
+- [ ] Basic QLoRA conversion
 
-### Phase 2: Novel Contributions (Weeks 3-4)
-- [ ] TALoRA implementation
-- [ ] DGR implementation
-- [ ] Integration with RuVector
+### Phase 2: Novel Contributions
+- [ ] TALoRA (wrap MicroLoRA with timestep routing)
+- [ ] DGR (uncertainty → HnswIndex retrieval)
+- [ ] Integration tests with existing SONA loops
 
-### Phase 3: Federation (Weeks 5-6)
-- [ ] DAF protocol
-- [ ] Privacy tiers
-- [ ] Gossip sync
+### Phase 3: Federation Extension
+- [ ] DAF (extend FederatedCoordinator)
+- [ ] Privacy tiers (extend EphemeralAgent)
+- [ ] Gossip sync for diffusion updates
 
-### Phase 4: Optimization (Weeks 7-8)
+### Phase 4: Optimization
 - [ ] GPU kernels (CUDA/Metal)
 - [ ] Benchmark suite
 - [ ] Production hardening
@@ -221,9 +297,10 @@ use ruvector_core::HnswIndex;
 
 1. **Performance**: Meet latency and throughput targets
 2. **Novelty**: TALoRA, DGR, and DAF working and benchmarked
-3. **Security**: Pass security audit for federation
-4. **Usability**: Clean API, good documentation
-5. **Compatibility**: Works with existing ruvLLM ecosystem
+3. **Integration**: Clean extension of existing ruvector components
+4. **Security**: Pass security audit for federation
+5. **Usability**: Clean API, good documentation
+6. **Compatibility**: Works with existing ruvLLM/ruvector ecosystem
 
 ## References
 
