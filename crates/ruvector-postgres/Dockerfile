@@ -2,7 +2,8 @@
 # Builds the extension and creates a PostgreSQL image with it installed
 
 # Build stage
-FROM rust:1.83-slim-bookworm AS builder
+# Using nightly Rust to support edition2024 crates in the registry
+FROM rustlang/rust:nightly-bookworm-slim AS builder
 
 # Install build dependencies including PostgreSQL 17 from PGDG
 RUN apt-get update && apt-get install -y \
@@ -44,6 +45,13 @@ COPY Cargo.lock ./
 # Initialize pgrx with system PostgreSQL
 RUN cargo pgrx init --pg17=/usr/lib/postgresql/17/bin/pg_config
 
+# Pre-fetch dependencies to lock versions and warm the registry cache
+RUN cargo fetch
+
+# Configure cargo to avoid sparse registry issues with edition2024 crates
+# This uses the git protocol instead of sparse which skips problematic index entries
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git
+
 # Build the extension with all features including embeddings
 RUN cargo pgrx package --features "pg17 index-all quant-all embeddings"
 
@@ -56,9 +64,10 @@ LABEL description="PostgreSQL with ruvector extension - high-performance vector 
 LABEL version="0.2.4"
 
 # Copy the built extension from builder
-COPY --from=builder /build/target/release/ruvector-postgres-pg17/usr/share/postgresql/17/extension/* \
+# Note: pgrx uses the package name 'ruvector' (from Cargo.toml lib name), not 'ruvector-postgres'
+COPY --from=builder /build/target/release/ruvector-pg17/usr/share/postgresql/17/extension/* \
     /usr/share/postgresql/17/extension/
-COPY --from=builder /build/target/release/ruvector-postgres-pg17/usr/lib/postgresql/17/lib/* \
+COPY --from=builder /build/target/release/ruvector-pg17/usr/lib/postgresql/17/lib/* \
     /usr/lib/postgresql/17/lib/
 
 # Copy SQL files and control file
