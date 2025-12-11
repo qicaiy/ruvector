@@ -68,6 +68,7 @@ pub mod router;
 pub mod simd_inference;
 pub mod sona;
 pub mod training;
+pub mod trm;
 pub mod types;
 
 #[cfg(feature = "real-inference")]
@@ -83,6 +84,7 @@ pub use inference::{GenerationConfig, GenerationResult, InferenceMode, Inference
 pub use orchestrator::RuvLLM;
 pub use simd_inference::{SimdInferenceEngine, SimdGenerationConfig, SimdOps};
 pub use sona::{SonaConfig, LoopCoordinator, InstantLoop, BackgroundLoop};
+pub use trm::{TrmEngine, TrmEngineBuilder, TrmConfig, TrmResult, SonaBridge};
 pub use types::{Feedback, Request, Response, RoutingInfo, Session};
 
 /// Library version

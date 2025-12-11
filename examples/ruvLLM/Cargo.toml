@@ -121,6 +121,14 @@ harness = false
 name = "sona_bench"
 harness = false
 
+[[bench]]
+name = "trm_bench"
+harness = false
+
+[[test]]
+name = "trm_integration_test"
+path = "tests/trm_integration_test.rs"
+
 [lib]
 name = "ruvllm"
 path = "src/lib.rs"
