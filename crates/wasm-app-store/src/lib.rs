@@ -14,13 +14,22 @@
 //!
 //! ## Example
 //!
-//! ```rust
-//! use wasm_app_store::{AppStore, ChipApp, FullApp, AppMetadata};
+//! ```rust,no_run
+//! use wasm_app_store::{AppStore, ChipApp, templates};
 //!
+//! // Create an app store
 //! let store = AppStore::new();
 //!
-//! // Publish a chip app (≤8KB)
-//! let chip_app = ChipApp::new("calculator", wasm_bytes, metadata);
+//! // Create a chip app using template WASM
+//! let wasm = templates::hello_world_wasm();
+//! let chip_app = ChipApp::new(
+//!     "Calculator".to_string(),
+//!     "A simple calculator".to_string(),
+//!     "publisher_123".to_string(),
+//!     wasm,
+//! ).unwrap();
+//!
+//! // Publish the chip app
 //! store.publish_chip_app(chip_app).unwrap();
 //!
 //! // Search for apps
