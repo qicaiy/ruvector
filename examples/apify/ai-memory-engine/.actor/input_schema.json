@@ -762,6 +762,103 @@
       "description": "Set a seed for reproducible results across runs",
       "editor": "textfield",
       "example": "42"
+    },
+
+    "storageBackend": {
+      "title": "Storage Backend",
+      "type": "string",
+      "description": "Choose how and where to persist your memory embeddings. Different backends offer different trade-offs for scalability, persistence, and features.",
+      "editor": "select",
+      "default": "apify-binary",
+      "sectionCaption": "Vector Storage & Persistence",
+      "sectionDescription": "Configure advanced vector storage options. Choose from 8 backends including cloud vector databases, hyperbolic embeddings, and local storage.",
+      "enum": [
+        "apify-binary",
+        "postgres",
+        "supabase",
+        "neon",
+        "qdrant",
+        "pinecone",
+        "weaviate",
+        "lancedb",
+        "hyperbolic"
+      ],
+      "enumTitles": [
+        "Apify Binary - Default, 4x smaller than JSON (recommended)",
+        "PostgreSQL - Self-hosted with pgvector extension",
+        "Supabase - Managed PostgreSQL with pgvector",
+        "Neon - Serverless PostgreSQL with pgvector",
+        "Qdrant - High-performance vector database",
+        "Pinecone - Serverless managed vector DB",
+        "Weaviate - GraphQL-based vector search",
+        "LanceDB - Local embedded vector DB",
+        "Hyperbolic - Poincaré ball for hierarchical data"
+      ]
+    },
+    "postgresUrl": {
+      "title": "PostgreSQL Connection URL",
+      "type": "string",
+      "description": "Connection string for PostgreSQL/Supabase/Neon (e.g., postgres://user:pass@host:5432/db)",
+      "editor": "textfield",
+      "isSecret": true,
+      "example": "postgres://user:password@db.supabase.co:5432/postgres"
+    },
+    "qdrantUrl": {
+      "title": "Qdrant URL",
+      "type": "string",
+      "description": "Qdrant server URL (cloud or self-hosted)",
+      "editor": "textfield",
+      "default": "http://localhost:6333",
+      "example": "https://your-cluster.qdrant.io"
+    },
+    "qdrantApiKey": {
+      "title": "Qdrant API Key",
+      "type": "string",
+      "description": "API key for Qdrant Cloud authentication",
+      "editor": "textfield",
+      "isSecret": true
+    },
+    "pineconeApiKey": {
+      "title": "Pinecone API Key",
+      "type": "string",
+      "description": "API key for Pinecone serverless",
+      "editor": "textfield",
+      "isSecret": true
+    },
+    "pineconeIndex": {
+      "title": "Pinecone Index Name",
+      "type": "string",
+      "description": "Name of your Pinecone index",
+      "editor": "textfield",
+      "default": "ai-memories"
+    },
+    "weaviateHost": {
+      "title": "Weaviate Host",
+      "type": "string",
+      "description": "Weaviate instance host (without https://)",
+      "editor": "textfield",
+      "example": "your-instance.weaviate.network"
+    },
+    "weaviateApiKey": {
+      "title": "Weaviate API Key",
+      "type": "string",
+      "description": "API key for Weaviate Cloud authentication",
+      "editor": "textfield",
+      "isSecret": true
+    },
+    "curvature": {
+      "title": "Hyperbolic Curvature",
+      "type": "number",
+      "description": "Curvature parameter for Poincaré ball model (higher = more curved, better for deep hierarchies)",
+      "default": 1.0,
+      "minimum": 0.1,
+      "maximum": 10.0
+    },
+    "hyperbolicClustering": {
+      "title": "Enable Hyperbolic Clustering",
+      "type": "boolean",
+      "description": "Use hyperbolic k-means for hierarchical data clustering (better for tree-like relationships)",
+      "default": false
     }
   },
   "required": ["action"]

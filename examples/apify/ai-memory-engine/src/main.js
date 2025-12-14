@@ -546,6 +546,1036 @@ class MemoryStore {
       }
     }
   }
+
+  // Export embeddings separately for efficient binary storage
+  exportEmbeddings() {
+    const ids = [];
+    const embeddings = [];
+    for (const mem of this.memories) {
+      ids.push(mem.id);
+      embeddings.push(mem.embedding);
+    }
+    return { ids, embeddings, dimensions: this.dimensions };
+  }
+
+  // Import embeddings from binary format
+  importEmbeddings(ids, embeddings) {
+    for (let i = 0; i < ids.length; i++) {
+      const mem = this.memories.find(m => m.id === ids[i]);
+      if (mem && embeddings[i]) {
+        mem.embedding = embeddings[i];
+      }
+    }
+  }
+
+  // Export metadata only (no embeddings) for compact JSON storage
+  exportMetadataOnly() {
+    return {
+      memories: this.memories.map(m => ({
+        id: m.id,
+        text: m.text,
+        metadata: m.metadata,
+        createdAt: m.createdAt,
+        accessCount: m.accessCount
+        // embedding excluded - stored separately
+      })),
+      knowledgeGraph: this.knowledgeGraph,
+      stats: this.getStats(),
+      config: {
+        dimensions: this.dimensions,
+        distanceMetric: this.distanceMetric,
+        namespace: this.namespace
+      }
+    };
+  }
+}
+
+// ============================================
+// VECTOR PERSISTENCE BACKENDS
+// ============================================
+
+/**
+ * Base class for vector persistence backends
+ */
+class VectorPersistence {
+  constructor(config) {
+    this.config = config;
+  }
+  async init() { throw new Error('Not implemented'); }
+  async save(memoryStore, sessionId) { throw new Error('Not implemented'); }
+  async load(memoryStore, sessionId) { throw new Error('Not implemented'); }
+  async close() { }
+}
+
+/**
+ * Apify KeyValueStore with binary HNSW index
+ * Stores embeddings as Float32Array binary blob for 4x size reduction
+ */
+class ApifyBinaryPersistence extends VectorPersistence {
+  async init() {
+    log.info('Initialized Apify binary persistence');
+  }
+
+  async save(memoryStore, sessionId) {
+    const storeName = `ai-memory-${sessionId.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 50)}`;
+    const store = await Actor.openKeyValueStore(storeName);
+
+    // Save metadata as JSON (compact, no embeddings)
+    const metadata = memoryStore.exportMetadataOnly();
+    await store.setValue('metadata', metadata);
+
+    // Save embeddings as binary Float32Array (4x smaller than JSON)
+    const { ids, embeddings, dimensions } = memoryStore.exportEmbeddings();
+    if (embeddings.length > 0) {
+      // Flatten all embeddings into single Float32Array
+      const totalFloats = embeddings.length * dimensions;
+      const buffer = new Float32Array(totalFloats);
+      for (let i = 0; i < embeddings.length; i++) {
+        buffer.set(embeddings[i], i * dimensions);
+      }
+      // Store as binary with header
+      const header = { ids, dimensions, count: embeddings.length };
+      await store.setValue('embeddings_header', header);
+      await store.setValue('embeddings_binary', Buffer.from(buffer.buffer), { contentType: 'application/octet-stream' });
+    }
+
+    log.info(`Saved ${memoryStore.size()} memories to ${storeName} (binary format)`);
+    return { storeName, memoryCount: memoryStore.size(), format: 'binary' };
+  }
+
+  async load(memoryStore, sessionId) {
+    const storeName = `ai-memory-${sessionId.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 50)}`;
+    const store = await Actor.openKeyValueStore(storeName);
+
+    // Load metadata
+    const metadata = await store.getValue('metadata');
+    if (!metadata) {
+      // Try legacy JSON format
+      const legacyData = await store.getValue('memory_data');
+      if (legacyData) {
+        memoryStore.fromJSON(legacyData);
+        log.info(`Loaded ${memoryStore.size()} memories from legacy JSON format`);
+        return { loaded: true, format: 'legacy-json', count: memoryStore.size() };
+      }
+      return { loaded: false };
+    }
+
+    // Restore memories without embeddings first
+    memoryStore.memories = metadata.memories.map(m => ({ ...m, embedding: null }));
+    memoryStore.knowledgeGraph = metadata.knowledgeGraph || { nodes: [], edges: [] };
+    memoryStore.stats = { ...memoryStore.stats, ...metadata.stats };
+
+    // Load binary embeddings
+    const header = await store.getValue('embeddings_header');
+    const binaryData = await store.getValue('embeddings_binary');
+    if (header && binaryData) {
+      const buffer = new Float32Array(binaryData.buffer || binaryData);
+      const { ids, dimensions } = header;
+      for (let i = 0; i < ids.length; i++) {
+        const embedding = Array.from(buffer.slice(i * dimensions, (i + 1) * dimensions));
+        const mem = memoryStore.memories.find(m => m.id === ids[i]);
+        if (mem) {
+          mem.embedding = embedding;
+          // Re-add to HNSW index
+          if (memoryStore.ruvllm) {
+            try { memoryStore.ruvllm.addMemory(mem.text, mem.metadata); } catch (e) { }
+          }
+        }
+      }
+    }
+
+    log.info(`Loaded ${memoryStore.size()} memories from ${storeName} (binary format)`);
+    return { loaded: true, format: 'binary', count: memoryStore.size() };
+  }
+}
+
+/**
+ * PostgreSQL with pgvector extension
+ * Works with Supabase, Neon, or any PostgreSQL with pgvector
+ */
+class PostgresPersistence extends VectorPersistence {
+  constructor(config) {
+    super(config);
+    this.pool = null;
+    this.tableName = config.tableName || 'ai_memories';
+  }
+
+  async init() {
+    // Dynamic import pg
+    const { default: pg } = await import('pg');
+    const { Pool } = pg;
+
+    this.pool = new Pool({
+      connectionString: this.config.connectionString,
+      ssl: this.config.ssl !== false ? { rejectUnauthorized: false } : false
+    });
+
+    // Create table with pgvector if not exists
+    await this.pool.query(`
+      CREATE EXTENSION IF NOT EXISTS vector;
+      CREATE TABLE IF NOT EXISTS ${this.tableName} (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        embedding vector(${this.config.dimensions || 768}),
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        access_count INTEGER DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_${this.tableName}_session ON ${this.tableName}(session_id);
+      CREATE INDEX IF NOT EXISTS idx_${this.tableName}_embedding ON ${this.tableName} USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+    `);
+
+    log.info(`Initialized PostgreSQL persistence with table ${this.tableName}`);
+  }
+
+  async save(memoryStore, sessionId) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Upsert memories
+      for (const mem of memoryStore.memories) {
+        const embeddingStr = `[${mem.embedding.join(',')}]`;
+        await client.query(`
+          INSERT INTO ${this.tableName} (id, session_id, text, embedding, metadata, created_at, access_count)
+          VALUES ($1, $2, $3, $4::vector, $5, $6, $7)
+          ON CONFLICT (id) DO UPDATE SET
+            text = EXCLUDED.text,
+            embedding = EXCLUDED.embedding,
+            metadata = EXCLUDED.metadata,
+            access_count = EXCLUDED.access_count
+        `, [mem.id, sessionId, mem.text, embeddingStr, mem.metadata, mem.createdAt, mem.accessCount]);
+      }
+
+      await client.query('COMMIT');
+      log.info(`Saved ${memoryStore.size()} memories to PostgreSQL`);
+      return { saved: true, count: memoryStore.size() };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async load(memoryStore, sessionId) {
+    const result = await this.pool.query(`
+      SELECT id, text, embedding::text, metadata, created_at, access_count
+      FROM ${this.tableName}
+      WHERE session_id = $1
+      ORDER BY created_at
+    `, [sessionId]);
+
+    memoryStore.memories = result.rows.map(row => ({
+      id: row.id,
+      text: row.text,
+      embedding: JSON.parse(row.embedding.replace(/^\[/, '[').replace(/\]$/, ']')),
+      metadata: row.metadata,
+      createdAt: row.created_at,
+      accessCount: row.access_count
+    }));
+
+    // Re-index in HNSW
+    if (memoryStore.ruvllm) {
+      for (const mem of memoryStore.memories) {
+        try { memoryStore.ruvllm.addMemory(mem.text, mem.metadata); } catch (e) { }
+      }
+    }
+
+    log.info(`Loaded ${memoryStore.size()} memories from PostgreSQL`);
+    return { loaded: true, count: memoryStore.size() };
+  }
+
+  async search(queryEmbedding, sessionId, topK = 10) {
+    const embeddingStr = `[${queryEmbedding.join(',')}]`;
+    const result = await this.pool.query(`
+      SELECT id, text, metadata, 1 - (embedding <=> $1::vector) as similarity
+      FROM ${this.tableName}
+      WHERE session_id = $2
+      ORDER BY embedding <=> $1::vector
+      LIMIT $3
+    `, [embeddingStr, sessionId, topK]);
+    return result.rows;
+  }
+
+  async close() {
+    if (this.pool) await this.pool.end();
+  }
+}
+
+/**
+ * Qdrant vector database
+ * Works with Qdrant Cloud or self-hosted
+ */
+class QdrantPersistence extends VectorPersistence {
+  constructor(config) {
+    super(config);
+    this.client = null;
+    this.collectionName = config.collectionName || 'ai_memories';
+  }
+
+  async init() {
+    const { QdrantClient } = await import('@qdrant/js-client-rest');
+
+    this.client = new QdrantClient({
+      url: this.config.url || 'http://localhost:6333',
+      apiKey: this.config.apiKey
+    });
+
+    // Create collection if not exists
+    try {
+      await this.client.createCollection(this.collectionName, {
+        vectors: {
+          size: this.config.dimensions || 768,
+          distance: 'Cosine'
+        }
+      });
+    } catch (e) {
+      if (!e.message?.includes('already exists')) throw e;
+    }
+
+    // Create payload index for session filtering
+    try {
+      await this.client.createPayloadIndex(this.collectionName, {
+        field_name: 'session_id',
+        field_schema: 'keyword'
+      });
+    } catch (e) { /* Index may already exist */ }
+
+    log.info(`Initialized Qdrant persistence with collection ${this.collectionName}`);
+  }
+
+  async save(memoryStore, sessionId) {
+    const points = memoryStore.memories.map((mem, idx) => ({
+      id: idx + 1, // Qdrant needs numeric or UUID
+      vector: mem.embedding,
+      payload: {
+        memory_id: mem.id,
+        session_id: sessionId,
+        text: mem.text,
+        metadata: mem.metadata,
+        created_at: mem.createdAt,
+        access_count: mem.accessCount
+      }
+    }));
+
+    if (points.length > 0) {
+      // Delete existing points for this session
+      await this.client.delete(this.collectionName, {
+        filter: { must: [{ key: 'session_id', match: { value: sessionId } }] }
+      });
+
+      // Upsert new points in batches
+      const batchSize = 100;
+      for (let i = 0; i < points.length; i += batchSize) {
+        await this.client.upsert(this.collectionName, {
+          wait: true,
+          points: points.slice(i, i + batchSize)
+        });
+      }
+    }
+
+    log.info(`Saved ${memoryStore.size()} memories to Qdrant`);
+    return { saved: true, count: memoryStore.size() };
+  }
+
+  async load(memoryStore, sessionId) {
+    const result = await this.client.scroll(this.collectionName, {
+      filter: { must: [{ key: 'session_id', match: { value: sessionId } }] },
+      with_payload: true,
+      with_vector: true,
+      limit: 10000
+    });
+
+    memoryStore.memories = result.points.map(point => ({
+      id: point.payload.memory_id,
+      text: point.payload.text,
+      embedding: point.vector,
+      metadata: point.payload.metadata,
+      createdAt: point.payload.created_at,
+      accessCount: point.payload.access_count
+    }));
+
+    // Re-index in local HNSW
+    if (memoryStore.ruvllm) {
+      for (const mem of memoryStore.memories) {
+        try { memoryStore.ruvllm.addMemory(mem.text, mem.metadata); } catch (e) { }
+      }
+    }
+
+    log.info(`Loaded ${memoryStore.size()} memories from Qdrant`);
+    return { loaded: true, count: memoryStore.size() };
+  }
+
+  async search(queryEmbedding, sessionId, topK = 10) {
+    const result = await this.client.search(this.collectionName, {
+      vector: queryEmbedding,
+      filter: { must: [{ key: 'session_id', match: { value: sessionId } }] },
+      limit: topK,
+      with_payload: true
+    });
+    return result.map(r => ({
+      id: r.payload.memory_id,
+      text: r.payload.text,
+      metadata: r.payload.metadata,
+      similarity: r.score
+    }));
+  }
+
+  async close() {
+    // Qdrant client doesn't need explicit close
+  }
+}
+
+/**
+ * Pinecone vector database
+ * Serverless vector DB with managed infrastructure
+ */
+class PineconePersistence extends VectorPersistence {
+  constructor(config) {
+    super(config);
+    this.client = null;
+    this.index = null;
+    this.indexName = config.indexName || 'ai-memories';
+  }
+
+  async init() {
+    const { Pinecone } = await import('@pinecone-database/pinecone');
+    this.client = new Pinecone({ apiKey: this.config.apiKey });
+    this.index = this.client.index(this.indexName);
+    log.info(`Initialized Pinecone persistence with index ${this.indexName}`);
+  }
+
+  async save(memoryStore, sessionId) {
+    const vectors = memoryStore.memories.map(mem => ({
+      id: mem.id,
+      values: mem.embedding,
+      metadata: {
+        session_id: sessionId,
+        text: mem.text.substring(0, 1000), // Pinecone metadata limit
+        ...mem.metadata,
+        created_at: mem.createdAt,
+        access_count: mem.accessCount
+      }
+    }));
+
+    // Upsert in batches of 100
+    for (let i = 0; i < vectors.length; i += 100) {
+      await this.index.namespace(sessionId).upsert(vectors.slice(i, i + 100));
+    }
+
+    log.info(`Saved ${memoryStore.size()} memories to Pinecone`);
+    return { saved: true, count: memoryStore.size() };
+  }
+
+  async load(memoryStore, sessionId) {
+    // Pinecone doesn't support listing all vectors, use fetch with known IDs
+    // For now, return empty - would need to track IDs separately
+    log.warning('Pinecone load requires tracking IDs externally');
+    return { loaded: false, message: 'Use hybrid storage for Pinecone' };
+  }
+
+  async search(queryEmbedding, sessionId, topK = 10) {
+    const result = await this.index.namespace(sessionId).query({
+      vector: queryEmbedding,
+      topK,
+      includeMetadata: true
+    });
+    return result.matches.map(m => ({
+      id: m.id,
+      text: m.metadata.text,
+      metadata: m.metadata,
+      similarity: m.score
+    }));
+  }
+}
+
+/**
+ * Weaviate vector database
+ * Open-source, GraphQL-based vector search
+ */
+class WeaviatePersistence extends VectorPersistence {
+  constructor(config) {
+    super(config);
+    this.client = null;
+    this.className = config.className || 'AiMemory';
+  }
+
+  async init() {
+    const weaviate = await import('weaviate-ts-client');
+    this.client = weaviate.default.client({
+      scheme: this.config.scheme || 'https',
+      host: this.config.host,
+      apiKey: this.config.apiKey ? new weaviate.default.ApiKey(this.config.apiKey) : undefined
+    });
+
+    // Create class if not exists
+    try {
+      await this.client.schema.classCreator().withClass({
+        class: this.className,
+        vectorizer: 'none',
+        properties: [
+          { name: 'text', dataType: ['text'] },
+          { name: 'session_id', dataType: ['string'] },
+          { name: 'memory_id', dataType: ['string'] },
+          { name: 'metadata', dataType: ['text'] },
+          { name: 'created_at', dataType: ['date'] },
+          { name: 'access_count', dataType: ['int'] }
+        ]
+      }).do();
+    } catch (e) { /* Class may exist */ }
+
+    log.info(`Initialized Weaviate persistence with class ${this.className}`);
+  }
+
+  async save(memoryStore, sessionId) {
+    // Delete existing for this session
+    await this.client.batch.objectsBatchDeleter()
+      .withClassName(this.className)
+      .withWhere({ path: ['session_id'], operator: 'Equal', valueString: sessionId })
+      .do();
+
+    // Add memories in batches
+    let batcher = this.client.batch.objectsBatcher();
+    for (const mem of memoryStore.memories) {
+      batcher = batcher.withObject({
+        class: this.className,
+        properties: {
+          text: mem.text,
+          session_id: sessionId,
+          memory_id: mem.id,
+          metadata: JSON.stringify(mem.metadata),
+          created_at: mem.createdAt,
+          access_count: mem.accessCount
+        },
+        vector: mem.embedding
+      });
+    }
+    await batcher.do();
+
+    log.info(`Saved ${memoryStore.size()} memories to Weaviate`);
+    return { saved: true, count: memoryStore.size() };
+  }
+
+  async load(memoryStore, sessionId) {
+    const result = await this.client.graphql.get()
+      .withClassName(this.className)
+      .withFields('text memory_id metadata created_at access_count _additional { vector }')
+      .withWhere({ path: ['session_id'], operator: 'Equal', valueString: sessionId })
+      .do();
+
+    const items = result.data?.Get?.[this.className] || [];
+    memoryStore.memories = items.map(item => ({
+      id: item.memory_id,
+      text: item.text,
+      embedding: item._additional.vector,
+      metadata: JSON.parse(item.metadata || '{}'),
+      createdAt: item.created_at,
+      accessCount: item.access_count
+    }));
+
+    log.info(`Loaded ${memoryStore.size()} memories from Weaviate`);
+    return { loaded: true, count: memoryStore.size() };
+  }
+
+  async search(queryEmbedding, sessionId, topK = 10) {
+    const result = await this.client.graphql.get()
+      .withClassName(this.className)
+      .withFields('text memory_id metadata _additional { certainty }')
+      .withNearVector({ vector: queryEmbedding })
+      .withWhere({ path: ['session_id'], operator: 'Equal', valueString: sessionId })
+      .withLimit(topK)
+      .do();
+
+    return (result.data?.Get?.[this.className] || []).map(item => ({
+      id: item.memory_id,
+      text: item.text,
+      metadata: JSON.parse(item.metadata || '{}'),
+      similarity: item._additional.certainty
+    }));
+  }
+}
+
+/**
+ * LanceDB - Local, embedded vector database
+ * Fast, serverless, works locally
+ */
+class LanceDBPersistence extends VectorPersistence {
+  constructor(config) {
+    super(config);
+    this.db = null;
+    this.table = null;
+    this.tableName = config.tableName || 'ai_memories';
+    this.dbPath = config.dbPath || '/tmp/lancedb';
+  }
+
+  async init() {
+    const lancedb = await import('vectordb');
+    this.db = await lancedb.connect(this.dbPath);
+    log.info(`Initialized LanceDB at ${this.dbPath}`);
+  }
+
+  async save(memoryStore, sessionId) {
+    const data = memoryStore.memories.map(mem => ({
+      id: mem.id,
+      session_id: sessionId,
+      text: mem.text,
+      vector: mem.embedding,
+      metadata: JSON.stringify(mem.metadata),
+      created_at: mem.createdAt,
+      access_count: mem.accessCount
+    }));
+
+    const tableName = `${this.tableName}_${sessionId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    try {
+      await this.db.dropTable(tableName);
+    } catch (e) { /* Table may not exist */ }
+
+    this.table = await this.db.createTable(tableName, data);
+    log.info(`Saved ${memoryStore.size()} memories to LanceDB`);
+    return { saved: true, count: memoryStore.size() };
+  }
+
+  async load(memoryStore, sessionId) {
+    const tableName = `${this.tableName}_${sessionId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    try {
+      this.table = await this.db.openTable(tableName);
+      const data = await this.table.search([0]).limit(100000).execute(); // Get all
+
+      memoryStore.memories = data.map(row => ({
+        id: row.id,
+        text: row.text,
+        embedding: row.vector,
+        metadata: JSON.parse(row.metadata || '{}'),
+        createdAt: row.created_at,
+        accessCount: row.access_count
+      }));
+
+      log.info(`Loaded ${memoryStore.size()} memories from LanceDB`);
+      return { loaded: true, count: memoryStore.size() };
+    } catch (e) {
+      return { loaded: false };
+    }
+  }
+
+  async search(queryEmbedding, sessionId, topK = 10) {
+    if (!this.table) return [];
+    const results = await this.table.search(queryEmbedding).limit(topK).execute();
+    return results.map(r => ({
+      id: r.id,
+      text: r.text,
+      metadata: JSON.parse(r.metadata || '{}'),
+      similarity: 1 - r._distance
+    }));
+  }
+}
+
+// ============================================
+// HYPERBOLIC GEOMETRY UTILITIES
+// ============================================
+
+const POINCARE_EPS = 1e-7;
+
+/**
+ * Project vector into Poincaré ball (ensures ||x|| < 1)
+ */
+function projectToPoincareBall(x, c = 1.0) {
+  const normSq = x.reduce((sum, v) => sum + v * v, 0);
+  const maxNorm = (1.0 - POINCARE_EPS) / Math.sqrt(c);
+  if (normSq >= maxNorm * maxNorm) {
+    const scale = maxNorm / Math.sqrt(normSq);
+    return x.map(v => v * scale);
+  }
+  return x;
+}
+
+/**
+ * Poincaré distance between two points in hyperbolic space
+ */
+function poincareDistance(u, v, c = 1.0) {
+  const sqrtC = Math.sqrt(c);
+  const diff = u.map((ui, i) => ui - v[i]);
+  const normDiffSq = diff.reduce((sum, d) => sum + d * d, 0);
+  const normUSq = u.reduce((sum, ui) => sum + ui * ui, 0);
+  const normVSq = v.reduce((sum, vi) => sum + vi * vi, 0);
+
+  const lambdaU = 1.0 - c * normUSq;
+  const lambdaV = 1.0 - c * normVSq;
+
+  const arg = 1.0 + (2.0 * c * normDiffSq) / Math.max(lambdaU * lambdaV, POINCARE_EPS);
+  return (1.0 / sqrtC) * Math.acosh(Math.max(1.0, arg));
+}
+
+/**
+ * Möbius addition in Poincaré ball
+ */
+function mobiusAdd(u, v, c = 1.0) {
+  const normUSq = u.reduce((sum, ui) => sum + ui * ui, 0);
+  const normVSq = v.reduce((sum, vi) => sum + vi * vi, 0);
+  const dotUV = u.reduce((sum, ui, i) => sum + ui * v[i], 0);
+
+  const coefU = 1.0 + 2.0 * c * dotUV + c * normVSq;
+  const coefV = 1.0 - c * normUSq;
+  const denom = 1.0 + 2.0 * c * dotUV + c * c * normUSq * normVSq;
+
+  const result = u.map((ui, i) => (coefU * ui + coefV * v[i]) / Math.max(denom, POINCARE_EPS));
+  return projectToPoincareBall(result, c);
+}
+
+/**
+ * Exponential map: tangent space → hyperbolic space
+ */
+function expMap(base, tangent, c = 1.0) {
+  const sqrtC = Math.sqrt(c);
+  const normBaseSq = base.reduce((sum, b) => sum + b * b, 0);
+  const lambdaBase = 1.0 / Math.max(1.0 - c * normBaseSq, POINCARE_EPS);
+
+  const normTangent = Math.sqrt(tangent.reduce((sum, t) => sum + t * t, 0));
+  if (normTangent < POINCARE_EPS) return base;
+
+  const normTangentP = lambdaBase * normTangent;
+  const coef = Math.tanh(sqrtC * normTangentP / 2.0) / (sqrtC * normTangentP);
+  const transported = tangent.map(t => coef * t);
+
+  return mobiusAdd(base, transported, c);
+}
+
+/**
+ * Logarithmic map: hyperbolic space → tangent space
+ */
+function logMap(base, point, c = 1.0) {
+  const sqrtC = Math.sqrt(c);
+  const negBase = base.map(b => -b);
+  const diff = mobiusAdd(negBase, point, c);
+
+  const normDiff = Math.sqrt(diff.reduce((sum, d) => sum + d * d, 0));
+  if (normDiff < POINCARE_EPS) return diff;
+
+  const normBaseSq = base.reduce((sum, b) => sum + b * b, 0);
+  const lambdaBase = 1.0 / Math.max(1.0 - c * normBaseSq, POINCARE_EPS);
+
+  const coef = (2.0 / (sqrtC * lambdaBase)) * Math.atanh(Math.min(sqrtC * normDiff, 1.0 - POINCARE_EPS)) / normDiff;
+  return diff.map(d => coef * d);
+}
+
+/**
+ * Fréchet mean in hyperbolic space (centroid)
+ */
+function frechetMean(points, c = 1.0, maxIter = 100, tol = 1e-6) {
+  if (points.length === 0) return null;
+  if (points.length === 1) return [...points[0]];
+
+  // Initialize with Euclidean mean projected to ball
+  let mean = points[0].map((_, i) =>
+    points.reduce((sum, p) => sum + p[i], 0) / points.length
+  );
+  mean = projectToPoincareBall(mean, c);
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    // Compute tangent vectors from mean to all points
+    const tangents = points.map(p => logMap(mean, p, c));
+
+    // Average tangent
+    const avgTangent = tangents[0].map((_, i) =>
+      tangents.reduce((sum, t) => sum + t[i], 0) / tangents.length
+    );
+
+    // Move mean in direction of average tangent
+    const newMean = expMap(mean, avgTangent, c);
+
+    // Check convergence
+    const diff = newMean.reduce((sum, v, i) => sum + (v - mean[i]) ** 2, 0);
+    mean = newMean;
+
+    if (diff < tol) break;
+  }
+
+  return mean;
+}
+
+/**
+ * Hyperbolic k-means clustering
+ */
+function hyperbolicKMeans(points, k, c = 1.0, maxIter = 50) {
+  if (points.length <= k) {
+    return points.map((p, i) => ({ centroid: p, members: [i] }));
+  }
+
+  // Initialize centroids randomly
+  const indices = [...Array(points.length).keys()];
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  let centroids = indices.slice(0, k).map(i => [...points[i]]);
+
+  let assignments = new Array(points.length).fill(0);
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    // Assign points to nearest centroid
+    const newAssignments = points.map(p => {
+      let minDist = Infinity;
+      let minIdx = 0;
+      for (let j = 0; j < centroids.length; j++) {
+        const dist = poincareDistance(p, centroids[j], c);
+        if (dist < minDist) {
+          minDist = dist;
+          minIdx = j;
+        }
+      }
+      return minIdx;
+    });
+
+    // Check convergence
+    if (newAssignments.every((a, i) => a === assignments[i])) break;
+    assignments = newAssignments;
+
+    // Update centroids using Fréchet mean
+    centroids = centroids.map((_, j) => {
+      const members = points.filter((_, i) => assignments[i] === j);
+      return members.length > 0 ? frechetMean(members, c) : centroids[j];
+    });
+  }
+
+  // Build clusters
+  return centroids.map((centroid, j) => ({
+    centroid,
+    members: assignments.map((a, i) => a === j ? i : -1).filter(i => i >= 0)
+  }));
+}
+
+/**
+ * SIMD-friendly batch Poincaré distance computation
+ * Processes multiple point pairs efficiently using typed arrays
+ */
+function batchPoincareDistance(queries, targets, c = 1.0) {
+  const sqrtC = Math.sqrt(c);
+  const results = new Float32Array(queries.length * targets.length);
+
+  for (let q = 0; q < queries.length; q++) {
+    const u = queries[q];
+    const normUSq = u.reduce((sum, ui) => sum + ui * ui, 0);
+    const lambdaU = 1.0 - c * normUSq;
+
+    for (let t = 0; t < targets.length; t++) {
+      const v = targets[t];
+      const normVSq = v.reduce((sum, vi) => sum + vi * vi, 0);
+      const lambdaV = 1.0 - c * normVSq;
+
+      let normDiffSq = 0;
+      for (let i = 0; i < u.length; i++) {
+        const d = u[i] - v[i];
+        normDiffSq += d * d;
+      }
+
+      const arg = 1.0 + (2.0 * c * normDiffSq) / Math.max(lambdaU * lambdaV, POINCARE_EPS);
+      results[q * targets.length + t] = (1.0 / sqrtC) * Math.acosh(Math.max(1.0, arg));
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Batch projection to Poincaré ball (vectorized)
+ */
+function batchProjectToPoincareBall(vectors, c = 1.0) {
+  const maxNorm = (1.0 - POINCARE_EPS) / Math.sqrt(c);
+  const maxNormSq = maxNorm * maxNorm;
+
+  return vectors.map(x => {
+    const normSq = x.reduce((sum, v) => sum + v * v, 0);
+    if (normSq >= maxNormSq) {
+      const scale = maxNorm / Math.sqrt(normSq);
+      return x.map(v => v * scale);
+    }
+    return x;
+  });
+}
+
+/**
+ * Parallel transport in hyperbolic space
+ * Transports tangent vector from point a to point b
+ */
+function parallelTransport(a, b, tangent, c = 1.0) {
+  const logAB = logMap(a, b, c);
+  const normLogAB = Math.sqrt(logAB.reduce((sum, v) => sum + v * v, 0));
+
+  if (normLogAB < POINCARE_EPS) return tangent;
+
+  // Compute gyration
+  const normASq = a.reduce((sum, v) => sum + v * v, 0);
+  const normBSq = b.reduce((sum, v) => sum + v * v, 0);
+  const lambdaA = 1.0 / (1.0 - c * normASq);
+  const lambdaB = 1.0 / (1.0 - c * normBSq);
+
+  return tangent.map(t => t * (lambdaB / lambdaA));
+}
+
+/**
+ * Hyperbolic midpoint (geodesic midpoint)
+ */
+function hyperbolicMidpoint(u, v, c = 1.0) {
+  const tangent = logMap(u, v, c);
+  const halfTangent = tangent.map(t => t * 0.5);
+  return expMap(u, halfTangent, c);
+}
+
+/**
+ * Hyperbolic interpolation (geodesic interpolation)
+ * t=0 returns u, t=1 returns v
+ */
+function hyperbolicInterpolate(u, v, t, c = 1.0) {
+  const tangent = logMap(u, v, c);
+  const scaledTangent = tangent.map(tv => tv * t);
+  return expMap(u, scaledTangent, c);
+}
+
+/**
+ * Hyperbolic-aware persistence backend
+ * Stores vectors in Poincaré ball model for hierarchical data
+ */
+class HyperbolicPersistence extends VectorPersistence {
+  constructor(config) {
+    super(config);
+    this.curvature = config.curvature || 1.0;
+    this.innerPersistence = null;
+  }
+
+  async init() {
+    // Use apify-binary as inner storage, but with hyperbolic transforms
+    this.innerPersistence = new ApifyBinaryPersistence(this.config);
+    await this.innerPersistence.init();
+    log.info(`Initialized Hyperbolic persistence with curvature ${this.curvature}`);
+  }
+
+  // Convert Euclidean embeddings to Poincaré ball
+  euclideanToHyperbolic(embedding) {
+    // Normalize and project to Poincaré ball
+    const norm = Math.sqrt(embedding.reduce((sum, v) => sum + v * v, 0));
+    const scaled = embedding.map(v => v / (norm + 1)); // Ensure inside ball
+    return projectToPoincareBall(scaled, this.curvature);
+  }
+
+  async save(memoryStore, sessionId) {
+    // Convert all embeddings to hyperbolic space before saving
+    const originalEmbeddings = memoryStore.memories.map(m => m.embedding);
+
+    memoryStore.memories.forEach(mem => {
+      if (mem.embedding) {
+        mem.embedding = this.euclideanToHyperbolic(mem.embedding);
+        mem.metadata = { ...mem.metadata, _hyperbolic: true, _curvature: this.curvature };
+      }
+    });
+
+    const result = await this.innerPersistence.save(memoryStore, sessionId);
+
+    // Restore original embeddings
+    memoryStore.memories.forEach((mem, i) => {
+      mem.embedding = originalEmbeddings[i];
+    });
+
+    return { ...result, geometry: 'hyperbolic', curvature: this.curvature };
+  }
+
+  async load(memoryStore, sessionId) {
+    return await this.innerPersistence.load(memoryStore, sessionId);
+  }
+
+  // Hyperbolic similarity search
+  hyperbolicSearch(query, memories, topK = 10) {
+    const queryHyp = this.euclideanToHyperbolic(query);
+
+    return memories
+      .map(mem => ({
+        ...mem,
+        // Convert distance to similarity (closer = higher)
+        similarity: 1 / (1 + poincareDistance(queryHyp, mem.embedding, this.curvature))
+      }))
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, topK);
+  }
+}
+
+/**
+ * Factory function to create persistence backend
+ */
+async function createPersistence(config) {
+  const backend = config.storageBackend || 'apify-binary';
+
+  let persistence;
+  switch (backend) {
+    case 'postgres':
+    case 'supabase':
+    case 'neon':
+      if (!config.postgresUrl) {
+        throw new Error(`PostgreSQL connection string required for ${backend} backend`);
+      }
+      persistence = new PostgresPersistence({
+        connectionString: config.postgresUrl,
+        dimensions: config.dimensions || 768,
+        tableName: config.tableName || 'ai_memories',
+        ssl: backend !== 'postgres' // Supabase/Neon require SSL
+      });
+      break;
+
+    case 'qdrant':
+      persistence = new QdrantPersistence({
+        url: config.qdrantUrl || 'http://localhost:6333',
+        apiKey: config.qdrantApiKey,
+        collectionName: config.collectionName || 'ai_memories',
+        dimensions: config.dimensions || 768
+      });
+      break;
+
+    case 'pinecone':
+      if (!config.pineconeApiKey) {
+        throw new Error('Pinecone API key required');
+      }
+      persistence = new PineconePersistence({
+        apiKey: config.pineconeApiKey,
+        indexName: config.pineconeIndex || 'ai-memories',
+        dimensions: config.dimensions || 768
+      });
+      break;
+
+    case 'weaviate':
+      if (!config.weaviateHost) {
+        throw new Error('Weaviate host required');
+      }
+      persistence = new WeaviatePersistence({
+        host: config.weaviateHost,
+        apiKey: config.weaviateApiKey,
+        className: config.weaviateClass || 'AiMemory',
+        dimensions: config.dimensions || 768
+      });
+      break;
+
+    case 'lancedb':
+      persistence = new LanceDBPersistence({
+        dbPath: config.lancedbPath || '/tmp/lancedb',
+        tableName: config.tableName || 'ai_memories',
+        dimensions: config.dimensions || 768
+      });
+      break;
+
+    case 'hyperbolic':
+      persistence = new HyperbolicPersistence({
+        curvature: config.curvature || 1.0,
+        dimensions: config.dimensions || 768,
+        ...config
+      });
+      break;
+
+    case 'apify-binary':
+    default:
+      persistence = new ApifyBinaryPersistence(config);
+      break;
+  }
+
+  await persistence.init();
+  return persistence;
 }
 
 // ============================================

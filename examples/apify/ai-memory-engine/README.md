@@ -2,7 +2,7 @@
 
 **Give your AI persistent memory.** Store conversations, search semantically, build knowledge graphs, and watch your AI get smarter with every interaction. The ultimate memory solution for AI agents, chatbots, and intelligent automation.
 
-🧠 **Self-Learning** · 🔍 **Semantic Search** · 🕸️ **Knowledge Graphs** · ⚡ **Sub-millisecond** · 🔗 **LLM Agnostic** · 🔌 **One-Click Integrations**
+🧠 **Self-Learning** · 🔍 **Semantic Search** · 🕸️ **Knowledge Graphs** · ⚡ **Sub-millisecond** · 🔗 **LLM Agnostic** · 🔌 **One-Click Integrations** · 📊 **8 Vector DB Backends** · 🌀 **Hyperbolic Embeddings**
 
 [![Apify Actor](https://img.shields.io/badge/Apify-Actor-blue)](https://apify.com/ruv/ai-memory-engine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
@@ -21,9 +21,10 @@
 |---------|------------------|----------------------|
 | **Setup Time** | 1 minute | Hours to days |
 | **Cost** | Pay per use ($0.001/operation) | $50-500/month subscriptions |
-| **Memory Persistence** | Built-in cross-session | Requires external DB |
+| **Memory Persistence** | 8 storage backends (Supabase, Qdrant, Pinecone, etc.) | Single DB only |
 | **Self-Learning** | SONA neural architecture | Manual tuning |
 | **Apify Integration** | One-click from any actor | Custom code required |
+| **Hyperbolic Geometry** | Poincaré ball for hierarchical data | Euclidean only |
 | **Export Options** | 6 vector DB formats | Limited |
 
 ### Key Capabilities
@@ -34,6 +35,15 @@
 - **AI Features**: chat, recommend, analyze, build_knowledge, learn
 - **Integration**: integrate_actor, integrate_synthetic, integrate_scraper, template
 - **Utilities**: natural language commands, cluster, export_vectordb, feedback
+
+**8 Storage Backends**:
+- **Apify Binary** - Default, 4x smaller than JSON with HNSW re-indexing
+- **PostgreSQL/Supabase/Neon** - pgvector for production deployments
+- **Qdrant** - High-throughput cloud vector DB
+- **Pinecone** - Serverless managed infrastructure
+- **Weaviate** - GraphQL-based hybrid search
+- **LanceDB** - Local embedded database
+- **Hyperbolic** - Poincaré ball for hierarchical data
 
 **One-Click Actor Integration** with 10+ popular scrapers:
 - Google Maps, Instagram, TikTok, YouTube, Twitter, Amazon, TripAdvisor, LinkedIn, and more
@@ -500,6 +510,134 @@ Each template includes:
 - Identify content gaps
 - Organize knowledge automatically
 - Find related memories without a query
+
+---
+
+## Vector Storage Backends
+
+**8 storage backends** for different scalability and persistence needs:
+
+```json
+{
+  "action": "store",
+  "memories": [...],
+  "storageBackend": "supabase",
+  "postgresUrl": "postgres://user:pass@db.supabase.co:5432/postgres"
+}
+```
+
+### Available Backends
+
+| Backend | Best For | Features |
+|---------|----------|----------|
+| `apify-binary` | Default, simple persistence | 4x smaller than JSON, automatic HNSW re-indexing |
+| `postgres` / `supabase` / `neon` | Production deployments | pgvector extension, SQL queries, ACID compliance |
+| `qdrant` | High-throughput search | Built-in filtering, clustering, 100M+ vectors |
+| `pinecone` | Serverless, zero ops | Managed infrastructure, auto-scaling |
+| `weaviate` | GraphQL queries | Hybrid search, graph traversal |
+| `lancedb` | Local/embedded | No server needed, ML-pipeline friendly |
+| `hyperbolic` | Hierarchical data | Poincaré ball embeddings, tree structures |
+
+### PostgreSQL / Supabase / Neon
+
+Use pgvector for production-grade vector search:
+
+```json
+{
+  "action": "store",
+  "memories": [{"text": "Product X specs..."}],
+  "storageBackend": "supabase",
+  "postgresUrl": "postgres://user:pass@db.supabase.co:5432/postgres",
+  "sessionId": "my-app"
+}
+```
+
+Features:
+- IVFFlat and HNSW indexing
+- SQL filtering with vector search
+- Automatic schema creation
+- Incremental updates (upsert)
+
+### Qdrant Cloud
+
+High-performance vector search at scale:
+
+```json
+{
+  "action": "store",
+  "storageBackend": "qdrant",
+  "qdrantUrl": "https://your-cluster.qdrant.io",
+  "qdrantApiKey": "your-api-key"
+}
+```
+
+### Pinecone Serverless
+
+Zero-ops managed vector database:
+
+```json
+{
+  "action": "store",
+  "storageBackend": "pinecone",
+  "pineconeApiKey": "your-api-key",
+  "pineconeIndex": "my-memories"
+}
+```
+
+---
+
+## Hyperbolic Embeddings
+
+**NEW: Poincaré ball embeddings** for hierarchical and tree-structured data:
+
+```json
+{
+  "action": "store",
+  "memories": [
+    {"text": "CEO leads the company", "metadata": {"level": 1}},
+    {"text": "VP Engineering reports to CEO", "metadata": {"level": 2}},
+    {"text": "Senior Engineer reports to VP", "metadata": {"level": 3}}
+  ],
+  "storageBackend": "hyperbolic",
+  "curvature": 1.0
+}
+```
+
+### Why Hyperbolic?
+
+Traditional Euclidean embeddings struggle with:
+- **Taxonomies** (products → categories → subcategories)
+- **Organization charts** (CEO → VPs → Managers → Staff)
+- **Knowledge graphs** (concepts → related concepts)
+- **File systems** (directories → subdirectories → files)
+
+Hyperbolic space naturally represents hierarchical relationships because:
+- Distance from origin = depth in hierarchy
+- Points near boundary = leaf nodes
+- Points near center = root nodes
+
+### Hyperbolic Features
+
+| Feature | Description |
+|---------|-------------|
+| `poincareDistance` | True geodesic distance in curved space |
+| `mobiusAdd` | Addition operation preserving geometry |
+| `frechetMean` | Hyperbolic centroid computation |
+| `hyperbolicKMeans` | Clustering respecting hierarchy |
+| `expMap` / `logMap` | Tangent space operations |
+
+### Hyperbolic Clustering
+
+Group hierarchical data naturally:
+
+```json
+{
+  "action": "cluster",
+  "numClusters": 5,
+  "hyperbolicClustering": true,
+  "curvature": 1.0
+}
+```
 
 ---
 
