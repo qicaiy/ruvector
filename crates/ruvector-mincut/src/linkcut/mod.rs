@@ -256,7 +256,7 @@ impl LinkCutTree {
 
     /// Verify cached root is still valid
     #[inline]
-    fn verify_root_cache(&self, node_idx: usize, cached_root: usize) -> bool {
+    fn verify_root_cache(&self, _node_idx: usize, cached_root: usize) -> bool {
         // Quick check: if cached_root is still in bounds and appears reachable
         cached_root < self.nodes.len()
     }

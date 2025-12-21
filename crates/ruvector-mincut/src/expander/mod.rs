@@ -220,7 +220,7 @@ impl ExpanderDecomposition {
     /// Update after edge deletion
     ///
     /// Identifies affected components and rebuilds them if necessary
-    pub fn delete_edge(&mut self, u: VertexId, v: VertexId) -> Result<()> {
+    pub fn delete_edge(&mut self, u: VertexId, _v: VertexId) -> Result<()> {
         // Find affected components at each level
         for level in 0..self.levels.len() {
             if let Some(u_comp_id) = self.vertex_to_component[level].get(&u) {

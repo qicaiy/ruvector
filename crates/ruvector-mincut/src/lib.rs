@@ -45,7 +45,7 @@
 //! - [`euler`]: Euler tour trees for tree operations
 //! - [`sparsify`]: Graph sparsification for approximate cuts
 //! - [`expander`]: Expander decomposition for subpolynomial updates
-//! - [`monitoring`]: Real-time event monitoring (feature-gated)
+//! - `monitoring`: Real-time event monitoring (feature-gated)
 //!
 //! ## Feature Flags
 //!
@@ -135,6 +135,8 @@ pub mod connectivity;
 pub mod instance;
 pub mod wrapper;
 pub mod certificate;
+pub mod fragment;
+pub mod cluster;
 
 // Internal modules
 mod core;
@@ -159,13 +161,15 @@ pub use localkcut::{
     DeterministicLocalKCut, DeterministicFamilyGenerator,
 };
 pub use connectivity::DynamicConnectivity;
-pub use instance::{ProperCutInstance, InstanceResult, WitnessHandle, StubInstance};
+pub use instance::{ProperCutInstance, InstanceResult, WitnessHandle, StubInstance, BoundedInstance};
 pub use wrapper::MinCutWrapper;
 pub use certificate::{
     CutCertificate, CertificateError, CertLocalKCutQuery, LocalKCutResponse,
     LocalKCutResultSummary, UpdateTrigger, UpdateType, AuditLogger,
     AuditEntry, AuditEntryType, AuditData,
 };
+pub use cluster::{ClusterHierarchy, Cluster};
+pub use fragment::{Fragment, FragmentResult, FragmentingAlgorithm};
 
 #[cfg(feature = "monitoring")]
 pub use monitoring::{
@@ -205,8 +209,10 @@ pub mod prelude {
         DeterministicLocalKCut, DeterministicFamilyGenerator,
         CutCertificate, CertificateError, AuditLogger,
         DynamicConnectivity,
-        ProperCutInstance, InstanceResult, WitnessHandle, StubInstance,
+        ProperCutInstance, InstanceResult, WitnessHandle, StubInstance, BoundedInstance,
         MinCutWrapper,
+        ClusterHierarchy, Cluster,
+        Fragment, FragmentResult, FragmentingAlgorithm,
     };
 
     #[cfg(feature = "monitoring")]

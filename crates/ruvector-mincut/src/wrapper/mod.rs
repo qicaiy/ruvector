@@ -6,9 +6,9 @@
 //! # Overview
 //!
 //! The wrapper maintains instances with ranges:
-//! - Instance i: [λ_min[i], λ_max[i]] where
-//! - λ_min[i] = floor(1.2^i)
-//! - λ_max[i] = floor(1.2^(i+1))
+//! - Instance i: \[λ_min\[i\], λ_max\[i\]\] where
+//! - λ_min\[i\] = floor(1.2^i)
+//! - λ_max\[i\] = floor(1.2^(i+1))
 //!
 //! # Algorithm
 //!

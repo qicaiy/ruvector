@@ -568,7 +568,7 @@ impl UnionFind {
         }
     }
 
-    fn find(&mut self, mut x: VertexId) -> VertexId {
+    fn find(&mut self, x: VertexId) -> VertexId {
         let x_idx = x as usize % self.parent.len();
         let mut idx = x_idx;
 

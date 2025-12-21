@@ -6,10 +6,12 @@
 pub mod traits;
 pub mod witness;
 pub mod stub;
+pub mod bounded;
 
 pub use traits::{ProperCutInstance, InstanceResult};
 pub use witness::{WitnessHandle, ImplicitWitness, Witness};
 pub use stub::StubInstance;
+pub use bounded::BoundedInstance;
 
 #[cfg(test)]
 mod tests {

@@ -57,7 +57,7 @@ pub struct WitnessHandle {
 /// The witness represents a connected set U ⊆ V where:
 /// - U contains the seed vertex
 /// - |δ(U)| = boundary_size
-/// - membership[v] = true iff v ∈ U
+/// - membership\[v\] = true iff v ∈ U
 #[derive(Debug)]
 pub struct ImplicitWitness {
     /// Seed vertex that defines the cut (always in U)
