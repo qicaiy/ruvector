@@ -111,7 +111,8 @@ impl DynamicMinCut {
 
     /// Build from an existing graph
     pub fn from_graph(graph: DynamicGraph, config: MinCutConfig) -> Result<Self> {
-        let graph_arc = Arc::new(graph.clone());
+        // Create shared graph instance
+        let graph_shared = Arc::new(RwLock::new(graph.clone()));
 
         // Initialize link-cut tree and Euler tour tree with all vertices
         let mut link_cut_tree = LinkCutTree::new();
@@ -155,31 +156,35 @@ impl DynamicMinCut {
             }
         }
 
-        // Initialize hierarchical decomposition
-        let decomposition = HierarchicalDecomposition::build(graph_arc.clone())?;
+        // Initialize hierarchical decomposition with the same shared graph
+        let graph_for_decomp = Arc::new(graph);
+        let decomposition = HierarchicalDecomposition::build(graph_for_decomp)?;
 
-        // Get initial minimum cut from decomposition
-        let current_min_cut = decomposition.min_cut_value();
-
-        Ok(Self {
-            graph: Arc::new(RwLock::new(graph)),
+        // Create the structure first
+        let mut mincut = Self {
+            graph: graph_shared,
             decomposition,
             link_cut_tree,
             spanning_forest,
-            current_min_cut,
+            current_min_cut: f64::INFINITY,
             config,
             stats: Arc::new(RwLock::new(AlgorithmStats::default())),
             tree_edges: Arc::new(RwLock::new(tree_edges)),
-        })
+        };
+
+        // Now compute the initial minimum cut using the tree-edge-based method
+        mincut.recompute_min_cut();
+
+        Ok(mincut)
     }
 
     /// Insert an edge
     pub fn insert_edge(&mut self, u: VertexId, v: VertexId, weight: Weight) -> Result<f64> {
         let start_time = Instant::now();
 
-        // Add edge to graph
+        // Add edge to graph (use write lock)
         {
-            let graph = self.graph.read();
+            let graph = self.graph.write();
             graph.insert_edge(u, v, weight)?;
         }
 
@@ -210,8 +215,8 @@ impl DynamicMinCut {
             self.handle_cycle_edge(u, v, weight)?;
         }
 
-        // Update decomposition
-        self.decomposition.insert_edge(u, v, weight)?;
+        // Rebuild decomposition with updated graph
+        self.rebuild_decomposition();
 
         // Recompute minimum cut
         self.recompute_min_cut();
@@ -231,7 +236,13 @@ impl DynamicMinCut {
     pub fn delete_edge(&mut self, u: VertexId, v: VertexId) -> Result<f64> {
         let start_time = Instant::now();
 
-        // Check if edge is a tree edge
+        // Remove from graph first (use write lock)
+        {
+            let graph = self.graph.write();
+            graph.delete_edge(u, v)?;
+        }
+
+        // Check if edge was a tree edge
         let key = if u < v { (u, v) } else { (v, u) };
         let is_tree_edge = self.tree_edges.read().contains(&key);
 
@@ -241,14 +252,8 @@ impl DynamicMinCut {
             self.handle_non_tree_edge_deletion(u, v)?;
         }
 
-        // Remove from graph
-        {
-            let graph = self.graph.read();
-            graph.delete_edge(u, v)?;
-        }
-
-        // Update decomposition
-        self.decomposition.delete_edge(u, v)?;
+        // Rebuild decomposition with updated graph
+        self.rebuild_decomposition();
 
         // Recompute minimum cut
         self.recompute_min_cut();
@@ -392,19 +397,34 @@ impl DynamicMinCut {
         let key = if u < v { (u, v) } else { (v, u) };
         self.tree_edges.write().remove(&key);
 
-        // Cut in link-cut tree
-        // Note: We cut from u's perspective
-        self.link_cut_tree.cut(u)?;
+        // Cut in link-cut tree if they're still connected
+        // (They might already be disconnected from previous deletions)
+        if self.link_cut_tree.connected(u, v) {
+            // Cut from u's perspective (or v's if u is already a root)
+            // Try cutting u first, if it fails try v
+            if self.link_cut_tree.cut(u).is_err() {
+                let _ = self.link_cut_tree.cut(v); // Ignore error if both fail
+            }
+        }
 
         // Try to find a replacement edge
         if let Some((x, y)) = self.find_replacement_edge(u, v) {
-            // Add replacement edge to spanning forest
-            self.link_cut_tree.link(x, y)?;
-            self.spanning_forest.link(x, y)?;
+            // Check if they're already connected before linking
+            let already_connected = self.link_cut_tree.connected(x, y);
 
-            // Track as tree edge
-            let key = if x < y { (x, y) } else { (y, x) };
-            self.tree_edges.write().insert(key);
+            if !already_connected {
+                // Add replacement edge to spanning forest
+                self.link_cut_tree.link(x, y)?;
+
+                // Only link in spanning forest if not already connected
+                if !self.spanning_forest.connected(x, y) {
+                    let _ = self.spanning_forest.link(x, y); // Ignore errors here
+                }
+
+                // Track as tree edge
+                let key = if x < y { (x, y) } else { (y, x) };
+                self.tree_edges.write().insert(key);
+            }
         } else {
             // Graph is now disconnected
             // Minimum cut becomes 0
@@ -467,6 +487,21 @@ impl DynamicMinCut {
         None
     }
 
+    /// Rebuild the hierarchical decomposition with current graph state
+    fn rebuild_decomposition(&mut self) {
+        let graph = self.graph.read();
+        let graph_clone = graph.clone();
+        drop(graph);
+
+        let graph_for_decomp = Arc::new(graph_clone);
+        self.decomposition = HierarchicalDecomposition::build(graph_for_decomp)
+            .unwrap_or_else(|_| {
+                // If build fails, create an empty one
+                let empty = Arc::new(DynamicGraph::new());
+                HierarchicalDecomposition::build(empty).unwrap()
+            });
+    }
+
     /// Recompute minimum cut after structural change
     fn recompute_min_cut(&mut self) {
         let graph = self.graph.read();
@@ -474,28 +509,69 @@ impl DynamicMinCut {
         // If graph is disconnected, minimum cut is 0
         if !graph.is_connected() {
             self.current_min_cut = 0.0;
+            drop(graph);
             return;
         }
 
-        // If the decomposition is outdated (vertices added dynamically), rebuild it
-        let graph_vertices = graph.num_vertices();
-        let decomp_vertices = self.decomposition.num_nodes();
+        // Compute minimum cut by checking all tree edge cuts
+        let mut min_cut = self.decomposition.min_cut_value();
 
-        if decomp_vertices == 0 && graph_vertices > 0 {
-            // Need to rebuild decomposition
-            drop(graph); // Drop the read lock before rebuilding
-            let graph_arc = Arc::clone(&self.graph);
-            let graph_for_decomp = Arc::new(graph_arc.read().clone());
-            self.decomposition = HierarchicalDecomposition::build(graph_for_decomp)
-                .unwrap_or_else(|_| {
-                    // If build fails, create an empty one
-                    let empty = Arc::new(DynamicGraph::new());
-                    HierarchicalDecomposition::build(empty).unwrap()
-                });
+        // For each tree edge, compute the cut value when removing it
+        // This gives us all possible 2-partitions induced by the spanning tree
+        let tree_edges: Vec<_> = self.tree_edges.read().iter().copied().collect();
+
+        for (u, v) in tree_edges {
+            let cut_value = self.compute_tree_edge_cut(&graph, u, v);
+            if cut_value < min_cut {
+                min_cut = cut_value;
+            }
         }
 
-        // Get min cut from decomposition
-        self.current_min_cut = self.decomposition.min_cut_value();
+        drop(graph);
+        self.current_min_cut = min_cut;
+    }
+
+    /// Compute the cut value induced by removing a tree edge
+    fn compute_tree_edge_cut(&self, graph: &DynamicGraph, u: VertexId, v: VertexId) -> f64 {
+        // Find all vertices reachable from u without using edge (u,v)
+        let mut component_u = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+
+        queue.push_back(u);
+        component_u.insert(u);
+
+        while let Some(x) = queue.pop_front() {
+            for (y, _) in graph.neighbors(x) {
+                // Skip the tree edge we're "removing"
+                if (x == u && y == v) || (x == v && y == u) {
+                    continue;
+                }
+
+                // Only traverse tree edges for connectivity
+                let key = if x < y { (x, y) } else { (y, x) };
+                if !self.tree_edges.read().contains(&key) {
+                    continue;
+                }
+
+                if component_u.insert(y) {
+                    queue.push_back(y);
+                }
+            }
+        }
+
+        // Now compute cut: sum of all edge weights crossing the partition
+        let mut cut_weight = 0.0;
+        for &x in &component_u {
+            for (y, _) in graph.neighbors(x) {
+                if !component_u.contains(&y) {
+                    if let Some(weight) = graph.edge_weight(x, y) {
+                        cut_weight += weight;
+                    }
+                }
+            }
+        }
+
+        cut_weight
     }
 }
 
