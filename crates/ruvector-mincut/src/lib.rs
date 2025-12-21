@@ -131,6 +131,10 @@ pub mod algorithm;
 pub mod sparsify;
 pub mod expander;
 pub mod localkcut;
+pub mod connectivity;
+pub mod instance;
+pub mod wrapper;
+pub mod certificate;
 
 // Internal modules
 mod core;
@@ -149,7 +153,19 @@ pub use linkcut::LinkCutTree;
 pub use euler::EulerTourTree;
 pub use sparsify::{SparseGraph, SparsifyConfig};
 pub use expander::{ExpanderDecomposition, ExpanderComponent, Conductance};
-pub use localkcut::{LocalKCut, LocalCutResult, EdgeColor, ColorMask, ForestPacking};
+pub use localkcut::{
+    LocalKCut, LocalCutResult, EdgeColor, ColorMask, ForestPacking,
+    LocalKCutQuery, LocalKCutResult as PaperLocalKCutResult, LocalKCutOracle,
+    DeterministicLocalKCut, DeterministicFamilyGenerator,
+};
+pub use connectivity::DynamicConnectivity;
+pub use instance::{ProperCutInstance, InstanceResult, WitnessHandle, StubInstance};
+pub use wrapper::MinCutWrapper;
+pub use certificate::{
+    CutCertificate, CertificateError, CertLocalKCutQuery, LocalKCutResponse,
+    LocalKCutResultSummary, UpdateTrigger, UpdateType, AuditLogger,
+    AuditEntry, AuditEntryType, AuditData,
+};
 
 #[cfg(feature = "monitoring")]
 pub use monitoring::{
@@ -185,6 +201,12 @@ pub mod prelude {
         AlgorithmStats,
         ExpanderDecomposition, ExpanderComponent, Conductance,
         LocalKCut, LocalCutResult, EdgeColor, ColorMask, ForestPacking,
+        LocalKCutQuery, PaperLocalKCutResult, LocalKCutOracle,
+        DeterministicLocalKCut, DeterministicFamilyGenerator,
+        CutCertificate, CertificateError, AuditLogger,
+        DynamicConnectivity,
+        ProperCutInstance, InstanceResult, WitnessHandle, StubInstance,
+        MinCutWrapper,
     };
 
     #[cfg(feature = "monitoring")]

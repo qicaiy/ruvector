@@ -27,6 +27,14 @@
 //! - Total for all vertices: O(k^{O(1)} · m)
 //! - Deterministic (no randomization)
 
+pub mod paper_impl;
+
+// Re-export paper implementation types
+pub use paper_impl::{
+    LocalKCutQuery, LocalKCutResult, LocalKCutOracle,
+    DeterministicLocalKCut, DeterministicFamilyGenerator,
+};
+
 use crate::graph::{DynamicGraph, VertexId, EdgeId, Weight};
 use crate::{MinCutError, Result};
 use std::collections::{HashMap, HashSet, VecDeque};

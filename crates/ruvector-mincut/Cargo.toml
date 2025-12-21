@@ -53,3 +53,7 @@ bench = false
 [[bench]]
 name = "mincut_bench"
 harness = false
+
+[[bench]]
+name = "bounded_bench"
+harness = false
