@@ -141,6 +141,9 @@ pub struct EulerTourTree {
     last_occurrence: HashMap<NodeId, usize>,
     /// Map from edge (u, v) to the tour node representing entry to subtree
     edge_to_node: HashMap<(NodeId, NodeId), usize>,
+    /// Map from enter node index to corresponding exit node index
+    /// This enables O(1) lookup for the cut operation
+    enter_to_exit: HashMap<usize, usize>,
     /// Root of the treap (per tree)
     roots: HashMap<NodeId, usize>,
     /// Fast random number generator (xorshift64)
@@ -174,6 +177,7 @@ impl EulerTourTree {
             first_occurrence: HashMap::with_capacity(capacity),
             last_occurrence: HashMap::with_capacity(capacity),
             edge_to_node: HashMap::with_capacity(capacity),
+            enter_to_exit: HashMap::with_capacity(capacity),
             roots: HashMap::with_capacity(capacity),
             rng: XorShift64::new(seed),
         }
@@ -227,8 +231,9 @@ impl EulerTourTree {
         let enter_v = self.allocate_node(v, priority1, 0.0);
         let exit_v = self.allocate_node(u, priority2, 0.0);
 
-        // Store edge mapping
+        // Store edge mapping and enter-to-exit correspondence for O(1) cut lookup
         self.edge_to_node.insert((u, v), enter_v);
+        self.enter_to_exit.insert(enter_v, exit_v);
 
         // Merge: u_tour + [enter_v] + v_tour + [exit_v]
         let merged1 = self.merge(Some(u_root), Some(enter_v));
@@ -246,11 +251,8 @@ impl EulerTourTree {
 
     /// Cut: Remove edge between u and v
     ///
-    /// # Note
-    ///
-    /// This operation is partially implemented. The `find_matching_exit`
-    /// helper is a simplified stub and needs full implementation for
-    /// production use.
+    /// # Performance
+    /// O(log n) via Euler tour split and merge with O(1) exit node lookup.
     pub fn cut(&mut self, u: NodeId, v: NodeId) -> Result<()> {
         // Find the edge occurrence nodes
         let edge_node = self.edge_to_node.remove(&(u, v))
@@ -263,8 +265,11 @@ impl EulerTourTree {
         // After rerooting, (u, v) edge should have enter_v node
         let enter_v = edge_node;
 
-        // Find the corresponding exit node (the 'u' occurrence after v's subtour)
+        // Find the corresponding exit node (O(1) via enter_to_exit mapping)
         let exit_u_idx = self.find_matching_exit(enter_v)?;
+
+        // Clean up the enter_to_exit mapping
+        self.enter_to_exit.remove(&enter_v);
 
         // Get positions
         let pos1 = self.get_position(enter_v);
@@ -584,12 +589,17 @@ impl EulerTourTree {
     }
 
     /// Find the matching exit node for an enter node
-    #[cold]
-    fn find_matching_exit(&self, _enter_idx: usize) -> Result<usize> {
-        // This is a simplified implementation
-        // In a full implementation, we'd track which exit corresponds to which enter
-        // For now, we'll search for the next occurrence of the parent vertex
-        Err(MinCutError::InternalError("Not implemented".to_string()))
+    ///
+    /// # Performance
+    /// O(1) lookup via the enter_to_exit HashMap
+    #[inline]
+    fn find_matching_exit(&self, enter_idx: usize) -> Result<usize> {
+        self.enter_to_exit
+            .get(&enter_idx)
+            .copied()
+            .ok_or_else(|| MinCutError::InternalError(
+                format!("No matching exit node found for enter index {}", enter_idx)
+            ))
     }
 
     /// Split treap at position pos
@@ -1125,5 +1135,76 @@ mod tests {
         assert_eq!(ett.subtree_aggregate(1).unwrap(), 100.0);
         assert_eq!(ett.subtree_aggregate(2).unwrap(), 200.0);
         assert_eq!(ett.subtree_aggregate(3).unwrap(), 300.0);
+    }
+
+    #[test]
+    fn test_cut_edge() {
+        let mut ett = EulerTourTree::new();
+        ett.make_tree(1).unwrap();
+        ett.make_tree(2).unwrap();
+        ett.make_tree(3).unwrap();
+
+        // Create chain: 1 - 2 - 3
+        ett.link(1, 2).unwrap();
+        ett.link(2, 3).unwrap();
+
+        // Verify all connected
+        assert!(ett.connected(1, 3));
+        assert_eq!(ett.tree_size(1).unwrap(), 3);
+
+        // Cut edge between 2 and 3
+        ett.cut(2, 3).unwrap();
+
+        // Now 1-2 should be separate from 3
+        assert!(ett.connected(1, 2));
+        assert!(!ett.connected(1, 3));
+        assert!(!ett.connected(2, 3));
+        assert_eq!(ett.tree_size(1).unwrap(), 2);
+        assert_eq!(ett.tree_size(3).unwrap(), 1);
+    }
+
+    #[test]
+    fn test_cut_and_relink() {
+        let mut ett = EulerTourTree::new();
+        for i in 1..=4 {
+            ett.make_tree(i).unwrap();
+        }
+
+        // Create: 1 - 2 - 3 - 4
+        ett.link(1, 2).unwrap();
+        ett.link(2, 3).unwrap();
+        ett.link(3, 4).unwrap();
+
+        assert!(ett.connected(1, 4));
+        assert_eq!(ett.tree_size(1).unwrap(), 4);
+
+        // Cut middle edge
+        ett.cut(2, 3).unwrap();
+
+        // Now two separate components: {1,2} and {3,4}
+        assert!(ett.connected(1, 2));
+        assert!(ett.connected(3, 4));
+        assert!(!ett.connected(1, 3));
+        assert!(!ett.connected(2, 4));
+
+        // Relink with different edge
+        ett.link(1, 4).unwrap();
+
+        // Now all connected again
+        assert!(ett.connected(1, 3));
+        assert_eq!(ett.tree_size(1).unwrap(), 4);
+    }
+
+    #[test]
+    fn test_cut_nonexistent_edge() {
+        let mut ett = EulerTourTree::new();
+        ett.make_tree(1).unwrap();
+        ett.make_tree(2).unwrap();
+
+        // No edge between 1 and 2
+        assert!(matches!(
+            ett.cut(1, 2),
+            Err(MinCutError::EdgeNotFound(1, 2))
+        ));
     }
 }

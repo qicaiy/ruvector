@@ -140,18 +140,18 @@ fn test_stub_instance_range_behavior() {
     graph.insert_edge(1, 2, 1.0).unwrap();
 
     // Range [0, 0] - min cut 1 is above range
-    let instance = StubInstance::new(&graph, 0, 0);
+    let mut instance = StubInstance::new(&graph, 0, 0);
     assert!(matches!(instance.query(), InstanceResult::AboveRange));
 
     // Range [0, 1] - min cut 1 is in range
-    let instance = StubInstance::new(&graph, 0, 1);
+    let mut instance = StubInstance::new(&graph, 0, 1);
     match instance.query() {
         InstanceResult::ValueInRange { value, .. } => assert_eq!(value, 1),
         _ => panic!("Expected ValueInRange"),
     }
 
     // Range [0, 10] - min cut 1 is in range
-    let instance = StubInstance::new(&graph, 0, 10);
+    let mut instance = StubInstance::new(&graph, 0, 10);
     match instance.query() {
         InstanceResult::ValueInRange { value, .. } => assert_eq!(value, 1),
         _ => panic!("Expected ValueInRange"),

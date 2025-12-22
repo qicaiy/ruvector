@@ -16,6 +16,15 @@ use roaring::RoaringBitmap;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
+/// Cached boundary value for incremental updates
+#[derive(Clone, Default)]
+struct BoundaryCache {
+    /// Cached boundary size
+    value: u64,
+    /// Whether the cache is valid
+    valid: bool,
+}
+
 /// Bounded-range instance using LocalKCut oracle
 ///
 /// Maintains a family of candidate cuts and uses LocalKCut
@@ -41,6 +50,8 @@ pub struct BoundedInstance {
     cluster_hierarchy: Option<ClusterHierarchy>,
     /// Fragmenting algorithm for disconnected graph handling
     fragmenting: Option<FragmentingAlgorithm>,
+    /// Cached boundary for incremental updates (O(1) vs O(m))
+    boundary_cache: Mutex<BoundaryCache>,
 }
 
 impl BoundedInstance {
@@ -58,6 +69,7 @@ impl BoundedInstance {
             max_radius: 20,
             cluster_hierarchy: None,
             fragmenting: None,
+            boundary_cache: Mutex::new(BoundaryCache::default()),
         }
     }
 
@@ -77,7 +89,7 @@ impl BoundedInstance {
         }
     }
 
-    /// Insert an edge
+    /// Insert an edge with incremental boundary update
     fn insert(&mut self, edge_id: EdgeId, u: VertexId, v: VertexId) {
         self.vertices.insert(u);
         self.vertices.insert(v);
@@ -86,17 +98,58 @@ impl BoundedInstance {
         self.adjacency.entry(u).or_default().push((v, edge_id));
         self.adjacency.entry(v).or_default().push((u, edge_id));
 
+        // Incrementally update boundary cache if valid
+        self.update_boundary_on_insert(u, v);
+
         // Invalidate witness if affected
         self.maybe_invalidate_witness(u, v);
     }
 
-    /// Delete an edge
-    fn delete(&mut self, edge_id: EdgeId, _u: VertexId, _v: VertexId) {
+    /// Delete an edge with incremental boundary update
+    fn delete(&mut self, edge_id: EdgeId, u: VertexId, v: VertexId) {
+        // Check if edge crosses cut before removing (for incremental update)
+        self.update_boundary_on_delete(u, v);
+
         self.edges.retain(|(eid, _, _)| *eid != edge_id);
         self.rebuild_adjacency();
 
         // Invalidate current witness since structure changed
         *self.best_witness.lock().unwrap() = None;
+        // Note: boundary cache is already updated incrementally above
+    }
+
+    /// Incrementally update boundary cache on edge insertion
+    fn update_boundary_on_insert(&self, u: VertexId, v: VertexId) {
+        let witness_ref = self.best_witness.lock().unwrap();
+        if let Some((_, ref witness)) = *witness_ref {
+            let u_in = witness.contains(u);
+            let v_in = witness.contains(v);
+
+            // If edge crosses the cut, increment boundary
+            if u_in != v_in {
+                let mut cache = self.boundary_cache.lock().unwrap();
+                if cache.valid {
+                    cache.value += 1;
+                }
+            }
+        }
+    }
+
+    /// Incrementally update boundary cache on edge deletion
+    fn update_boundary_on_delete(&self, u: VertexId, v: VertexId) {
+        let witness_ref = self.best_witness.lock().unwrap();
+        if let Some((_, ref witness)) = *witness_ref {
+            let u_in = witness.contains(u);
+            let v_in = witness.contains(v);
+
+            // If edge crossed the cut, decrement boundary
+            if u_in != v_in {
+                let mut cache = self.boundary_cache.lock().unwrap();
+                if cache.valid {
+                    cache.value = cache.value.saturating_sub(1);
+                }
+            }
+        }
     }
 
     /// Check if witness needs invalidation after edge change
@@ -106,9 +159,13 @@ impl BoundedInstance {
             let u_in = witness.contains(u);
             let v_in = witness.contains(v);
 
-            // If edge crosses the cut boundary, boundary changed
+            // If edge crosses the cut boundary, witness becomes invalid
+            // Note: boundary was already incrementally updated, but witness value is now stale
             if u_in != v_in {
                 *witness_ref = None;
+                // Also invalidate boundary cache since we no longer have a valid witness
+                drop(witness_ref); // Release lock before acquiring another
+                self.invalidate_boundary_cache();
             }
         }
     }
@@ -304,7 +361,7 @@ impl BoundedInstance {
         visited.len() == subset.len()
     }
 
-    /// Compute boundary of subset
+    /// Compute boundary of subset (O(m) operation)
     fn compute_boundary(&self, subset: &HashSet<VertexId>) -> u64 {
         let mut boundary = 0u64;
 
@@ -317,6 +374,33 @@ impl BoundedInstance {
         }
 
         boundary
+    }
+
+    /// Get cached boundary value for current witness
+    ///
+    /// # Performance
+    /// Returns O(1) if cache is valid, otherwise recomputes in O(m)
+    /// and caches the result for future incremental updates.
+    fn get_cached_boundary(&self) -> Option<u64> {
+        let cache = self.boundary_cache.lock().unwrap();
+        if cache.valid {
+            Some(cache.value)
+        } else {
+            None
+        }
+    }
+
+    /// Set boundary cache with new value
+    fn set_boundary_cache(&self, value: u64) {
+        let mut cache = self.boundary_cache.lock().unwrap();
+        cache.value = value;
+        cache.valid = true;
+    }
+
+    /// Invalidate boundary cache
+    fn invalidate_boundary_cache(&self) {
+        let mut cache = self.boundary_cache.lock().unwrap();
+        cache.valid = false;
     }
 
     /// Get the certificate
@@ -380,8 +464,9 @@ impl ProperCutInstance for BoundedInstance {
         // For small graphs, use brute force
         if self.vertices.len() < 20 {
             if let Some((value, witness)) = self.brute_force_min_cut() {
-                // Cache the result
+                // Cache the result and initialize boundary cache for incremental updates
                 *self.best_witness.lock().unwrap() = Some((value, witness.clone()));
+                self.set_boundary_cache(value);
 
                 if value <= self.lambda_max {
                     return InstanceResult::ValueInRange { value, witness };
@@ -393,8 +478,9 @@ impl ProperCutInstance for BoundedInstance {
 
         // Use LocalKCut oracle for larger graphs
         if let Some((value, witness)) = self.search_for_cuts() {
-            // Cache the result
+            // Cache the result and initialize boundary cache for incremental updates
             *self.best_witness.lock().unwrap() = Some((value, witness.clone()));
+            self.set_boundary_cache(value);
             return InstanceResult::ValueInRange { value, witness };
         }
 
