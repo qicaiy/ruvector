@@ -38,13 +38,14 @@ mockall = { workspace = true }
 
 [features]
 default = ["exact", "approximate"]
-full = ["exact", "approximate", "integration", "monitoring", "simd"]
+full = ["exact", "approximate", "integration", "monitoring", "simd", "agentic"]
 exact = []  # Exact minimum cut algorithm
 approximate = []  # (1+ε)-approximate algorithm
 integration = ["ruvector-graph"]  # GraphDB integration
 monitoring = []  # Real-time monitoring with callbacks
 simd = ["ruvector-core/simd"]
 wasm = []  # WASM compatibility mode
+agentic = []  # 256-core parallel agentic chip backend
 
 [lib]
 crate-type = ["rlib"]

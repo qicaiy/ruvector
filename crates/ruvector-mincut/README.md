@@ -24,24 +24,28 @@ Subpolynomial-time dynamic minimum cut algorithm with real-time graph monitoring
 
 This crate implements the **first deterministic exact fully-dynamic minimum cut algorithm** based on the December 2025 paper ([arxiv:2512.13105](https://arxiv.org/abs/2512.13105)):
 
-| Component | Description |
-|-----------|-------------|
-| **MinCutWrapper** | O(log n) bounded-range instances with geometric factor 1.2 |
-| **DeterministicLocalKCut** | BFS-based local minimum cut oracle (no randomness) |
-| **CutCertificate** | Compact witness using RoaringBitmap |
-| **ClusterHierarchy** | O(log n) levels of recursive decomposition |
-| **FragmentingAlgorithm** | Handles disconnected subgraphs |
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **MinCutWrapper** | ✅ Complete | O(log n) bounded-range instances with geometric factor 1.2 |
+| **BoundedInstance** | ✅ Complete | Production implementation with strategic seed selection |
+| **DeterministicLocalKCut** | ✅ Complete | BFS-based local minimum cut oracle (no randomness) |
+| **CutCertificate** | ✅ Complete | Compact witness using RoaringBitmap |
+| **ClusterHierarchy** | ✅ Integrated | O(log n) levels of recursive decomposition |
+| **FragmentingAlgorithm** | ✅ Integrated | Handles disconnected subgraphs |
+| **EulerTourTree** | ✅ Integrated | O(log n) dynamic connectivity with hybrid fallback |
 
 ### Agentic Chip Optimizations
 
 Optimized for deployment on agentic chips with 256 WASM cores × 8KB memory each:
 
-| Feature | Specification |
-|---------|---------------|
-| **Compact Structures** | 6.7KB per core (verified at compile-time) |
-| **BitSet256** | 32-byte membership (vs RoaringBitmap's 100s of bytes) |
-| **256-Core Parallel** | Lock-free coordination with atomic CAS |
-| **WASM SIMD128** | Accelerated boundary computation |
+| Feature | Status | Specification |
+|---------|--------|---------------|
+| **Compact Structures** | ✅ Complete | 6.7KB per core (verified at compile-time) |
+| **BitSet256** | ✅ Complete | 32-byte membership (vs RoaringBitmap's 100s of bytes) |
+| **256-Core Parallel** | ✅ Complete | Lock-free coordination with atomic CAS |
+| **WASM SIMD128** | ✅ Integrated | Accelerated boundary computation |
+| **CoreExecutor** | ✅ Complete | Per-core execution with SIMD boundary methods |
+| **AgenticAnalyzer** | ✅ Integrated | Graph distribution across cores |
 
 ## Installation
 
@@ -175,34 +179,37 @@ The crate implements a sophisticated multi-layered architecture:
 ┌─────────────────────────────────────────────────────────────┐
 │                  DynamicMinCut (Public API)                 │
 ├─────────────────────────────────────────────────────────────┤
-│  MinCutWrapper (December 2025 Paper Implementation)         │
-│  ├── O(log n) bounded-range instances                       │
+│  MinCutWrapper (December 2025 Paper Implementation)    [✅] │
+│  ├── O(log n) BoundedInstance with strategic seeds          │
 │  ├── Geometric ranges with factor 1.2                       │
+│  ├── ClusterHierarchy integration                           │
+│  ├── FragmentingAlgorithm integration                       │
 │  └── DeterministicLocalKCut oracle                          │
 ├─────────────────────────────────────────────────────────────┤
-│  HierarchicalDecomposition (O(log n) depth)                 │
+│  HierarchicalDecomposition (O(log n) depth)            [✅] │
 │  ├── DecompositionNode (Binary tree)                        │
 │  ├── ClusterHierarchy (recursive decomposition)             │
 │  └── FragmentingAlgorithm (disconnected subgraphs)          │
 ├─────────────────────────────────────────────────────────────┤
-│  Dynamic Connectivity (Spanning Forest)                     │
-│  ├── LinkCutTree (Sleator-Tarjan)                           │
-│  │   └── Splay trees with path aggregates                   │
-│  └── EulerTourTree (Treap-based)                            │
-│      └── O(log n) link/cut/connected                        │
+│  Dynamic Connectivity (Hybrid: ETT + Union-Find)       [✅] │
+│  ├── EulerTourTree (Treap-based, O(log n))                  │
+│  │   └── Bulk operations, lazy propagation                  │
+│  ├── Union-Find (path compression fallback)                 │
+│  └── LinkCutTree (Sleator-Tarjan)                           │
 ├─────────────────────────────────────────────────────────────┤
-│  Graph Sparsification (Approximate mode)                    │
+│  Graph Sparsification (Approximate mode)               [✅] │
 │  ├── Benczúr-Karger (Randomized)                            │
 │  └── Nagamochi-Ibaraki (Deterministic)                      │
 ├─────────────────────────────────────────────────────────────┤
-│  DynamicGraph (Thread-safe storage)                         │
+│  DynamicGraph (Thread-safe storage)                    [✅] │
 │  └── DashMap for concurrent operations                      │
 ├─────────────────────────────────────────────────────────────┤
-│  Agentic Chip Layer (WASM)                                  │
-│  ├── CompactCoreState (6.7KB per core)                      │
+│  Agentic Chip Layer (WASM, feature: agentic)           [✅] │
+│  ├── CompactCoreState (6.7KB per core, compile-verified)    │
 │  ├── SharedCoordinator (lock-free atomics)                  │
-│  ├── CoreDistributor (256-core distribution)                │
-│  └── SIMD128 accelerated operations                         │
+│  ├── CoreExecutor with SIMD boundary methods                │
+│  ├── AgenticAnalyzer (256-core distribution)                │
+│  └── SIMD128 accelerated popcount/xor/boundary              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -494,4 +501,4 @@ This implementation is based on research in dynamic graph algorithms:
 
 ---
 
-**Status**: Production-ready • **Version**: 0.2.0 • **Rust Version**: 1.70+ • **Tests**: 314 passing
+**Status**: Production-ready • **Version**: 0.2.0 • **Rust Version**: 1.70+ • **Tests**: 321 passing (314 lib + 7 integration)

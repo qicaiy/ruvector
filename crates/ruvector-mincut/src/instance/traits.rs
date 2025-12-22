@@ -223,7 +223,7 @@ pub trait ProperCutInstance: Send + Sync {
     /// # Complexity
     ///
     /// Typically O(1) to O(log n) depending on the data structure.
-    fn query(&self) -> InstanceResult;
+    fn query(&mut self) -> InstanceResult;
 
     /// Get the lambda bounds for this instance
     ///

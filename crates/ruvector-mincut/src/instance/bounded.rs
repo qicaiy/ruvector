@@ -10,6 +10,8 @@ use crate::localkcut::paper_impl::{
     DeterministicLocalKCut, LocalKCutOracle, LocalKCutQuery, LocalKCutResult,
 };
 use crate::certificate::{CutCertificate, LocalKCutResponse, CertLocalKCutQuery, LocalKCutResultSummary};
+use crate::cluster::ClusterHierarchy;
+use crate::fragment::FragmentingAlgorithm;
 use roaring::RoaringBitmap;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
@@ -35,6 +37,10 @@ pub struct BoundedInstance {
     certificate: Mutex<CutCertificate>,
     /// Maximum radius for local search
     max_radius: usize,
+    /// Cluster hierarchy for strategic seed selection
+    cluster_hierarchy: Option<ClusterHierarchy>,
+    /// Fragmenting algorithm for disconnected graph handling
+    fragmenting: Option<FragmentingAlgorithm>,
 }
 
 impl BoundedInstance {
@@ -50,6 +56,15 @@ impl BoundedInstance {
             oracle: DeterministicLocalKCut::new(20), // Default max radius
             certificate: Mutex::new(CutCertificate::new()),
             max_radius: 20,
+            cluster_hierarchy: None,
+            fragmenting: None,
+        }
+    }
+
+    /// Ensure cluster hierarchy is built when needed
+    fn ensure_hierarchy(&mut self, graph: &DynamicGraph) {
+        if self.cluster_hierarchy.is_none() && self.vertices.len() > 50 {
+            self.cluster_hierarchy = Some(ClusterHierarchy::new(Arc::new(graph.clone())));
         }
     }
 
@@ -125,17 +140,51 @@ impl BoundedInstance {
     }
 
     /// Search for cuts using LocalKCut oracle
-    fn search_for_cuts(&self) -> Option<(u64, WitnessHandle)> {
+    fn search_for_cuts(&mut self) -> Option<(u64, WitnessHandle)> {
         // Build a temporary graph for the oracle
         let graph = Arc::new(DynamicGraph::new());
         for &(_, u, v) in &self.edges {
             let _ = graph.insert_edge(u, v, 1.0);
         }
 
+        // Build cluster hierarchy for strategic seed selection
+        self.ensure_hierarchy(&graph);
+
+        // Determine seed vertices to try
+        let seed_vertices: Vec<VertexId> = if let Some(ref hierarchy) = self.cluster_hierarchy {
+            // Use cluster boundary vertices as strategic seeds
+            let mut boundary_vertices = HashSet::new();
+
+            // Collect vertices from cluster boundaries
+            for cluster in hierarchy.clusters.values() {
+                // Get vertices on the boundary of each cluster
+                for &v in &cluster.vertices {
+                    if let Some(neighbors) = self.adjacency.get(&v) {
+                        for &(neighbor, _) in neighbors {
+                            // If neighbor is outside cluster, v is on boundary
+                            if !cluster.vertices.contains(&neighbor) {
+                                boundary_vertices.insert(v);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If we have boundary vertices, use them; otherwise fall back to all vertices
+            if boundary_vertices.is_empty() {
+                self.vertices.iter().copied().collect()
+            } else {
+                boundary_vertices.into_iter().collect()
+            }
+        } else {
+            // No hierarchy - use all vertices
+            self.vertices.iter().copied().collect()
+        };
+
         // Try different budgets within our range
         for budget in self.lambda_min..=self.lambda_max {
-            // Try each vertex as a seed
-            for &seed in &self.vertices {
+            // Try strategic seed vertices
+            for &seed in &seed_vertices {
                 let query = LocalKCutQuery {
                     seed_vertices: vec![seed],
                     budget_k: budget,
@@ -293,14 +342,26 @@ impl ProperCutInstance for BoundedInstance {
         }
     }
 
-    fn query(&self) -> InstanceResult {
-        // Check for disconnected graph
-        if !self.is_connected() && !self.vertices.is_empty() {
-            let v = *self.vertices.iter().next().unwrap();
-            let mut membership = RoaringBitmap::new();
-            membership.insert(v as u32);
-            let witness = WitnessHandle::new(v, membership, 0);
-            return InstanceResult::ValueInRange { value: 0, witness };
+    fn query(&mut self) -> InstanceResult {
+        // FIRST: Check if graph is fragmented (disconnected) using FragmentingAlgorithm
+        if let Some(ref frag) = self.fragmenting {
+            if !frag.is_connected() {
+                // Graph is disconnected, min cut is 0
+                let v = *self.vertices.iter().next().unwrap_or(&0);
+                let mut membership = RoaringBitmap::new();
+                membership.insert(v as u32);
+                let witness = WitnessHandle::new(v, membership, 0);
+                return InstanceResult::ValueInRange { value: 0, witness };
+            }
+        } else {
+            // Fallback: Check for disconnected graph using basic connectivity check
+            if !self.is_connected() && !self.vertices.is_empty() {
+                let v = *self.vertices.iter().next().unwrap();
+                let mut membership = RoaringBitmap::new();
+                membership.insert(v as u32);
+                let witness = WitnessHandle::new(v, membership, 0);
+                return InstanceResult::ValueInRange { value: 0, witness };
+            }
         }
 
         // Use cached witness if valid

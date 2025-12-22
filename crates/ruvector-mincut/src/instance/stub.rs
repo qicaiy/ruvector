@@ -267,7 +267,7 @@ impl ProperCutInstance for StubInstance {
         }
     }
 
-    fn query(&self) -> InstanceResult {
+    fn query(&mut self) -> InstanceResult {
         match self.compute_min_cut() {
             Some((value, witness)) if value <= self.lambda_max => {
                 InstanceResult::ValueInRange { value, witness }

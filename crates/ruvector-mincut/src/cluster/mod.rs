@@ -29,7 +29,7 @@ pub struct Cluster {
 /// Multi-level cluster hierarchy
 pub struct ClusterHierarchy {
     /// All clusters indexed by ID
-    clusters: HashMap<u64, Cluster>,
+    pub clusters: HashMap<u64, Cluster>,
     /// Root cluster ID
     root_id: Option<u64>,
     /// Number of levels

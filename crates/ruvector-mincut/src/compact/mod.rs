@@ -33,7 +33,8 @@ pub type CompactEdgeId = u16;
 #[derive(Clone, Copy, Default)]
 #[repr(C, align(32))]
 pub struct BitSet256 {
-    bits: [u64; 4], // 256 bits = 32 bytes
+    /// Raw bits storage - public for SIMD access
+    pub bits: [u64; 4], // 256 bits = 32 bytes
 }
 
 impl BitSet256 {

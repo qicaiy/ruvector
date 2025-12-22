@@ -11,6 +11,30 @@ use crate::compact::{
 };
 use core::sync::atomic::{AtomicU8, AtomicU16, Ordering};
 
+// SIMD functions (inlined for non-wasm, uses wasm::simd when available)
+#[cfg(feature = "wasm")]
+use crate::wasm::simd::{simd_boundary_size, simd_popcount};
+
+#[cfg(not(feature = "wasm"))]
+#[inline]
+fn simd_popcount(bits: &[u64; 4]) -> u32 {
+    bits.iter().map(|b| b.count_ones()).sum()
+}
+
+#[cfg(not(feature = "wasm"))]
+#[inline]
+fn simd_boundary_size(set_a: &BitSet256, edges: &[(CompactVertexId, CompactVertexId)]) -> u16 {
+    let mut count = 0u16;
+    for &(src, tgt) in edges {
+        let src_in = set_a.contains(src);
+        let tgt_in = set_a.contains(tgt);
+        if src_in != tgt_in {
+            count += 1;
+        }
+    }
+    count
+}
+
 /// Number of WASM cores
 pub const NUM_CORES: usize = 256;
 
@@ -319,6 +343,29 @@ impl<'a> CoreExecutor<'a> {
             }
         }
         degree
+    }
+
+    /// SIMD-accelerated boundary computation for a vertex set
+    ///
+    /// Uses WASM SIMD128 when available for parallel edge checking
+    #[inline]
+    pub fn compute_boundary_simd(&self, set: &BitSet256) -> u16 {
+        // Collect active edges as (source, target) pairs
+        let edges: Vec<(CompactVertexId, CompactVertexId)> = self.state.edges
+            [..self.state.num_edges as usize]
+            .iter()
+            .filter(|e| e.is_active())
+            .map(|e| (e.source, e.target))
+            .collect();
+
+        // Use SIMD-accelerated boundary computation
+        simd_boundary_size(set, &edges)
+    }
+
+    /// SIMD-accelerated population count for membership sets
+    #[inline]
+    pub fn membership_count_simd(&self, set: &BitSet256) -> u32 {
+        simd_popcount(&set.bits)
     }
 }
 

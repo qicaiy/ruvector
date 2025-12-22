@@ -129,6 +129,7 @@ impl TreapNode {
 }
 
 /// Represents a tree as an Euler tour stored in a balanced BST (treap)
+#[derive(Debug, Clone)]
 pub struct EulerTourTree {
     /// Node storage (arena allocation)
     nodes: Vec<TreapNode>,
