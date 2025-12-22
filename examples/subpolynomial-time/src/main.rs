@@ -7,6 +7,7 @@
 //! 4. Real-time monitoring
 //! 5. Network resilience analysis
 //! 6. Performance scaling
+//! 7. Vector-Graph Fusion with brittleness detection
 
 use ruvector_mincut::prelude::*;
 use ruvector_mincut::{MonitorBuilder, EventType};
@@ -15,10 +16,17 @@ use std::time::Instant;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+mod fusion;
+use fusion::{
+    FusionGraph, FusionConfig, RelationType,
+    StructuralMonitor, StructuralMonitorConfig, BrittlenessSignal,
+    Optimizer, OptimizerAction,
+};
+
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Subpolynomial-Time Dynamic Minimum Cut Algorithm Demo      ║");
-    println!("║  ruvector-mincut v0.1.0                                      ║");
+    println!("║  ruvector-mincut v0.1.0 + Vector-Graph Fusion               ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Demo 1: Basic usage
@@ -43,6 +51,18 @@ fn main() {
 
     // Demo 6: Performance scaling
     demo_performance_scaling();
+    println!("\n{}\n", "─".repeat(64));
+
+    // Demo 7: Vector-Graph Fusion
+    demo_vector_graph_fusion();
+    println!("\n{}\n", "─".repeat(64));
+
+    // Demo 8: Brittleness Detection
+    demo_brittleness_detection();
+    println!("\n{}\n", "─".repeat(64));
+
+    // Demo 9: Self-Learning Optimization
+    demo_self_learning_optimization();
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║  Demo Complete!                                              ║");
@@ -454,4 +474,209 @@ fn demo_performance_scaling() {
     println!("\nAggregate statistics:");
     println!("  • Total updates: {}", stats.insertions + stats.deletions);
     println!("  • Avg update time: {:.2} μs", stats.avg_update_time_us);
+}
+
+/// Demo 7: Vector-Graph Fusion
+fn demo_vector_graph_fusion() {
+    println!("🔗 DEMO 7: Vector-Graph Fusion");
+    println!("Combining vector similarity with graph relations...\n");
+
+    // Create fusion graph with custom config
+    let config = FusionConfig {
+        vector_weight: 0.6,
+        graph_weight: 0.4,
+        similarity_threshold: 0.5,
+        top_k: 5,
+        ..Default::default()
+    };
+
+    let mut fusion = FusionGraph::with_config(config);
+
+    // Ingest document vectors (simulating embeddings)
+    println!("Ingesting document vectors...");
+    let docs = vec![
+        (1, vec![1.0, 0.0, 0.0, 0.0]),    // Topic A
+        (2, vec![0.9, 0.1, 0.0, 0.0]),    // Similar to Topic A
+        (3, vec![0.8, 0.2, 0.0, 0.0]),    // Similar to Topic A
+        (4, vec![0.0, 1.0, 0.0, 0.0]),    // Topic B
+        (5, vec![0.0, 0.9, 0.1, 0.0]),    // Similar to Topic B
+        (6, vec![0.0, 0.0, 1.0, 0.0]),    // Topic C (isolated)
+    ];
+
+    for (id, vec) in &docs {
+        fusion.ingest_node_with_id(*id, vec.clone());
+    }
+
+    println!("  • Nodes: {}", fusion.num_nodes());
+    println!("  • Edges from similarity: {}", fusion.num_edges());
+
+    // Add explicit relations
+    println!("\nAdding explicit graph relations...");
+    fusion.add_relation(1, 4, RelationType::References, 0.8);
+    fusion.add_relation(2, 5, RelationType::CoOccurs, 0.6);
+
+    println!("  • Total edges: {}", fusion.num_edges());
+    println!("  • Min cut estimate: {:.2}", fusion.min_cut());
+
+    // Show fusion edge capacities
+    println!("\nEdge capacity computation:");
+    println!("  c(u,v) = w_v * f_v(similarity) + w_g * f_g(strength, type)");
+    println!("  where w_v=0.6, w_g=0.4");
+
+    for edge in fusion.get_edges().iter().take(5) {
+        let origin = match edge.origin {
+            fusion::EdgeOrigin::Vector => "Vector",
+            fusion::EdgeOrigin::Graph => "Graph",
+            fusion::EdgeOrigin::SelfLearn => "Learned",
+        };
+        println!("  • ({}, {}) [{:>7}]: raw={:.2}, capacity={:.4}",
+            edge.src, edge.dst, origin, edge.raw_strength, edge.capacity);
+    }
+
+    // Query with brittleness awareness
+    println!("\nQuerying for Topic A documents...");
+    let result = fusion.query(&[1.0, 0.0, 0.0, 0.0], 4);
+    println!("  • Retrieved: {:?}", result.nodes);
+    println!("  • Subgraph min-cut: {:.2}", result.min_cut);
+
+    if let Some(warning) = result.brittleness_warning {
+        println!("  • ⚠️  {}", warning);
+    } else {
+        println!("  • ✓ Good connectivity");
+    }
+}
+
+/// Demo 8: Brittleness Detection
+fn demo_brittleness_detection() {
+    println!("🔍 DEMO 8: Brittleness Detection");
+    println!("Monitoring graph health with structural analysis...\n");
+
+    let mut monitor = StructuralMonitor::with_config(StructuralMonitorConfig {
+        window_size: 10,
+        lambda_low: 3.0,
+        lambda_critical: 1.5,
+        volatility_threshold: 0.5,
+        trend_slope_threshold: -0.2,
+    });
+
+    // Simulate a series of graph states
+    println!("Simulating graph evolution...\n");
+    let observations = vec![
+        (5.0, "Healthy: strong connectivity"),
+        (4.5, "Slight decrease"),
+        (4.2, "Continuing decline"),
+        (3.8, "Below warning threshold"),
+        (2.5, "Warning: low connectivity"),
+        (1.8, "Approaching critical"),
+        (1.0, "Critical: islanding risk!"),
+    ];
+
+    for (lambda, description) in observations {
+        let triggers = monitor.observe(lambda, vec![(1, 2), (2, 3)]);
+        let signal = monitor.signal();
+
+        let signal_icon = match signal {
+            BrittlenessSignal::Healthy => "🟢",
+            BrittlenessSignal::Warning => "🟡",
+            BrittlenessSignal::Critical => "🔴",
+            BrittlenessSignal::Disconnected => "⚫",
+        };
+
+        println!("{} λ={:.1}: {} [{}]", signal_icon, lambda, description, signal.as_str());
+
+        for trigger in triggers {
+            println!("   ⚡ TRIGGER: {:?} (severity: {:.0}%)",
+                trigger.trigger_type, trigger.severity * 100.0);
+            println!("      → {}", trigger.recommendation);
+        }
+    }
+
+    // Show trend analysis
+    println!("\nTrend Analysis:");
+    let state = monitor.state();
+    let trend_dir = if state.lambda_trend > 0.0 { "↑" } else { "↓" };
+    println!("  • Trend slope: {}{:.3} per observation", trend_dir, state.lambda_trend.abs());
+    println!("  • Volatility: {:.3}", state.cut_volatility);
+    println!("  • Boundary edges: {}", state.boundary_edges.len());
+
+    println!("\nMonitor Report:");
+    println!("  {}", monitor.report());
+}
+
+/// Demo 9: Self-Learning Optimization
+fn demo_self_learning_optimization() {
+    println!("🧠 DEMO 9: Self-Learning Optimization");
+    println!("Adaptive maintenance planning with learning gate...\n");
+
+    let mut monitor = StructuralMonitor::new();
+    let mut optimizer = Optimizer::new();
+
+    // Simulate different graph health states
+    let scenarios = vec![
+        (5.0, "Healthy graph"),
+        (2.5, "Degrading connectivity"),
+        (0.8, "Critical brittleness"),
+        (3.5, "Recovering"),
+        (4.0, "Stable again"),
+    ];
+
+    println!("Scenario-based optimization:\n");
+
+    for (lambda, description) in scenarios {
+        println!("━━━ {} (λ={}) ━━━", description, lambda);
+
+        // Update monitor
+        monitor.observe(lambda, vec![(1, 2)]);
+
+        // Get optimization result
+        let result = optimizer.analyze(&monitor);
+
+        println!("Signal: {} | Learning rate: {:.4}",
+            result.signal.as_str(),
+            optimizer.learning_gate().learning_rate);
+
+        // Show immediate action if any
+        match &result.immediate_action {
+            OptimizerAction::NoOp => {
+                println!("Immediate action: None needed");
+            }
+            OptimizerAction::Rewire { strengthen, .. } => {
+                println!("Immediate action: Rewire ({} edges to strengthen)", strengthen.len());
+            }
+            OptimizerAction::Reindex { new_threshold, .. } => {
+                println!("Immediate action: Reindex (threshold: {:?})", new_threshold);
+            }
+            OptimizerAction::LearningGate { enable, rate_multiplier } => {
+                println!("Immediate action: {} learning (rate x{})",
+                    if *enable { "Enable" } else { "Disable" }, rate_multiplier);
+            }
+            _ => {
+                println!("Immediate action: {:?}", result.immediate_action);
+            }
+        }
+
+        // Show maintenance plan
+        if !result.plan.is_empty() {
+            println!("Maintenance plan: {}", result.plan.summary);
+            for task in result.plan.tasks.iter().take(2) {
+                println!("  • [P{}] {}", task.priority, task.benefit);
+            }
+        }
+
+        println!();
+    }
+
+    // Show metrics summary
+    println!("Final Optimization Metrics:");
+    if let Some(result) = optimizer.last_result() {
+        for (key, value) in &result.metrics {
+            println!("  • {}: {:.4}", key, value);
+        }
+    }
+
+    println!("\nLearning Gate Status:");
+    let gate = optimizer.learning_gate();
+    println!("  • Enabled: {}", gate.enabled);
+    println!("  • Current rate: {:.4}", gate.learning_rate);
+    println!("  • Base rate: {:.4}", gate.base_rate);
 }
