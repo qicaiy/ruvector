@@ -3,6 +3,8 @@
 //! Implements hierarchical clustering from the December 2024 paper.
 //! Enables efficient cut maintenance through recursive decomposition.
 
+pub mod hierarchy;
+
 use crate::graph::{DynamicGraph, VertexId, EdgeId};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
