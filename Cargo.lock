@@ -6690,6 +6690,7 @@ name = "ruvector-mincut-wasm"
 version = "0.1.25"
 dependencies = [
  "console_error_panic_hook",
+ "getrandom 0.2.16",
  "js-sys",
  "ruvector-mincut",
  "serde",

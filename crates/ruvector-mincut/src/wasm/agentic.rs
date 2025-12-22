@@ -83,11 +83,13 @@ impl Default for AgenticMinCut {
 
 /// FFI exports for WASM
 #[cfg(target_arch = "wasm32")]
+#[allow(missing_docs)]
 pub mod ffi {
     use super::*;
 
     static mut INSTANCE: Option<AgenticMinCut> = None;
 
+    /// Initialize the minimum cut computation with graph parameters.
     #[no_mangle]
     pub extern "C" fn mincut_init(num_vertices: u16, num_edges: u16, strategy: u8) {
         unsafe {
@@ -103,6 +105,7 @@ pub mod ffi {
         }
     }
 
+    /// Get a pointer to the shared coordinator for multi-core coordination.
     #[no_mangle]
     pub extern "C" fn mincut_get_coordinator() -> *const SharedCoordinator {
         unsafe {
@@ -110,6 +113,7 @@ pub mod ffi {
         }
     }
 
+    /// Add a result from a completed core computation.
     #[no_mangle]
     pub extern "C" fn mincut_add_result(
         core_id: u8,
@@ -136,6 +140,7 @@ pub mod ffi {
         }
     }
 
+    /// Get the current minimum cut value.
     #[no_mangle]
     pub extern "C" fn mincut_get_result() -> u16 {
         unsafe {
@@ -143,6 +148,7 @@ pub mod ffi {
         }
     }
 
+    /// Check if the computation is complete (returns 1 if complete, 0 otherwise).
     #[no_mangle]
     pub extern "C" fn mincut_is_complete() -> u8 {
         unsafe {

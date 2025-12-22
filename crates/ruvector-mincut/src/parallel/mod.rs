@@ -101,8 +101,8 @@ impl WorkItem {
 pub struct SharedCoordinator {
     /// Global minimum cut found so far
     pub global_min_cut: AtomicU16,
-    /// Number of cores that have completed
-    pub completed_cores: AtomicU8,
+    /// Number of cores that have completed (u16 to support NUM_CORES=256)
+    pub completed_cores: AtomicU16,
     /// Current phase
     pub phase: AtomicU8,
     /// Work queue head (for work stealing)
@@ -112,7 +112,7 @@ pub struct SharedCoordinator {
     /// Best result core ID
     pub best_core: AtomicU8,
     /// Padding for alignment
-    _pad: [u8; 53],
+    _pad: [u8; 52],
 }
 
 impl SharedCoordinator {
@@ -125,12 +125,12 @@ impl SharedCoordinator {
     pub fn new() -> Self {
         Self {
             global_min_cut: AtomicU16::new(u16::MAX),
-            completed_cores: AtomicU8::new(0),
+            completed_cores: AtomicU16::new(0),
             phase: AtomicU8::new(Self::PHASE_INIT),
             queue_head: AtomicU16::new(0),
             queue_tail: AtomicU16::new(0),
             best_core: AtomicU8::new(0),
-            _pad: [0; 53],
+            _pad: [0; 52],
         }
     }
 
@@ -157,13 +157,13 @@ impl SharedCoordinator {
     }
 
     /// Mark core as completed
-    pub fn mark_completed(&self) -> u8 {
+    pub fn mark_completed(&self) -> u16 {
         self.completed_cores.fetch_add(1, Ordering::AcqRel) + 1
     }
 
     /// Check if all cores completed
     pub fn all_completed(&self) -> bool {
-        self.completed_cores.load(Ordering::Acquire) >= NUM_CORES as u8
+        self.completed_cores.load(Ordering::Acquire) >= NUM_CORES as u16
     }
 }
 
@@ -339,7 +339,8 @@ impl<'a> CoreExecutor<'a> {
         for i in 0..self.state.num_edges as usize {
             let edge = &self.state.edges[i];
             if edge.is_active() && (edge.source == v || edge.target == v) {
-                degree += 1;
+                // Sum weights for weighted min-cut (not edge count)
+                degree = degree.saturating_add(edge.weight);
             }
         }
         degree
