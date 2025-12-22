@@ -28,6 +28,7 @@
 //! - Deterministic (no randomization)
 
 pub mod paper_impl;
+pub mod deterministic;
 
 // Re-export paper implementation types
 pub use paper_impl::{
