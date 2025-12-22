@@ -715,6 +715,394 @@ impl ThreeLevelHierarchy {
         self.global_min_cut = min_cut;
     }
 
+    // === Incremental Updates ===
+
+    /// Handle edge insertion with incremental updates
+    ///
+    /// Instead of rebuilding, propagate changes through hierarchy:
+    /// 1. Update expander containing endpoints
+    /// 2. Propagate to precluster
+    /// 3. Propagate to cluster
+    /// 4. Update affected mirror cuts
+    pub fn handle_edge_insert(&mut self, u: VertexId, v: VertexId, weight: Weight) {
+        // First, add the edge to the graph
+        self.insert_edge(u, v, weight);
+
+        // If hierarchy not built yet, nothing to update
+        if self.expanders.is_empty() {
+            return;
+        }
+
+        // Find expanders containing u and v
+        let exp_u = self.vertex_expander.get(&u).copied();
+        let exp_v = self.vertex_expander.get(&v).copied();
+
+        match (exp_u, exp_v) {
+            (Some(eu), Some(ev)) if eu == ev => {
+                // Both in same expander - update internal edges
+                self.update_expander_edges(eu);
+            }
+            (Some(eu), Some(ev)) => {
+                // Different expanders - update both and their connection
+                self.update_expander_edges(eu);
+                self.update_expander_edges(ev);
+
+                // Update mirror cut between them
+                self.update_mirror_cut_between(eu, ev);
+            }
+            (Some(eu), None) => {
+                // Only u is in an expander - add v to same expander or create new
+                self.try_add_vertex_to_expander(v, eu);
+                self.update_expander_edges(eu);
+            }
+            (None, Some(ev)) => {
+                // Only v is in an expander - add u to same expander or create new
+                self.try_add_vertex_to_expander(u, ev);
+                self.update_expander_edges(ev);
+            }
+            (None, None) => {
+                // Neither in an expander - create new expander for both
+                self.create_expander_for_new_vertices(&[u, v]);
+            }
+        }
+
+        // Propagate changes up the hierarchy
+        self.propagate_updates(&[u, v]);
+
+        // Update global min cut
+        self.update_global_min_cut();
+    }
+
+    /// Handle edge deletion with incremental updates
+    pub fn handle_edge_delete(&mut self, u: VertexId, v: VertexId) {
+        // Remove the edge from the graph
+        self.delete_edge(u, v);
+
+        // If hierarchy not built yet, nothing to update
+        if self.expanders.is_empty() {
+            return;
+        }
+
+        // Find expanders containing u and v
+        let exp_u = self.vertex_expander.get(&u).copied();
+        let exp_v = self.vertex_expander.get(&v).copied();
+
+        if let (Some(eu), Some(ev)) = (exp_u, exp_v) {
+            if eu == ev {
+                // Same expander - may need to split if expansion violated
+                self.check_and_split_expander(eu);
+            } else {
+                // Different expanders - update boundary
+                self.update_expander_edges(eu);
+                self.update_expander_edges(ev);
+
+                // Update mirror cut
+                self.update_mirror_cut_between(eu, ev);
+            }
+        }
+
+        // Propagate changes up the hierarchy
+        self.propagate_updates(&[u, v]);
+
+        // Update global min cut
+        self.update_global_min_cut();
+    }
+
+    /// Update edges for an expander
+    fn update_expander_edges(&mut self, exp_id: u64) {
+        // First collect vertices
+        let vertices = match self.expanders.get(&exp_id) {
+            Some(e) => e.vertices.clone(),
+            None => return,
+        };
+
+        let mut internal = Vec::new();
+        let mut boundary = Vec::new();
+        let mut volume = 0;
+
+        for &v in &vertices {
+            let neighbors = self.neighbors(v);
+            volume += neighbors.len();
+
+            for (neighbor, _) in neighbors {
+                if vertices.contains(&neighbor) {
+                    if v < neighbor {
+                        internal.push((v, neighbor));
+                    }
+                } else {
+                    boundary.push((v, neighbor));
+                }
+            }
+        }
+
+        // Now update the expander
+        if let Some(expander) = self.expanders.get_mut(&exp_id) {
+            expander.internal_edges = internal;
+            expander.boundary_edges = boundary;
+            expander.volume = volume;
+
+            let min_vol = volume.min(vertices.len() * 2);
+            expander.expansion_ratio = if min_vol > 0 {
+                expander.boundary_edges.len() as f64 / min_vol as f64
+            } else {
+                0.0
+            };
+        }
+    }
+
+    /// Try to add a new vertex to an existing expander
+    fn try_add_vertex_to_expander(&mut self, v: VertexId, exp_id: u64) {
+        // Check if adding v would violate expansion
+        if let Some(expander) = self.expanders.get(&exp_id) {
+            let new_volume = expander.volume + self.degree(v);
+            let new_boundary = self.count_boundary_with_vertex(exp_id, v);
+
+            let expansion = if new_volume > 0 {
+                new_boundary as f64 / new_volume as f64
+            } else {
+                0.0
+            };
+
+            if expansion >= self.config.phi * 0.5 {
+                // OK to add
+                if let Some(exp) = self.expanders.get_mut(&exp_id) {
+                    exp.vertices.insert(v);
+                    self.vertex_expander.insert(v, exp_id);
+                }
+            } else {
+                // Create new expander for this vertex
+                self.create_expander_for_new_vertices(&[v]);
+            }
+        }
+    }
+
+    /// Count boundary if we add a vertex to an expander
+    fn count_boundary_with_vertex(&self, exp_id: u64, v: VertexId) -> usize {
+        let expander = match self.expanders.get(&exp_id) {
+            Some(e) => e,
+            None => return 0,
+        };
+
+        let mut extended = expander.vertices.clone();
+        extended.insert(v);
+
+        let mut boundary = 0;
+        for &u in &extended {
+            for (neighbor, _) in self.neighbors(u) {
+                if !extended.contains(&neighbor) {
+                    boundary += 1;
+                }
+            }
+        }
+        boundary
+    }
+
+    /// Create a new expander for new vertices
+    fn create_expander_for_new_vertices(&mut self, vertices: &[VertexId]) {
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let vertex_set: HashSet<_> = vertices.iter().copied().collect();
+        let mut expander = Expander::new(id, vertex_set);
+        self.compute_expander_properties(&mut expander);
+
+        for &v in vertices {
+            self.vertex_expander.insert(v, id);
+        }
+
+        self.expanders.insert(id, expander);
+
+        // Add to existing precluster if possible
+        self.assign_expander_to_precluster(id);
+    }
+
+    /// Assign a new expander to a precluster
+    fn assign_expander_to_precluster(&mut self, exp_id: u64) {
+        // Find adjacent precluster
+        for (pre_id, precluster) in &self.preclusters {
+            // Check if any expander in precluster is adjacent
+            for &other_exp in &precluster.expanders {
+                if self.expanders_adjacent(exp_id, other_exp) {
+                    if let Some(exp) = self.expanders.get_mut(&exp_id) {
+                        exp.precluster_id = Some(*pre_id);
+                    }
+                    return;
+                }
+            }
+        }
+
+        // Create new precluster if not adjacent to any
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let mut precluster = Precluster::new(id);
+        if let Some(expander) = self.expanders.get_mut(&exp_id) {
+            precluster.add_expander(expander);
+            expander.precluster_id = Some(id);
+        }
+        self.compute_precluster_boundary(&mut precluster);
+        self.preclusters.insert(id, precluster);
+
+        // Assign to cluster
+        self.assign_precluster_to_cluster(id);
+    }
+
+    /// Assign a new precluster to a cluster
+    fn assign_precluster_to_cluster(&mut self, pre_id: u64) {
+        // Find adjacent cluster
+        for (cluster_id, cluster) in &self.clusters {
+            for &other_pre in &cluster.preclusters {
+                if self.preclusters_adjacent(pre_id, other_pre) {
+                    if let Some(pre) = self.preclusters.get_mut(&pre_id) {
+                        pre.cluster_id = Some(*cluster_id);
+                    }
+                    return;
+                }
+            }
+        }
+
+        // Create new cluster
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let mut cluster = HierarchyCluster::new(id);
+        if let Some(precluster) = self.preclusters.get_mut(&pre_id) {
+            cluster.add_precluster(precluster);
+            precluster.cluster_id = Some(id);
+        }
+        self.compute_cluster_boundary(&mut cluster);
+        self.clusters.insert(id, cluster);
+    }
+
+    /// Check if an expander needs splitting after edge deletion
+    fn check_and_split_expander(&mut self, exp_id: u64) {
+        if let Some(expander) = self.expanders.get(&exp_id) {
+            // Check if expansion is now violated
+            if expander.expansion_ratio < self.config.phi * 0.3 {
+                // Need to potentially split - for now just update
+                self.update_expander_edges(exp_id);
+            }
+        }
+    }
+
+    /// Update mirror cut between two expanders
+    fn update_mirror_cut_between(&mut self, exp1: u64, exp2: u64) {
+        let (cut_value, cut_edges) = self.compute_expander_cut(exp1, exp2);
+
+        // Find cluster containing these expanders
+        let cluster_id = self.expanders.get(&exp1)
+            .and_then(|e| e.precluster_id)
+            .and_then(|pid| self.preclusters.get(&pid))
+            .and_then(|p| p.cluster_id);
+
+        if let Some(cid) = cluster_id {
+            if let Some(cluster) = self.clusters.get_mut(&cid) {
+                // Update or add mirror cut
+                let found = cluster.mirror_cuts.iter_mut()
+                    .find(|m| {
+                        (m.source_expander == exp1 && m.target_expander == exp2) ||
+                        (m.source_expander == exp2 && m.target_expander == exp1)
+                    });
+
+                if let Some(mirror) = found {
+                    mirror.cut_value = cut_value;
+                    mirror.cut_edges = cut_edges;
+                } else if !cut_edges.is_empty() {
+                    cluster.mirror_cuts.push(MirrorCut {
+                        source_expander: exp1,
+                        target_expander: exp2,
+                        cut_value,
+                        cut_edges,
+                        certified: false,
+                    });
+                }
+
+                // Update internal min cut
+                if let Some(min_mirror) = cluster.mirror_cuts.iter()
+                    .map(|m| m.cut_value)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                {
+                    cluster.internal_min_cut = min_mirror;
+                }
+            }
+        }
+    }
+
+    /// Propagate updates up through the hierarchy
+    fn propagate_updates(&mut self, vertices: &[VertexId]) {
+        // Collect affected expanders
+        let mut affected_expanders = HashSet::new();
+        for &v in vertices {
+            if let Some(&exp_id) = self.vertex_expander.get(&v) {
+                affected_expanders.insert(exp_id);
+            }
+        }
+
+        // Collect affected preclusters
+        let mut affected_preclusters = HashSet::new();
+        for &exp_id in &affected_expanders {
+            if let Some(expander) = self.expanders.get(&exp_id) {
+                if let Some(pre_id) = expander.precluster_id {
+                    affected_preclusters.insert(pre_id);
+                }
+            }
+        }
+
+        // Update precluster boundaries
+        for &pre_id in &affected_preclusters {
+            if let Some(precluster) = self.preclusters.get_mut(&pre_id) {
+                // Recollect vertices from expanders
+                precluster.vertices.clear();
+                precluster.volume = 0;
+
+                for &exp_id in &precluster.expanders {
+                    if let Some(expander) = self.expanders.get(&exp_id) {
+                        precluster.vertices.extend(&expander.vertices);
+                        precluster.volume += expander.volume;
+                    }
+                }
+            }
+
+            // Recompute boundary
+            let precluster = self.preclusters.get(&pre_id).cloned();
+            if let Some(mut pre) = precluster {
+                self.compute_precluster_boundary(&mut pre);
+                self.preclusters.insert(pre_id, pre);
+            }
+        }
+
+        // Collect affected clusters
+        let mut affected_clusters = HashSet::new();
+        for &pre_id in &affected_preclusters {
+            if let Some(precluster) = self.preclusters.get(&pre_id) {
+                if let Some(cluster_id) = precluster.cluster_id {
+                    affected_clusters.insert(cluster_id);
+                }
+            }
+        }
+
+        // Update cluster boundaries
+        for &cluster_id in &affected_clusters {
+            if let Some(cluster) = self.clusters.get_mut(&cluster_id) {
+                // Recollect vertices from preclusters
+                cluster.vertices.clear();
+
+                for &pre_id in &cluster.preclusters {
+                    if let Some(precluster) = self.preclusters.get(&pre_id) {
+                        cluster.vertices.extend(&precluster.vertices);
+                    }
+                }
+            }
+
+            // Recompute boundary
+            let cluster = self.clusters.get(&cluster_id).cloned();
+            if let Some(mut c) = cluster {
+                self.compute_cluster_boundary(&mut c);
+                self.clusters.insert(cluster_id, c);
+            }
+        }
+    }
+
     // === Getters ===
 
     /// Get expander containing vertex
@@ -910,5 +1298,80 @@ mod tests {
         assert_eq!(stats.num_vertices, 5);
         assert_eq!(stats.num_edges, 4);
         assert!(stats.avg_expander_size > 0.0);
+    }
+
+    #[test]
+    fn test_incremental_insert() {
+        let mut h = ThreeLevelHierarchy::with_defaults();
+        build_clique(&mut h, &[1, 2, 3, 4]);
+        h.build();
+
+        let initial_expanders = h.expanders.len();
+
+        // Insert an edge to a new vertex
+        h.handle_edge_insert(4, 5, 1.0);
+
+        // Should have updated the hierarchy
+        assert!(h.expanders.len() >= initial_expanders);
+
+        let stats = h.stats();
+        assert!(stats.num_vertices >= 5);
+        assert!(stats.num_edges >= 7);
+    }
+
+    #[test]
+    fn test_incremental_delete() {
+        let mut h = ThreeLevelHierarchy::new(HierarchyConfig {
+            min_expander_size: 2,
+            ..Default::default()
+        });
+
+        build_clique(&mut h, &[1, 2, 3]);
+        build_clique(&mut h, &[4, 5, 6]);
+        h.insert_edge(3, 4, 1.0); // Bridge
+        h.build();
+
+        let initial_min_cut = h.global_min_cut;
+
+        // Delete the bridge
+        h.handle_edge_delete(3, 4);
+
+        // Min cut should change (possibly to 0 if disconnected)
+        assert!(h.global_min_cut <= initial_min_cut || h.global_min_cut.is_infinite());
+    }
+
+    #[test]
+    fn test_incremental_within_expander() {
+        let mut h = ThreeLevelHierarchy::with_defaults();
+        build_clique(&mut h, &[1, 2, 3, 4]);
+        h.build();
+
+        let initial_expanders = h.expanders.len();
+
+        // Insert edge within existing vertices
+        h.handle_edge_insert(1, 4, 2.0);
+
+        // Should still have same expanders
+        assert_eq!(h.expanders.len(), initial_expanders);
+    }
+
+    #[test]
+    fn test_propagate_updates() {
+        let mut h = ThreeLevelHierarchy::new(HierarchyConfig {
+            min_expander_size: 2,
+            ..Default::default()
+        });
+
+        build_clique(&mut h, &[1, 2, 3]);
+        h.build();
+
+        // Add edge to new vertex
+        h.handle_edge_insert(3, 4, 1.0);
+        h.handle_edge_insert(4, 5, 1.0);
+
+        // Hierarchy should have been updated
+        assert!(h.expanders.len() >= 1);
+        assert!(h.preclusters.len() >= 1);
+        assert!(h.clusters.len() >= 1);
     }
 }
