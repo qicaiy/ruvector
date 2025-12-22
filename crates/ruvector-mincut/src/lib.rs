@@ -139,6 +139,7 @@ pub mod fragment;
 pub mod cluster;
 pub mod compact;
 pub mod parallel;
+pub mod pool;
 pub mod integration;
 
 // Internal modules
