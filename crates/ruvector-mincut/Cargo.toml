@@ -62,3 +62,7 @@ harness = false
 [[bench]]
 name = "sota_bench"
 harness = false
+
+[[bench]]
+name = "paper_algorithms_bench"
+harness = false

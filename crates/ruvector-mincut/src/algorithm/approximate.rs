@@ -445,7 +445,8 @@ impl ApproxMinCut {
         self.stoer_wagner(&sparsifier.adj, &sparsifier.vertices)
     }
 
-    /// Stoer-Wagner minimum cut algorithm for small graphs
+    /// Optimized Stoer-Wagner minimum cut algorithm
+    /// Uses early termination and degree-based lower bound
     fn stoer_wagner(
         &self,
         adj: &HashMap<VertexId, Vec<(VertexId, f64)>>,
@@ -453,6 +454,19 @@ impl ApproxMinCut {
     ) -> f64 {
         if vertices.len() <= 1 {
             return f64::INFINITY;
+        }
+
+        // Quick lower bound: minimum weighted degree
+        let min_degree: f64 = adj
+            .iter()
+            .filter(|(v, _)| vertices.contains(v))
+            .map(|(_, neighbors)| neighbors.iter().map(|(_, w)| *w).sum::<f64>())
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(f64::INFINITY);
+
+        // For very small graphs, use simpler algorithm
+        if vertices.len() <= 3 {
+            return min_degree;
         }
 
         // Build adjacency matrix
@@ -471,27 +485,35 @@ impl ApproxMinCut {
             }
         }
 
-        // Stoer-Wagner iterations
+        // Stoer-Wagner iterations with optimizations
         let mut min_cut = f64::INFINITY;
         let mut active: Vec<bool> = vec![true; n];
-        let mut contracted_to: Vec<usize> = (0..n).collect();
 
         for phase in 0..n - 1 {
-            // Maximum adjacency search
+            // Early termination if we found a zero cut
+            if min_cut == 0.0 {
+                break;
+            }
+
+            // Maximum adjacency search with optimized tracking
             let mut in_a = vec![false; n];
             let mut cut_of_phase = vec![0.0; n];
 
             // Find first active vertex
-            let first = (0..n).find(|&i| active[i]).unwrap();
+            let first = match (0..n).find(|&i| active[i]) {
+                Some(f) => f,
+                None => break,
+            };
             in_a[first] = true;
 
             let mut last = first;
             let mut before_last = first;
 
-            for _ in 1..n - phase {
-                // Update cut values
+            let active_count = active.iter().filter(|&&a| a).count();
+            for _ in 1..active_count {
+                // Update cut values only for neighbors of last
                 for j in 0..n {
-                    if active[j] && !in_a[j] {
+                    if active[j] && !in_a[j] && weights[last][j] > 0.0 {
                         cut_of_phase[j] += weights[last][j];
                     }
                 }
@@ -507,13 +529,15 @@ impl ApproxMinCut {
                 }
 
                 if max_val == f64::NEG_INFINITY {
-                    break; // No more vertices to add
+                    break;
                 }
                 in_a[last] = true;
             }
 
             // Update minimum cut
-            min_cut = min_cut.min(cut_of_phase[last]);
+            if cut_of_phase[last] > 0.0 || phase == 0 {
+                min_cut = min_cut.min(cut_of_phase[last]);
+            }
 
             // Merge last two vertices
             active[last] = false;
@@ -521,7 +545,6 @@ impl ApproxMinCut {
                 weights[before_last][j] += weights[last][j];
                 weights[j][before_last] += weights[j][last];
             }
-            contracted_to[last] = before_last;
         }
 
         min_cut

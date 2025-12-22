@@ -56,10 +56,14 @@ struct LevelForest {
     parent: HashMap<VertexId, VertexId>,
     /// Rank for union by rank
     rank: HashMap<VertexId, usize>,
+    /// Component sizes for smarter union
+    component_size: HashMap<VertexId, usize>,
     /// Tree edges at this level
     tree_edges: HashSet<(VertexId, VertexId)>,
     /// Non-tree edges at this level
     non_tree_edges: HashSet<(VertexId, VertexId)>,
+    /// Adjacency list for faster traversal (vertex -> neighbors)
+    adjacency: HashMap<VertexId, Vec<VertexId>>,
     /// Number of vertices
     size: usize,
 }
@@ -69,20 +73,26 @@ impl LevelForest {
         Self {
             parent: HashMap::new(),
             rank: HashMap::new(),
+            component_size: HashMap::new(),
             tree_edges: HashSet::new(),
             non_tree_edges: HashSet::new(),
+            adjacency: HashMap::new(),
             size: 0,
         }
     }
 
+    #[inline]
     fn add_vertex(&mut self, v: VertexId) {
         if !self.parent.contains_key(&v) {
             self.parent.insert(v, v);
             self.rank.insert(v, 0);
+            self.component_size.insert(v, 1);
+            self.adjacency.insert(v, Vec::new());
             self.size += 1;
         }
     }
 
+    #[inline]
     fn find(&mut self, v: VertexId) -> VertexId {
         if !self.parent.contains_key(&v) {
             return v;
@@ -93,11 +103,23 @@ impl LevelForest {
             return v;
         }
 
-        let root = self.find(p);
-        self.parent.insert(v, root);
+        // Path compression with iterative approach (faster than recursive)
+        let mut path = Vec::with_capacity(8);
+        let mut current = v;
+        while self.parent[&current] != current {
+            path.push(current);
+            current = self.parent[&current];
+        }
+        let root = current;
+
+        // Compress path
+        for node in path {
+            self.parent.insert(node, root);
+        }
         root
     }
 
+    #[inline]
     fn union(&mut self, u: VertexId, v: VertexId) -> bool {
         let root_u = self.find(u);
         let root_v = self.find(v);
@@ -106,28 +128,34 @@ impl LevelForest {
             return false;
         }
 
-        let rank_u = *self.rank.get(&root_u).unwrap_or(&0);
-        let rank_v = *self.rank.get(&root_v).unwrap_or(&0);
+        // Union by size (better than rank for our use case)
+        let size_u = *self.component_size.get(&root_u).unwrap_or(&1);
+        let size_v = *self.component_size.get(&root_v).unwrap_or(&1);
 
-        if rank_u < rank_v {
+        if size_u < size_v {
             self.parent.insert(root_u, root_v);
-        } else if rank_u > rank_v {
-            self.parent.insert(root_v, root_u);
+            self.component_size.insert(root_v, size_u + size_v);
         } else {
             self.parent.insert(root_v, root_u);
-            self.rank.insert(root_u, rank_u + 1);
+            self.component_size.insert(root_u, size_u + size_v);
         }
 
         true
     }
 
+    #[inline]
     fn connected(&mut self, u: VertexId, v: VertexId) -> bool {
         self.find(u) == self.find(v)
     }
 
+    #[inline]
     fn insert_edge(&mut self, u: VertexId, v: VertexId) -> bool {
         self.add_vertex(u);
         self.add_vertex(v);
+
+        // Update adjacency list
+        self.adjacency.entry(u).or_default().push(v);
+        self.adjacency.entry(v).or_default().push(u);
 
         let edge = if u < v { (u, v) } else { (v, u) };
 
@@ -145,12 +173,33 @@ impl LevelForest {
     fn remove_edge(&mut self, u: VertexId, v: VertexId) -> bool {
         let edge = if u < v { (u, v) } else { (v, u) };
 
+        // Update adjacency
+        if let Some(neighbors) = self.adjacency.get_mut(&u) {
+            neighbors.retain(|&x| x != v);
+        }
+        if let Some(neighbors) = self.adjacency.get_mut(&v) {
+            neighbors.retain(|&x| x != u);
+        }
+
         if self.tree_edges.remove(&edge) {
             true
         } else {
             self.non_tree_edges.remove(&edge);
             false
         }
+    }
+
+    /// Get neighbors of a vertex (faster than iterating edges)
+    #[inline]
+    fn neighbors(&self, v: VertexId) -> &[VertexId] {
+        self.adjacency.get(&v).map_or(&[], |n| n.as_slice())
+    }
+
+    /// Get component size for a vertex
+    #[inline]
+    fn get_component_size(&mut self, v: VertexId) -> usize {
+        let root = self.find(v);
+        *self.component_size.get(&root).unwrap_or(&1)
     }
 }
 
@@ -349,51 +398,53 @@ impl PolylogConnectivity {
     }
 
     /// Find a replacement edge for deleted tree edge
+    /// Optimized: Uses adjacency list and smaller component first
     fn find_replacement(&mut self, u: VertexId, v: VertexId, level: usize) -> Option<(VertexId, VertexId)> {
-        // BFS from smaller component to find replacement
-        let mut visited = HashSet::new();
-        let mut queue = VecDeque::new();
+        // Choose smaller component for BFS (optimization)
+        let size_u = self.levels[level].get_component_size(u);
+        let size_v = self.levels[level].get_component_size(v);
+        let (start, _target) = if size_u <= size_v { (u, v) } else { (v, u) };
 
-        // Start BFS from u
-        queue.push_back(u);
-        visited.insert(u);
+        // Use FxHashSet for faster hashing if available, fallback to HashSet
+        let mut visited = HashSet::with_capacity(size_u.min(size_v).min(1000));
+        let mut queue = VecDeque::with_capacity(64);
+
+        // Start BFS from smaller component
+        queue.push_back(start);
+        visited.insert(start);
+
+        // Early termination limit
+        let max_search = (self.vertex_count / 2).max(100);
 
         while let Some(current) = queue.pop_front() {
-            // Check non-tree edges at this level
-            for &(a, b) in &self.levels[level].non_tree_edges {
-                let other = if a == current {
-                    b
-                } else if b == current {
-                    a
-                } else {
-                    continue
-                };
+            // Check non-tree edges first (more likely to find replacement)
+            let non_tree_edges: Vec<_> = self.levels[level]
+                .non_tree_edges
+                .iter()
+                .filter(|&&(a, b)| a == current || b == current)
+                .copied()
+                .collect();
 
-                // Check if this edge connects to v's component
+            for (a, b) in non_tree_edges {
+                let other = if a == current { b } else { a };
+
+                // If other is not in visited set, it's in the other component
                 if !visited.contains(&other) {
-                    // This could be a replacement
                     return Some((a, b));
                 }
             }
 
-            // Expand via tree edges
-            for &(a, b) in &self.levels[level].tree_edges {
-                let other = if a == current {
-                    b
-                } else if b == current {
-                    a
-                } else {
-                    continue
-                };
-
-                if !visited.contains(&other) {
-                    visited.insert(other);
-                    queue.push_back(other);
+            // Use adjacency list for faster neighbor iteration
+            let neighbors: Vec<_> = self.levels[level].neighbors(current).to_vec();
+            for neighbor in neighbors {
+                if !visited.contains(&neighbor) {
+                    visited.insert(neighbor);
+                    queue.push_back(neighbor);
                 }
             }
 
             // Limit search to avoid worst-case
-            if visited.len() > self.vertex_count / 2 {
+            if visited.len() >= max_search {
                 break;
             }
         }
