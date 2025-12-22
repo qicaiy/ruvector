@@ -66,3 +66,18 @@ harness = false
 [[bench]]
 name = "paper_algorithms_bench"
 harness = false
+
+[[example]]
+name = "mincut_neural_optimizer"
+path = "../../examples/mincut/neural_optimizer/main.rs"
+required-features = ["exact"]
+
+[[example]]
+name = "mincut_causal_discovery"
+path = "../../examples/mincut/causal_discovery/main.rs"
+required-features = ["exact"]
+
+[[example]]
+name = "morphogenetic"
+path = "../../examples/mincut/morphogenetic/main.rs"
+required-features = ["exact"]
