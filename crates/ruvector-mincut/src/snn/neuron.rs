@@ -343,6 +343,7 @@ impl SpikeTrain {
 
     /// Compute cross-correlation with another spike train
     ///
+    /// Uses O(n log n) sliding window algorithm instead of O(n²) pairwise comparison.
     /// Safely handles potential overflow in bin calculation.
     pub fn cross_correlation(&self, other: &SpikeTrain, max_lag: f64, bin_size: f64) -> Vec<f64> {
         // Guard against invalid parameters
@@ -360,19 +361,45 @@ impl SpikeTrain {
 
         let mut correlation = vec![0.0; num_bins];
 
-        for &t1 in &self.spike_times {
-            for &t2 in &other.spike_times {
+        // Empty train optimization
+        if self.spike_times.is_empty() || other.spike_times.is_empty() {
+            return correlation;
+        }
+
+        // Sort both spike trains (usually already sorted, but ensure)
+        let mut t1_sorted: Vec<f64> = self.spike_times.clone();
+        let mut t2_sorted: Vec<f64> = other.spike_times.clone();
+        t1_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        t2_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Use sliding window: for each spike in t1, find valid range in t2
+        // A spike t2 is valid if: t1 - max_lag <= t2 <= t1 + max_lag
+        let mut window_start = 0usize;
+
+        for &t1 in &t1_sorted {
+            let lower_bound = t1 - max_lag;
+            let upper_bound = t1 + max_lag;
+
+            // Advance window_start past spikes too early
+            while window_start < t2_sorted.len() && t2_sorted[window_start] < lower_bound {
+                window_start += 1;
+            }
+
+            // Count spikes within window
+            let mut j = window_start;
+            while j < t2_sorted.len() && t2_sorted[j] <= upper_bound {
+                let t2 = t2_sorted[j];
                 let lag = t1 - t2;
-                if lag.abs() <= max_lag {
-                    // Safe bin calculation
-                    let bin_f64 = (lag + max_lag) / bin_size;
-                    if bin_f64 >= 0.0 && bin_f64 < num_bins as f64 {
-                        let bin = bin_f64 as usize;
-                        if bin < num_bins {
-                            correlation[bin] += 1.0;
-                        }
+
+                // Safe bin calculation
+                let bin_f64 = (lag + max_lag) / bin_size;
+                if bin_f64 >= 0.0 && bin_f64 < num_bins as f64 {
+                    let bin = bin_f64 as usize;
+                    if bin < num_bins {
+                        correlation[bin] += 1.0;
                     }
                 }
+                j += 1;
             }
         }
 

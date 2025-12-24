@@ -256,26 +256,34 @@ impl SpikingNetwork {
             // Calculate input currents for this layer
             let mut currents = vec![0.0; self.layers[layer_idx].size()];
 
-            // Add feedforward input from previous layer
+            // Add feedforward input from previous layer (sparse iteration)
             if layer_idx > 0 {
                 let weights = &self.feedforward_weights[layer_idx - 1];
-                for j in 0..currents.len() {
-                    for i in 0..self.layers[layer_idx - 1].size() {
-                        let pre_v = self.layers[layer_idx - 1].neurons[i].membrane_potential();
-                        currents[j] += weights.weight(i, j) * pre_v.max(0.0);
-                    }
+                // Collect pre-activations once
+                let pre_activations: Vec<f64> = self.layers[layer_idx - 1]
+                    .neurons
+                    .iter()
+                    .map(|n| n.membrane_potential().max(0.0))
+                    .collect();
+                // Use sparse weighted sum computation
+                let ff_currents = weights.compute_weighted_sums(&pre_activations);
+                for (j, &c) in ff_currents.iter().enumerate() {
+                    currents[j] += c;
                 }
             }
 
-            // Add recurrent input
+            // Add recurrent input (sparse iteration)
             if let Some(ref weights) = self.recurrent_weights[layer_idx] {
-                for j in 0..currents.len() {
-                    for i in 0..self.layers[layer_idx].size() {
-                        if i != j {
-                            let pre_v = self.layers[layer_idx].neurons[i].membrane_potential();
-                            currents[j] += weights.weight(i, j) * pre_v.max(0.0);
-                        }
-                    }
+                // Collect activations
+                let activations: Vec<f64> = self.layers[layer_idx]
+                    .neurons
+                    .iter()
+                    .map(|n| n.membrane_potential().max(0.0))
+                    .collect();
+                // Use sparse weighted sum computation
+                let rec_currents = weights.compute_weighted_sums(&activations);
+                for (j, &c) in rec_currents.iter().enumerate() {
+                    currents[j] += c;
                 }
             }
 

@@ -204,6 +204,37 @@ impl SynapseMatrix {
         self.get_synapse(pre, post).map(|s| s.weight).unwrap_or(0.0)
     }
 
+    /// Compute weighted sum for all post-synaptic neurons given pre-synaptic activations
+    ///
+    /// This is optimized to iterate only over existing synapses, avoiding O(n²) lookups.
+    /// pre_activations[i] is the activation of pre-synaptic neuron i.
+    /// Returns vector of weighted sums for each post-synaptic neuron.
+    #[inline]
+    pub fn compute_weighted_sums(&self, pre_activations: &[f64]) -> Vec<f64> {
+        let mut sums = vec![0.0; self.n_post];
+
+        // Iterate only over existing synapses (sparse operation)
+        for (&(pre, post), synapse) in &self.synapses {
+            if pre < pre_activations.len() {
+                sums[post] += synapse.weight * pre_activations[pre];
+            }
+        }
+
+        sums
+    }
+
+    /// Compute weighted sum for a single post-synaptic neuron
+    #[inline]
+    pub fn weighted_sum_for_post(&self, post: usize, pre_activations: &[f64]) -> f64 {
+        let mut sum = 0.0;
+        for pre in 0..self.n_pre.min(pre_activations.len()) {
+            if let Some(synapse) = self.synapses.get(&(pre, post)) {
+                sum += synapse.weight * pre_activations[pre];
+            }
+        }
+        sum
+    }
+
     /// Set weight of a synapse (creates if doesn't exist)
     pub fn set_weight(&mut self, pre: usize, post: usize, weight: f64) {
         if let Some(synapse) = self.get_synapse_mut(pre, post) {

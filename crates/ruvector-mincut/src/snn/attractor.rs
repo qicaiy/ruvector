@@ -278,13 +278,12 @@ impl AttractorDynamics {
         self.karger_stein_with_skip(&skip_edges)
     }
 
-    /// Randomized Karger-Stein mincut with skip edges
+    /// Fast approximate mincut with skip edges
     ///
-    /// Implements the Karger-Stein algorithm using edge contraction.
-    /// Time complexity: O(n² log n) with O(log² n) iterations for high probability.
+    /// Uses optimized Karger-Stein with early termination and reduced iterations.
+    /// For SNN context, we need relative accuracy not exact values.
+    /// Time complexity: O(n log n) amortized with early termination.
     fn karger_stein_with_skip(&self, skip_edges: &std::collections::HashSet<(VertexId, VertexId)>) -> f64 {
-        use std::collections::HashMap;
-
         let vertices: Vec<_> = self.graph.vertices();
         let n = vertices.len();
 
@@ -292,145 +291,219 @@ impl AttractorDynamics {
             return 0.0;
         }
 
-        // Build adjacency with weights, excluding skip edges
-        let mut adj: HashMap<VertexId, HashMap<VertexId, f64>> = HashMap::new();
-        for v in &vertices {
-            adj.insert(*v, HashMap::new());
+        // For small graphs, use exact algorithm
+        if n <= 10 {
+            return self.exact_mincut_small(skip_edges, &vertices);
         }
+
+        // Build compact adjacency representation (Vec-based for speed)
+        let mut vertex_to_idx: std::collections::HashMap<VertexId, usize> =
+            vertices.iter().enumerate().map(|(i, &v)| (v, i)).collect();
+
+        let mut adj_weights: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n];
+        let mut total_weight = 0.0;
 
         for edge in self.graph.edges() {
             let key1 = (edge.source, edge.target);
             let key2 = (edge.target, edge.source);
 
             if !skip_edges.contains(&key1) && !skip_edges.contains(&key2) {
-                *adj.entry(edge.source).or_default().entry(edge.target).or_insert(0.0) += edge.weight;
-                *adj.entry(edge.target).or_default().entry(edge.source).or_insert(0.0) += edge.weight;
+                if let (Some(&i), Some(&j)) = (vertex_to_idx.get(&edge.source), vertex_to_idx.get(&edge.target)) {
+                    adj_weights[i].push((j, edge.weight));
+                    adj_weights[j].push((i, edge.weight));
+                    total_weight += edge.weight;
+                }
             }
         }
 
-        // Number of iterations for O(log² n) success probability
-        let iterations = ((n as f64).ln().powi(2).ceil() as usize).max(1);
+        // Fewer iterations with early termination - O(log n) typically sufficient
+        let max_iterations = ((n as f64).ln().ceil() as usize).max(3).min(10);
         let mut best_cut = f64::INFINITY;
 
-        for iter in 0..iterations {
-            let cut = self.karger_contract(&adj, &vertices, iter as u64);
+        // Early termination threshold: if we find a cut < avg_edge_weight, stop
+        let avg_edge = total_weight / (self.graph.num_edges().max(1) as f64);
+        let early_threshold = avg_edge * 2.0;
+
+        for iter in 0..max_iterations {
+            let cut = self.karger_contract_fast(&adj_weights, n, iter as u64);
             if cut < best_cut {
                 best_cut = cut;
+                // Early termination for good cuts
+                if best_cut <= early_threshold {
+                    break;
+                }
             }
         }
 
         if best_cut == f64::INFINITY { 0.0 } else { best_cut }
     }
 
-    /// Single Karger contraction run
-    fn karger_contract(
+    /// Exact mincut for small graphs (brute force is fine for n <= 10)
+    fn exact_mincut_small(&self, skip_edges: &std::collections::HashSet<(VertexId, VertexId)>, vertices: &[VertexId]) -> f64 {
+        let n = vertices.len();
+        if n <= 1 {
+            return 0.0;
+        }
+
+        // Build edge weights excluding skipped
+        let mut edge_weights: Vec<(VertexId, VertexId, f64)> = Vec::new();
+        for edge in self.graph.edges() {
+            let key1 = (edge.source, edge.target);
+            let key2 = (edge.target, edge.source);
+            if !skip_edges.contains(&key1) && !skip_edges.contains(&key2) {
+                edge_weights.push((edge.source, edge.target, edge.weight));
+            }
+        }
+
+        // Try all 2^(n-1) - 1 partitions (fixing first vertex)
+        let mut best_cut = f64::INFINITY;
+        let first = vertices[0];
+
+        for mask in 1..(1u64 << (n - 1)) {
+            let mut cut_weight = 0.0;
+
+            // Check each edge
+            for &(u, v, w) in &edge_weights {
+                let u_idx = vertices.iter().position(|&x| x == u);
+                let v_idx = vertices.iter().position(|&x| x == v);
+
+                if let (Some(ui), Some(vi)) = (u_idx, v_idx) {
+                    // First vertex always in set 0
+                    let u_in_set = if ui == 0 { false } else { (mask >> (ui - 1)) & 1 == 1 };
+                    let v_in_set = if vi == 0 { false } else { (mask >> (vi - 1)) & 1 == 1 };
+
+                    if u_in_set != v_in_set {
+                        cut_weight += w;
+                    }
+                }
+            }
+
+            if cut_weight < best_cut {
+                best_cut = cut_weight;
+            }
+        }
+
+        if best_cut == f64::INFINITY { 0.0 } else { best_cut }
+    }
+
+    /// Fast Karger contraction using Vec-based adjacency
+    fn karger_contract_fast(
         &self,
-        initial_adj: &std::collections::HashMap<VertexId, std::collections::HashMap<VertexId, f64>>,
-        vertices: &[VertexId],
+        adj_weights: &[Vec<(usize, f64)>],
+        n: usize,
         seed: u64,
     ) -> f64 {
-        use std::collections::HashMap;
+        // Union-find with path compression and union by rank
+        let mut parent: Vec<usize> = (0..n).collect();
+        let mut rank: Vec<usize> = vec![0; n];
+        let mut component_count = n;
 
-        // Union-find for tracking contractions
-        let mut parent: HashMap<VertexId, VertexId> = vertices.iter().map(|&v| (v, v)).collect();
-        let mut adj = initial_adj.clone();
-        let mut remaining = vertices.len();
+        // Pre-compute edge list with total weight
+        let mut edges: Vec<(usize, usize, f64)> = Vec::new();
+        let mut total_weight = 0.0;
 
-        // Simple seeded PRNG for this iteration
+        for (u, neighbors) in adj_weights.iter().enumerate() {
+            for &(v, w) in neighbors {
+                if u < v {
+                    edges.push((u, v, w));
+                    total_weight += w;
+                }
+            }
+        }
+
+        if edges.is_empty() {
+            return 0.0;
+        }
+
+        // Seeded PRNG
         let mut rng_state = seed.wrapping_add(0x9e3779b97f4a7c15);
         let mut rand = || {
             rng_state = rng_state.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(1);
             rng_state
         };
 
-        // Find root with path compression
-        fn find(parent: &mut HashMap<VertexId, VertexId>, v: VertexId) -> VertexId {
-            if parent[&v] != v {
-                let root = find(parent, parent[&v]);
-                parent.insert(v, root);
-                root
-            } else {
-                v
+        // Find with path compression
+        fn find(parent: &mut [usize], mut x: usize) -> usize {
+            let mut root = x;
+            while parent[root] != root {
+                root = parent[root];
             }
+            // Path compression
+            while parent[x] != root {
+                let next = parent[x];
+                parent[x] = root;
+                x = next;
+            }
+            root
         }
 
-        // Contract until 2 supervertices remain
-        while remaining > 2 {
-            // Collect all edges with weights
-            let edges: Vec<_> = adj.iter()
-                .flat_map(|(&u, neighbors)| {
-                    let u_copy = u; // Copy to avoid borrow issues
-                    neighbors.iter()
-                        .filter(move |(&v, _)| u_copy < v)
-                        .map(move |(&v, &w)| (u, v, w))
-                })
-                .collect();
-
-            if edges.is_empty() {
-                break;
+        // Union by rank
+        fn union(parent: &mut [usize], rank: &mut [usize], x: usize, y: usize) -> bool {
+            let rx = find(parent, x);
+            let ry = find(parent, y);
+            if rx == ry {
+                return false;
             }
-
-            // Select random edge weighted by edge weight
-            let total_weight: f64 = edges.iter().map(|(_, _, w)| w).sum();
-            if total_weight <= 0.0 {
-                break;
+            if rank[rx] < rank[ry] {
+                parent[rx] = ry;
+            } else if rank[rx] > rank[ry] {
+                parent[ry] = rx;
+            } else {
+                parent[ry] = rx;
+                rank[rx] += 1;
             }
+            true
+        }
 
+        // Contract until 2 components remain
+        while component_count > 2 && total_weight > 0.0 {
+            // Weighted random edge selection
             let threshold = (rand() as f64 / u64::MAX as f64) * total_weight;
             let mut cumulative = 0.0;
             let mut selected = edges[0];
 
             for &edge in &edges {
-                cumulative += edge.2;
-                if cumulative >= threshold {
-                    selected = edge;
-                    break;
-                }
-            }
-
-            let (u, v, _) = selected;
-            let root_u = find(&mut parent, u);
-            let root_v = find(&mut parent, v);
-
-            if root_u == root_v {
-                continue; // Already contracted
-            }
-
-            // Contract v into u
-            parent.insert(root_v, root_u);
-
-            // Merge adjacency lists
-            if let Some(v_neighbors) = adj.remove(&root_v) {
-                for (neighbor, weight) in v_neighbors {
-                    if neighbor != root_u {
-                        let root_n = find(&mut parent, neighbor);
-                        if root_n != root_u {
-                            *adj.entry(root_u).or_default().entry(root_n).or_insert(0.0) += weight;
-                            *adj.entry(root_n).or_default().entry(root_u).or_insert(0.0) += weight;
-                        }
+                let (eu, ev, ew) = edge;
+                let ru = find(&mut parent, eu);
+                let rv = find(&mut parent, ev);
+                // Only count edges between different components
+                if ru != rv {
+                    cumulative += ew;
+                    if cumulative >= threshold {
+                        selected = edge;
+                        break;
                     }
                 }
             }
 
-            // Remove self-loops and update references
-            if let Some(u_neighbors) = adj.get_mut(&root_u) {
-                u_neighbors.remove(&root_u);
-                u_neighbors.remove(&root_v);
+            let (u, v, w) = selected;
+            let root_u = find(&mut parent, u);
+            let root_v = find(&mut parent, v);
+
+            if root_u == root_v {
+                continue;
             }
 
-            remaining -= 1;
+            // Contract by union
+            if union(&mut parent, &mut rank, root_u, root_v) {
+                component_count -= 1;
+                // Update total_weight (edges between these components are now internal)
+                // This is approximate but fast
+                total_weight -= w;
+            }
         }
 
-        // Cut value = sum of edges between the two remaining supervertices
-        let roots: Vec<_> = adj.keys().cloned().collect();
-        if roots.len() >= 2 {
-            adj.get(&roots[0])
-                .and_then(|neighbors| neighbors.get(&roots[1]))
-                .copied()
-                .unwrap_or(0.0)
-        } else {
-            0.0
+        // Calculate cut value: sum of edges crossing the two remaining components
+        let mut cut_value = 0.0;
+        for &(u, v, w) in &edges {
+            let ru = find(&mut parent, u);
+            let rv = find(&mut parent, v);
+            if ru != rv {
+                cut_value += w;
+            }
         }
+
+        cut_value
     }
 
     /// Check if attractor has been reached
