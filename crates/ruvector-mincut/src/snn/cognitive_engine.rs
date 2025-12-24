@@ -154,6 +154,9 @@ pub enum OperationMode {
     Full,
 }
 
+/// Maximum event history size to prevent memory exhaustion
+const MAX_EVENT_HISTORY: usize = 10_000;
+
 /// The unified Cognitive MinCut Engine
 pub struct CognitiveMinCutEngine {
     /// Primary graph being optimized
@@ -432,9 +435,21 @@ impl CognitiveMinCutEngine {
             self.graph = opt.graph().clone();
         }
 
-        // Update other subsystems
+        // Update attractor subsystem with current graph state
         if let Some(ref mut attractor) = self.attractor {
-            // Sync would happen here
+            // Create new attractor dynamics with updated graph
+            // This preserves configuration while syncing graph
+            *attractor = AttractorDynamics::new(
+                self.graph.clone(),
+                attractor.config().clone(),
+            );
+        }
+
+        // Limit event history size to prevent memory exhaustion
+        if self.event_history.len() > MAX_EVENT_HISTORY {
+            // Keep only the most recent events
+            let drain_count = self.event_history.len() - MAX_EVENT_HISTORY;
+            self.event_history.drain(..drain_count);
         }
     }
 

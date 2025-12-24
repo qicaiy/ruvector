@@ -159,8 +159,10 @@ impl LIFNeuron {
             // Threshold adaptation
             self.state.threshold += self.config.threshold_adapt;
 
-            // Update running spike rate for homeostasis
-            self.state.spike_rate = self.state.spike_rate * 0.99 + 0.01;
+            // Update running spike rate for homeostasis using proper exponential
+            // decay based on tau_homeostatic: rate += (1 - rate) * dt / tau
+            let alpha = (dt / self.config.tau_homeostatic).min(1.0);
+            self.state.spike_rate = self.state.spike_rate * (1.0 - alpha) + alpha;
 
             return true;
         }
@@ -182,7 +184,9 @@ impl LIFNeuron {
     /// Inject a direct spike (for input neurons)
     pub fn inject_spike(&mut self, time: SimTime) {
         self.state.last_spike_time = time;
-        self.state.spike_rate = self.state.spike_rate * 0.99 + 0.01;
+        // Use same homeostatic update as regular spikes
+        let alpha = (1.0 / self.config.tau_homeostatic).min(1.0);
+        self.state.spike_rate = self.state.spike_rate * (1.0 - alpha) + alpha;
     }
 
     /// Get time since last spike
@@ -306,14 +310,30 @@ impl SpikeTrain {
     }
 
     /// Convert spike train to binary pattern (temporal encoding)
+    ///
+    /// Safely handles potential overflow in bin calculation.
     pub fn to_pattern(&self, start: SimTime, bin_size: f64, num_bins: usize) -> Vec<bool> {
         let mut pattern = vec![false; num_bins];
 
+        // Guard against zero/negative bin_size
+        if bin_size <= 0.0 || num_bins == 0 {
+            return pattern;
+        }
+
+        let end_time = start + bin_size * num_bins as f64;
+
         for &spike_time in &self.spike_times {
-            if spike_time >= start && spike_time < start + bin_size * num_bins as f64 {
-                let bin = ((spike_time - start) / bin_size) as usize;
-                if bin < num_bins {
-                    pattern[bin] = true;
+            if spike_time >= start && spike_time < end_time {
+                // Safe bin calculation with overflow protection
+                let offset = spike_time - start;
+                let bin_f64 = offset / bin_size;
+
+                // Check for overflow before casting
+                if bin_f64 >= 0.0 && bin_f64 < num_bins as f64 {
+                    let bin = bin_f64 as usize;
+                    if bin < num_bins {
+                        pattern[bin] = true;
+                    }
                 }
             }
         }
@@ -322,17 +342,35 @@ impl SpikeTrain {
     }
 
     /// Compute cross-correlation with another spike train
+    ///
+    /// Safely handles potential overflow in bin calculation.
     pub fn cross_correlation(&self, other: &SpikeTrain, max_lag: f64, bin_size: f64) -> Vec<f64> {
-        let num_bins = (2.0 * max_lag / bin_size) as usize + 1;
+        // Guard against invalid parameters
+        if bin_size <= 0.0 || max_lag <= 0.0 {
+            return vec![0.0];
+        }
+
+        // Safe num_bins calculation with overflow protection
+        let num_bins_f64 = 2.0 * max_lag / bin_size + 1.0;
+        let num_bins = if num_bins_f64 > 0.0 && num_bins_f64 < usize::MAX as f64 {
+            (num_bins_f64 as usize).min(100_000) // Cap at 100K bins to prevent DoS
+        } else {
+            return vec![0.0];
+        };
+
         let mut correlation = vec![0.0; num_bins];
 
         for &t1 in &self.spike_times {
             for &t2 in &other.spike_times {
                 let lag = t1 - t2;
                 if lag.abs() <= max_lag {
-                    let bin = ((lag + max_lag) / bin_size) as usize;
-                    if bin < num_bins {
-                        correlation[bin] += 1.0;
+                    // Safe bin calculation
+                    let bin_f64 = (lag + max_lag) / bin_size;
+                    if bin_f64 >= 0.0 && bin_f64 < num_bins as f64 {
+                        let bin = bin_f64 as usize;
+                        if bin < num_bins {
+                            correlation[bin] += 1.0;
+                        }
                     }
                 }
             }

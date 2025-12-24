@@ -453,6 +453,11 @@ impl AttractorDynamics {
         &self.graph
     }
 
+    /// Get configuration
+    pub fn config(&self) -> &AttractorConfig {
+        &self.config
+    }
+
     /// Get mutable graph reference
     pub fn graph_mut(&mut self) -> &mut DynamicGraph {
         &mut self.graph

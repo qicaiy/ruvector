@@ -251,7 +251,6 @@ pub fn compute_synchrony(spikes: &[Spike], window_ms: f64) -> f64 {
 
     // Use sliding window approach: O(n log n) due to sort
     let mut coincidences = 0usize;
-    let mut total_pairs = 0usize;
     let mut window_start = 0;
 
     for i in 0..sorted.len() {
@@ -260,24 +259,22 @@ pub fn compute_synchrony(spikes: &[Spike], window_ms: f64) -> f64 {
             window_start += 1;
         }
 
-        // Count pairs in window (from window_start to i-1)
+        // Count coincident pairs in window (from window_start to i-1)
         for j in window_start..i {
             if sorted[i].neuron_id != sorted[j].neuron_id {
-                total_pairs += 1;
-                coincidences += 1; // All pairs in window are coincident by definition
+                coincidences += 1;
             }
         }
     }
 
-    // Also count non-coincident pairs (those outside window)
-    // Total possible pairs = n*(n-1)/2, but we need inter-neuron pairs only
+    // Total inter-neuron pairs (excluding same-neuron pairs)
     let n = sorted.len();
     let mut neuron_counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
     for spike in &sorted {
         *neuron_counts.entry(spike.neuron_id).or_insert(0) += 1;
     }
 
-    // Total inter-neuron pairs
+    // Total inter-neuron pairs = all pairs - same-neuron pairs
     let total_inter_pairs: usize = {
         let total = n * (n - 1) / 2;
         let intra: usize = neuron_counts.values().map(|&c| c * (c - 1) / 2).sum();
