@@ -176,14 +176,16 @@ pub struct ValueNetwork {
 impl ValueNetwork {
     /// Create a new value network
     pub fn new(input_size: usize, hidden_size: usize) -> Self {
-        // Initialize with small random weights
+        // Initialize with small random weights (Xavier initialization)
+        let scale = (2.0 / (input_size + hidden_size) as f64).sqrt();
         let w_hidden: Vec<Vec<f64>> = (0..hidden_size)
-            .map(|_| (0..input_size).map(|_| rand_small()).collect())
+            .map(|_| (0..input_size).map(|_| rand_small() * scale).collect())
             .collect();
 
         let b_hidden = vec![0.0; hidden_size];
 
-        let w_output: Vec<f64> = (0..hidden_size).map(|_| rand_small()).collect();
+        let output_scale = (1.0 / hidden_size as f64).sqrt();
+        let w_output: Vec<f64> = (0..hidden_size).map(|_| rand_small() * output_scale).collect();
         let b_output = 0.0;
 
         Self {
@@ -224,19 +226,57 @@ impl ValueNetwork {
         self.last_estimate
     }
 
-    /// Update weights with TD error
+    /// Update weights with TD error using proper backpropagation
+    ///
+    /// Implements gradient descent with:
+    /// - Forward pass to compute activations
+    /// - Backward pass to compute ∂V/∂w
+    /// - Weight update: w += lr * td_error * ∂V/∂w
     pub fn update(&mut self, state: &[f64], td_error: f64, lr: f64) {
-        // Simplified gradient update
-        for (j, weights) in self.w_hidden.iter_mut().enumerate() {
-            for (i, w) in weights.iter_mut().enumerate() {
+        let hidden_size = self.w_hidden.len();
+        let input_size = if self.w_hidden.is_empty() { 0 } else { self.w_hidden[0].len() };
+
+        // Forward pass: compute hidden activations and pre-activations
+        let mut hidden_pre = vec![0.0; hidden_size]; // Before ReLU
+        let mut hidden_post = vec![0.0; hidden_size]; // After ReLU
+
+        for (j, weights) in self.w_hidden.iter().enumerate() {
+            let mut sum = self.b_hidden[j];
+            for (i, &w) in weights.iter().enumerate() {
                 if i < state.len() {
-                    *w += lr * td_error * state[i] * 0.01;
+                    sum += w * state[i];
                 }
             }
+            hidden_pre[j] = sum;
+            hidden_post[j] = relu(sum);
         }
 
-        for w in &mut self.w_output {
-            *w += lr * td_error * 0.01;
+        // Backward pass: compute gradients
+        // Output layer gradient: ∂L/∂w_output = td_error * hidden_post
+        // (since L = 0.5 * td_error², ∂L/∂V = td_error)
+
+        // Update output weights: ∂V/∂w_output[j] = hidden_post[j]
+        for (j, w) in self.w_output.iter_mut().enumerate() {
+            *w += lr * td_error * hidden_post[j];
+        }
+        self.b_output += lr * td_error;
+
+        // Backpropagate to hidden layer
+        // ∂V/∂hidden_post[j] = w_output[j]
+        // ∂hidden_post/∂hidden_pre = relu'(hidden_pre) = 1 if hidden_pre > 0 else 0
+        // ∂V/∂w_hidden[j][i] = ∂V/∂hidden_post[j] * relu'(hidden_pre[j]) * state[i]
+
+        for (j, weights) in self.w_hidden.iter_mut().enumerate() {
+            // ReLU derivative: 1 if pre-activation > 0, else 0
+            let relu_grad = if hidden_pre[j] > 0.0 { 1.0 } else { 0.0 };
+            let delta = td_error * self.w_output[j] * relu_grad;
+
+            for (i, w) in weights.iter_mut().enumerate() {
+                if i < state.len() {
+                    *w += lr * delta * state[i];
+                }
+            }
+            self.b_hidden[j] += lr * delta;
         }
     }
 }
@@ -680,14 +720,20 @@ fn estimate_mincut(graph: &DynamicGraph) -> f64 {
         .fold(f64::INFINITY, f64::min)
 }
 
-// Simple PRNG helpers
+// Thread-safe PRNG helpers using atomic CAS
 use std::sync::atomic::{AtomicU64, Ordering};
 static OPTIMIZER_RNG: AtomicU64 = AtomicU64::new(0xdeadbeef12345678);
 
 fn rand_small() -> f64 {
-    let mut state = OPTIMIZER_RNG.load(Ordering::Relaxed);
-    state = state.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(1);
-    OPTIMIZER_RNG.store(state, Ordering::Relaxed);
+    // Use compare_exchange loop to ensure atomicity
+    let state = loop {
+        let current = OPTIMIZER_RNG.load(Ordering::Relaxed);
+        let next = current.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(1);
+        match OPTIMIZER_RNG.compare_exchange_weak(current, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break next,
+            Err(_) => continue,
+        }
+    };
     (state as f64) / (u64::MAX as f64) * 0.4 - 0.2
 }
 

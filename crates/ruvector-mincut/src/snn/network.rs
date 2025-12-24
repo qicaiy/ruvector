@@ -437,15 +437,20 @@ impl SpikingNetwork {
     }
 }
 
-// Simple PRNG for weight initialization
+// Thread-safe PRNG for weight initialization using atomic CAS
 use std::sync::atomic::{AtomicU64, Ordering};
 static RNG_STATE: AtomicU64 = AtomicU64::new(0x853c49e6748fea9b);
 
 fn rand_u64() -> u64 {
-    let mut state = RNG_STATE.load(Ordering::Relaxed);
-    state = state.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
-    RNG_STATE.store(state, Ordering::Relaxed);
-    state
+    // Use compare_exchange loop to ensure atomicity
+    loop {
+        let current = RNG_STATE.load(Ordering::Relaxed);
+        let next = current.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
+        match RNG_STATE.compare_exchange_weak(current, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => return next,
+            Err(_) => continue, // Retry on contention
+        }
+    }
 }
 
 fn rand_weight() -> f64 {

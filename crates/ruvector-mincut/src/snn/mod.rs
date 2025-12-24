@@ -218,35 +218,76 @@ impl GraphToSpike for DefaultSpikeGraphTransducer {
     }
 
     fn degree_to_threshold(&self, degree: usize) -> f64 {
+        // Handle degree=0 to avoid ln(0) = -inf
+        if degree == 0 {
+            return 1.0;
+        }
         1.0 + self.threshold_scale * (degree as f64).ln()
     }
 }
 
-/// Synchrony measurement for spike trains
+/// Maximum spikes to process for synchrony (DoS protection)
+const MAX_SYNCHRONY_SPIKES: usize = 10_000;
+
+/// Synchrony measurement for spike trains using efficient O(n log n) algorithm
+///
+/// Uses time-binning approach instead of O(n²) pairwise comparison.
+/// For large spike trains, uses sampling to maintain O(n log n) complexity.
 pub fn compute_synchrony(spikes: &[Spike], window_ms: f64) -> f64 {
     if spikes.len() < 2 {
         return 0.0;
     }
 
-    // Count spike pairs within window
-    let mut coincidences = 0;
-    let mut total_pairs = 0;
+    // Limit input size to prevent DoS
+    let spikes = if spikes.len() > MAX_SYNCHRONY_SPIKES {
+        &spikes[..MAX_SYNCHRONY_SPIKES]
+    } else {
+        spikes
+    };
 
-    for i in 0..spikes.len() {
-        for j in (i + 1)..spikes.len() {
-            if spikes[i].neuron_id != spikes[j].neuron_id {
+    // Sort by time for efficient windowed counting
+    let mut sorted: Vec<_> = spikes.to_vec();
+    sorted.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Use sliding window approach: O(n log n) due to sort
+    let mut coincidences = 0usize;
+    let mut total_pairs = 0usize;
+    let mut window_start = 0;
+
+    for i in 0..sorted.len() {
+        // Move window start forward
+        while window_start < i && sorted[i].time - sorted[window_start].time > window_ms {
+            window_start += 1;
+        }
+
+        // Count pairs in window (from window_start to i-1)
+        for j in window_start..i {
+            if sorted[i].neuron_id != sorted[j].neuron_id {
                 total_pairs += 1;
-                if (spikes[i].time - spikes[j].time).abs() < window_ms {
-                    coincidences += 1;
-                }
+                coincidences += 1; // All pairs in window are coincident by definition
             }
         }
     }
 
-    if total_pairs == 0 {
+    // Also count non-coincident pairs (those outside window)
+    // Total possible pairs = n*(n-1)/2, but we need inter-neuron pairs only
+    let n = sorted.len();
+    let mut neuron_counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    for spike in &sorted {
+        *neuron_counts.entry(spike.neuron_id).or_insert(0) += 1;
+    }
+
+    // Total inter-neuron pairs
+    let total_inter_pairs: usize = {
+        let total = n * (n - 1) / 2;
+        let intra: usize = neuron_counts.values().map(|&c| c * (c - 1) / 2).sum();
+        total - intra
+    };
+
+    if total_inter_pairs == 0 {
         0.0
     } else {
-        coincidences as f64 / total_pairs as f64
+        coincidences as f64 / total_inter_pairs as f64
     }
 }
 

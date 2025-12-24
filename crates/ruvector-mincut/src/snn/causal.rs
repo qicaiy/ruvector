@@ -131,9 +131,24 @@ impl CausalGraph {
         &self.edges
     }
 
+    /// Maximum nodes for transitive closure (O(n³) algorithm)
+    const MAX_CLOSURE_NODES: usize = 500;
+
     /// Compute transitive closure (indirect causation)
+    ///
+    /// Uses Floyd-Warshall algorithm with O(n³) complexity.
+    /// Limited to MAX_CLOSURE_NODES to prevent DoS.
     pub fn transitive_closure(&self) -> Self {
         let mut closed = Self::new(self.num_nodes);
+
+        // Resource limit: skip if too many nodes (O(n³) would be too slow)
+        if self.num_nodes > Self::MAX_CLOSURE_NODES {
+            // Just copy direct edges without transitive closure
+            for edge in &self.edges {
+                closed.add_edge(edge.source, edge.target, edge.strength, edge.relation);
+            }
+            return closed;
+        }
 
         // Copy direct edges
         for edge in &self.edges {
@@ -349,14 +364,22 @@ impl CausalDiscoverySNN {
         }
     }
 
-    /// Decay all synaptic weights
+    /// Decay all synaptic weights toward baseline
+    ///
+    /// Applies exponential decay: w' = w * (1 - decay_rate) + baseline * decay_rate
     pub fn decay_weights(&mut self) {
-        let decay = 1.0 - self.config.decay_rate;
-        for ((_, _), synapse) in self.synapses.iter() {
-            // Get mutable reference through synapses
-            let s = synapse;
-            // Can't directly modify, so skip decay for now
-            // In production, would use internal mutability
+        let decay = self.config.decay_rate;
+        let baseline = 0.5; // Neutral weight
+        let n = self.config.num_event_types;
+
+        // Iterate through all possible synapse pairs
+        for i in 0..n {
+            for j in 0..n {
+                if let Some(synapse) = self.synapses.get_synapse_mut(i, j) {
+                    // Exponential decay toward baseline
+                    synapse.weight = synapse.weight * (1.0 - decay) + baseline * decay;
+                }
+            }
         }
     }
 

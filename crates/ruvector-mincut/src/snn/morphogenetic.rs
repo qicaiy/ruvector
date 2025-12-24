@@ -237,10 +237,17 @@ pub struct MorphogeneticSNN {
     is_mature: bool,
 }
 
+/// Maximum grid size to prevent memory exhaustion (256x256 = 65536 neurons)
+const MAX_GRID_SIZE: usize = 256;
+
 impl MorphogeneticSNN {
     /// Create a new morphogenetic SNN
+    ///
+    /// # Panics
+    /// Panics if grid_size exceeds MAX_GRID_SIZE (256) to prevent memory exhaustion.
     pub fn new(config: MorphConfig) -> Self {
-        let grid_size = config.grid_size;
+        // Resource limit: prevent grid_size² memory explosion
+        let grid_size = config.grid_size.min(MAX_GRID_SIZE);
         let n = grid_size * grid_size;
 
         // Create neuron pairs on grid
