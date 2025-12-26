@@ -3,6 +3,10 @@
 //! All buffers are preallocated at initialization. The inference hot path
 //! performs zero heap allocations.
 
+extern crate alloc;
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::config::TransformerConfig;
 use crate::error::Result;
 

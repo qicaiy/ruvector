@@ -1,7 +1,26 @@
 //! Spike scheduler for event-driven inference.
 //!
+//! Implements spike-driven compute scheduling inspired by:
+//! - **Spike-driven Transformer** (Yao et al., 2023) - Event-driven inference with 87× energy reduction
+//! - **Spike-driven Transformer V2** (Yao et al., 2024) - Meta spiking architecture with novelty detection
+//! - **Dynamic Sparse Attention** (Jiang et al., 2024) - Top-k position selection for 90% FLOPs reduction
+//!
 //! The spike scheduler determines whether to run inference at all,
-//! and if so, at what compute tier based on event signals.
+//! and if so, at what compute tier based on event signals:
+//! - **Firing status:** spike.fired == 1 means run, == 0 means skip
+//! - **Rate-based tiers:** Higher rates trigger higher compute budgets
+//! - **Novelty gating:** Low novelty reduces tier even when firing
+//! - **Sparse routing:** Top-k positions guide attention sparsity
+//!
+//! ## References
+//!
+//! - Yao, M., et al. (2023). Spike-driven Transformer. NeurIPS 2023.
+//! - Yao, M., et al. (2024). Spike-driven Transformer V2. ICLR 2024.
+//! - Jiang, H., et al. (2024). MInference 1.0. NeurIPS 2024.
+
+extern crate alloc;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::packets::SpikePacket;
 

@@ -1,13 +1,29 @@
 //! Gate controller for coherence-based intervention.
 //!
+//! Implements coherence-gated control inspired by:
+//! - **Mixture-of-Depths** (Raposo et al., 2024) - Dynamic compute tiers based on complexity
+//! - **Energy-Based Transformers** (Gladstone et al., 2025) - Lambda as energy metric
+//! - **Spectral Graph Theory** (Kreuzer et al., 2021) - Mincut signals for coherence
+//!
 //! The gate controller evaluates mincut signals and determines:
 //! - Whether to intervene
 //! - What type of intervention (reduce scope, flush KV, freeze writes, quarantine)
-//! - What compute tier to use
-//! - What effective parameters to apply
+//! - What compute tier to use (0=normal, 1=reduced, 2=safe, 3=skip)
+//! - What effective parameters to apply (layers, sequence length, attention window)
+//!
+//! Supports both rule-based and energy-based policies.
+//!
+//! ## References
+//!
+//! - Raposo, D., et al. (2024). Mixture-of-Depths. arXiv:2404.02258.
+//! - Gladstone, A., et al. (2025). Energy-Based Transformers. arXiv:2507.02092.
+//! - Kreuzer, D., et al. (2021). Spectral Attention. NeurIPS 2021.
 
 use crate::config::GatePolicy;
 use crate::packets::{GatePacket, SpikePacket, GateDecision, GateReason};
+
+#[cfg(feature = "energy_gate")]
+use crate::energy_gate::{EnergyGate, EnergyGateConfig};
 
 /// Tier decision from gate evaluation.
 #[derive(Clone, Copy, Debug)]
@@ -53,6 +69,10 @@ pub struct GateController {
     /// Gate policy
     policy: GatePolicy,
 
+    /// Optional energy-based gate
+    #[cfg(feature = "energy_gate")]
+    energy_gate: Option<EnergyGate>,
+
     /// Default layers for tier 0
     layers_normal: u16,
 
@@ -81,6 +101,25 @@ impl GateController {
         // Use baseline config defaults - these get overridden by actual config
         Self {
             policy,
+            #[cfg(feature = "energy_gate")]
+            energy_gate: None,
+            layers_normal: 4,
+            layers_degraded: 2,
+            seq_len_normal: 64,
+            seq_len_degraded: 32,
+            seq_len_safe: 8,
+            window_normal: 16,
+            window_degraded: 8,
+        }
+    }
+
+    /// Create with energy-based gate policy (requires `energy_gate` feature).
+    #[cfg(feature = "energy_gate")]
+    pub fn with_energy_gate(policy: GatePolicy, energy_config: EnergyGateConfig) -> Self {
+        let energy_gate = EnergyGate::new(energy_config, policy.clone());
+        Self {
+            policy,
+            energy_gate: Some(energy_gate),
             layers_normal: 4,
             layers_degraded: 2,
             seq_len_normal: 64,
@@ -104,6 +143,35 @@ impl GateController {
     ) -> Self {
         Self {
             policy,
+            #[cfg(feature = "energy_gate")]
+            energy_gate: None,
+            layers_normal,
+            layers_degraded,
+            seq_len_normal,
+            seq_len_degraded,
+            seq_len_safe,
+            window_normal,
+            window_degraded,
+        }
+    }
+
+    /// Create with explicit configuration and energy gate (requires `energy_gate` feature).
+    #[cfg(feature = "energy_gate")]
+    pub fn with_config_and_energy(
+        policy: GatePolicy,
+        energy_config: EnergyGateConfig,
+        layers_normal: u16,
+        layers_degraded: u16,
+        seq_len_normal: u16,
+        seq_len_degraded: u16,
+        seq_len_safe: u16,
+        window_normal: u16,
+        window_degraded: u16,
+    ) -> Self {
+        let energy_gate = EnergyGate::new(energy_config, policy.clone());
+        Self {
+            policy,
+            energy_gate: Some(energy_gate),
             layers_normal,
             layers_degraded,
             seq_len_normal,
@@ -122,7 +190,22 @@ impl GateController {
     /// 3. Pre-KV write: may disable KV writes, flush KV, or quarantine
     /// 4. Post-layer: may early exit remaining layers
     /// 5. Pre-external write: may freeze external writes
+    ///
+    /// If energy gate is enabled, it will be used first with fallback to rule-based policy.
     pub fn evaluate(&self, gate: &GatePacket, spikes: Option<&SpikePacket>) -> TierDecision {
+        // Try energy-based evaluation first if enabled
+        #[cfg(feature = "energy_gate")]
+        if let Some(ref energy_gate) = self.energy_gate {
+            let (decision, confidence) = energy_gate.decide(gate);
+
+            // If high confidence, use energy gate decision
+            if confidence >= 0.7 {
+                return self.tier_from_decision(decision, GateReason::None);
+            }
+            // Otherwise fall through to rule-based policy
+        }
+
+        // Rule-based evaluation (original logic)
         // Check for forced flags first
         if gate.skip_requested() {
             return TierDecision {
@@ -241,6 +324,25 @@ impl GateController {
     }
 
     // ---- Private helpers ----
+
+    #[cfg(feature = "energy_gate")]
+    fn tier_from_decision(&self, decision: GateDecision, reason: GateReason) -> TierDecision {
+        match decision {
+            GateDecision::Allow => TierDecision {
+                decision,
+                reason,
+                tier: 0,
+                skip: false,
+                layers_to_run: self.layers_normal,
+                effective_seq_len: self.seq_len_normal,
+                effective_window: self.window_normal,
+            },
+            GateDecision::ReduceScope => self.tier_reduced(reason),
+            GateDecision::FlushKv => self.tier_with_intervention(decision, reason),
+            GateDecision::FreezeWrites => self.tier_safe(reason),
+            GateDecision::QuarantineUpdates => self.tier_with_intervention(decision, reason),
+        }
+    }
 
     fn tier_reduced(&self, reason: GateReason) -> TierDecision {
         TierDecision {

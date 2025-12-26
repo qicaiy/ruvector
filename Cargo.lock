@@ -6686,6 +6686,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruvector-mincut-gated-transformer-wasm"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "ruvector-mincut-gated-transformer",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "ruvector-mincut-node"
 version = "0.1.29"
 dependencies = [

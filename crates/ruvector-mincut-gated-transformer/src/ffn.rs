@@ -1,7 +1,17 @@
 //! Quantized Feed-Forward Network (FFN) layer.
 //!
-//! Implements the FFN sublayer of the transformer:
+//! Implements the FFN sublayer of the transformer with INT8 quantization:
 //! FFN(x) = activation(x @ W1) @ W2
+//!
+//! Uses GELU activation as standard in transformer architectures (Vaswani et al., 2017).
+//! Quantization reduces memory bandwidth and enables SIMD acceleration.
+//!
+//! ## References
+//!
+//! - Vaswani, A., et al. (2017). Attention is all you need. NeurIPS 2017.
+
+extern crate alloc;
+use alloc::vec;
 
 use crate::kernel::qgemm::qgemm_i8;
 

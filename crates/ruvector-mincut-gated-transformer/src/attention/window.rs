@@ -3,6 +3,10 @@
 //! Each token attends to at most W previous tokens, giving O(S * W) complexity
 //! per layer instead of O(S^2).
 
+extern crate alloc;
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::kernel::qgemm::qgemm_i8;
 
 /// Configuration for sliding window attention.
@@ -232,6 +236,116 @@ pub fn apply_sparse_mask(
             if j < seq_len && j <= i {
                 output_mask[i * seq_len + j] = true;
             }
+        }
+    }
+}
+
+/// Apply mincut sparse mask (requires `sparse_attention` feature).
+///
+/// Uses mincut-based sparse attention mask instead of window mask.
+#[cfg(feature = "sparse_attention")]
+pub fn apply_mincut_sparse_mask(
+    mincut_mask: &crate::sparse_attention::SparseMask,
+    output_mask: &mut [bool],
+    seq_len: usize,
+) {
+    debug_assert_eq!(output_mask.len(), seq_len * seq_len);
+
+    // Clear mask first
+    output_mask.fill(false);
+
+    // Set positions from mincut mask
+    for &(query_pos, key_pos) in &mincut_mask.positions {
+        let idx = (query_pos as usize) * seq_len + (key_pos as usize);
+        if idx < output_mask.len() {
+            output_mask[idx] = true;
+        }
+    }
+}
+
+/// Compute attention with mincut sparse mask (requires `sparse_attention` feature).
+///
+/// Efficiently computes attention using only the sparse positions.
+#[cfg(feature = "sparse_attention")]
+pub fn sparse_attention_with_mincut_mask(
+    attn: &SlidingWindowAttention,
+    q: &[i8],
+    k_cache: &[i8],
+    v_cache: &[i8],
+    mincut_mask: &crate::sparse_attention::SparseMask,
+    seq_len: usize,
+    valid_len: usize,
+    output: &mut [f32],
+) {
+    let head_dim = attn.config.head_dim;
+    let scale = attn.config.scale;
+
+    // Group positions by query
+    let mut positions_by_query: Vec<Vec<u16>> = vec![Vec::new(); seq_len];
+    for &(query_pos, key_pos) in &mincut_mask.positions {
+        if (query_pos as usize) < seq_len && (key_pos as usize) < valid_len {
+            positions_by_query[query_pos as usize].push(key_pos);
+        }
+    }
+
+    // Compute attention for each query position
+    for query_pos in 0..seq_len {
+        let key_positions = &positions_by_query[query_pos];
+        if key_positions.is_empty() {
+            // No attention - output zeros
+            for d in 0..head_dim {
+                output[query_pos * head_dim + d] = 0.0;
+            }
+            continue;
+        }
+
+        // Compute scores for sparse keys
+        let mut scores = Vec::with_capacity(key_positions.len());
+        for &key_pos in key_positions {
+            let mut score = 0i32;
+            for d in 0..head_dim {
+                let q_val = q[query_pos * head_dim + d] as i32;
+                let k_val = k_cache[key_pos as usize * head_dim + d] as i32;
+                score += q_val * k_val;
+            }
+            scores.push((score as f32) * scale);
+        }
+
+        // Softmax over sparse positions
+        softmax_inplace(&mut scores);
+
+        // Weighted sum of values
+        for d in 0..head_dim {
+            let mut sum = 0.0f32;
+            for (i, &key_pos) in key_positions.iter().enumerate() {
+                let v_val = v_cache[key_pos as usize * head_dim + d] as f32;
+                sum += scores[i] * v_val;
+            }
+            output[query_pos * head_dim + d] = sum;
+        }
+    }
+}
+
+/// Helper function for in-place softmax
+#[cfg(feature = "sparse_attention")]
+#[inline]
+fn softmax_inplace(scores: &mut [f32]) {
+    if scores.is_empty() {
+        return;
+    }
+
+    let max = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+
+    let mut sum = 0.0f32;
+    for s in scores.iter_mut() {
+        *s = (*s - max).exp();
+        sum += *s;
+    }
+
+    if sum > 0.0 {
+        let inv_sum = 1.0 / sum;
+        for s in scores.iter_mut() {
+            *s *= inv_sum;
         }
     }
 }

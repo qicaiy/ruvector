@@ -5,6 +5,19 @@
 //! and optionally a spiking scheduler that skips work when nothing meaningful
 //! is happening.
 //!
+//! ## Academic Foundations
+//!
+//! This crate integrates multiple state-of-the-art optimization techniques:
+//!
+//! 1. **Mixture-of-Depths** (Raposo et al., 2024) - Dynamic compute allocation with 50% FLOPs reduction
+//! 2. **Early Exit** (Elhoushi et al., 2024) - Layer-skipping with 30-50% latency reduction
+//! 3. **Sparse Attention** (Jiang et al., 2024) - 90% attention FLOPs reduction for long contexts
+//! 4. **Energy-Based Transformers** (Gladstone et al., 2025) - Principled compute-quality tradeoffs
+//! 5. **Spike-Driven Inference** (Yao et al., 2023, 2024) - 87× energy reduction via event-driven compute
+//! 6. **Spectral Methods** (Kreuzer et al., 2021) - Graph-based coherence via spectral partitioning
+//!
+//! See `docs/THEORY.md` for detailed academic references and theoretical analysis.
+//!
 //! ## Primary Outcomes
 //!
 //! 1. **Deterministic, bounded inference** - Same inputs yield same outputs
@@ -87,9 +100,20 @@ pub mod spike;
 pub mod kernel;
 pub mod attention;
 pub mod ffn;
+pub mod mod_routing;
+pub mod early_exit;
 
 #[cfg(feature = "trace")]
 pub mod trace;
+
+#[cfg(feature = "spectral_pe")]
+pub mod spectral;
+
+#[cfg(feature = "sparse_attention")]
+pub mod sparse_attention;
+
+#[cfg(feature = "energy_gate")]
+pub mod energy_gate;
 
 // Re-exports for convenient access
 pub use config::{TransformerConfig, GatePolicy};
@@ -101,9 +125,27 @@ pub use state::RuntimeState;
 pub use model::{MincutGatedTransformer, QuantizedWeights, WeightsLoader};
 pub use gate::{GateController, TierDecision};
 pub use spike::SpikeScheduler;
+pub use mod_routing::{
+    MincutDepthRouter, ModRoutingConfig, TokenRoute, RoutingStats,
+};
+pub use early_exit::{
+    CoherenceEarlyExit, EarlyExitConfig, EarlyExitDecision, ExitReason,
+};
 
 #[cfg(feature = "trace")]
 pub use trace::{TraceState, TraceSnapshot, TraceCounters};
+
+#[cfg(feature = "spike_attention")]
+pub use attention::spike_driven::{SpikeDrivenAttention, SpikeDrivenConfig, SpikeTrain};
+
+#[cfg(feature = "spectral_pe")]
+pub use spectral::{SpectralPositionEncoder, SpectralPEConfig};
+
+#[cfg(feature = "sparse_attention")]
+pub use sparse_attention::{MincutSparseAttention, SparseMask, SparsityConfig, LambdaDensitySchedule};
+
+#[cfg(feature = "energy_gate")]
+pub use energy_gate::{EnergyGate, EnergyGateConfig, EnergyGradient};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -115,6 +157,8 @@ pub mod prelude {
         GatePacket, SpikePacket, GateDecision, GateReason, Witness,
         InferInput, InferOutput, InferStats,
         QuantizedWeights, WeightsLoader,
+        MincutDepthRouter, ModRoutingConfig, TokenRoute, RoutingStats,
+        CoherenceEarlyExit, EarlyExitConfig, EarlyExitDecision, ExitReason,
         Error, Result,
     };
 

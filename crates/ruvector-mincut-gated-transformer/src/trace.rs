@@ -2,6 +2,9 @@
 //!
 //! This module is only available with the `trace` feature.
 
+extern crate alloc;
+use alloc::vec::Vec;
+
 use crate::packets::{GateDecision, GateReason, Witness};
 
 /// Rolling buffer size for trace history.
@@ -276,6 +279,7 @@ impl Default for TraceState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use crate::packets::GatePacket;
 
     #[test]

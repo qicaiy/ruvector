@@ -411,6 +411,12 @@ pub struct InferStats {
 
     /// Whether inference was skipped
     pub skipped: u8,
+
+    /// Number of tokens skipped via MoD routing
+    pub tokens_skipped: u32,
+
+    /// Layer at which early exit occurred (0 = no early exit)
+    pub early_exit_layer: u16,
 }
 
 #[cfg(test)]
