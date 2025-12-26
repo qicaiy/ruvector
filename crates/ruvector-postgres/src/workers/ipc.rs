@@ -406,7 +406,7 @@ impl LargePayloadSegment {
             return None;
         }
 
-        let slots_needed = (size + SLOT_SIZE - 1) / SLOT_SIZE;
+        let slots_needed = size.div_ceil(SLOT_SIZE);
 
         // Find contiguous free slots
         for start_slot in 0..=(NUM_SLOTS - slots_needed) {
@@ -471,7 +471,7 @@ impl LargePayloadSegment {
     /// Free a previously allocated payload
     pub fn free(&self, payload_ref: &PayloadRef) {
         let start_slot = payload_ref.offset as usize / SLOT_SIZE;
-        let slots = (payload_ref.length as usize + SLOT_SIZE - 1) / SLOT_SIZE;
+        let slots = (payload_ref.length as usize).div_ceil(SLOT_SIZE);
 
         for slot in start_slot..(start_slot + slots) {
             let word = slot / 64;
@@ -896,7 +896,7 @@ fn prepare_operation(
     shmem
         .large_payload_segment
         .write(payload_ref.offset as usize, &serialized)
-        .map_err(|e| IpcError::SharedMemoryError(e))?;
+        .map_err(IpcError::SharedMemoryError)?;
 
     Ok((Operation::LargePayloadRef(payload_ref), Some(payload_ref)))
 }

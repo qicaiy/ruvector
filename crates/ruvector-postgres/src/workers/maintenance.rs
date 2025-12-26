@@ -177,7 +177,7 @@ pub struct TierCandidate {
 // ============================================================================
 
 /// Maintenance operation statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MaintenanceStats {
     /// Total cycles completed
     pub cycles_completed: u64,
@@ -201,24 +201,6 @@ pub struct MaintenanceStats {
     pub last_cycle_duration_us: u64,
     /// Last cycle timestamp
     pub last_cycle_at: u64,
-}
-
-impl Default for MaintenanceStats {
-    fn default() -> Self {
-        Self {
-            cycles_completed: 0,
-            indexes_maintained: 0,
-            compactions_performed: 0,
-            bytes_reclaimed: 0,
-            tier_promotions: 0,
-            tier_demotions: 0,
-            stats_collections: 0,
-            cleanup_operations: 0,
-            total_time_us: 0,
-            last_cycle_duration_us: 0,
-            last_cycle_at: 0,
-        }
-    }
 }
 
 /// Atomic maintenance statistics

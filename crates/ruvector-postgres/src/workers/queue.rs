@@ -74,22 +74,19 @@ impl std::fmt::Display for TaskType {
 }
 
 /// Task priority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum TaskPriority {
     /// Critical priority - processed immediately
     Critical = 0,
     /// High priority
     High = 1,
     /// Medium priority (default)
+    #[default]
     Medium = 2,
     /// Low priority - background tasks
     Low = 3,
-}
-
-impl Default for TaskPriority {
-    fn default() -> Self {
-        TaskPriority::Medium
-    }
 }
 
 impl std::fmt::Display for TaskPriority {

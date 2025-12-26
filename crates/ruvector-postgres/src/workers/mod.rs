@@ -131,10 +131,7 @@ impl WorkerRegistry {
     /// Register a new worker
     pub fn register(&self, worker_type: WorkerType, handle: WorkerHandle) {
         let mut workers = self.workers.write();
-        workers
-            .entry(worker_type)
-            .or_insert_with(Vec::new)
-            .push(handle);
+        workers.entry(worker_type).or_default().push(handle);
         self.total_spawned.fetch_add(1, Ordering::SeqCst);
     }
 
