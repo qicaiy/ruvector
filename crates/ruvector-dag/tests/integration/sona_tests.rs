@@ -119,7 +119,7 @@ fn test_trajectory_buffer_ordering() {
 
     // Should maintain insertion order
     for (idx, traj) in trajectories.iter().enumerate() {
-        assert_eq!(traj.query_id, idx as u64);
+        assert_eq!(traj.query_hash, idx as u64);
     }
 }
 
@@ -164,7 +164,8 @@ fn test_reasoning_bank_similarity_threshold() {
 fn test_ewc_consolidation_updates() {
     let mut ewc = EwcPlusPlus::new(EwcConfig {
         lambda: 1000.0,
-        gamma: 0.9,
+        decay: 0.9,
+        online: true,
     });
 
     let params1 = ndarray::Array1::from_vec(vec![1.0; 256]);
@@ -206,7 +207,7 @@ fn test_trajectory_buffer_capacity() {
     assert_eq!(trajectories.len(), 5);
 
     // Should have IDs 5-9 (most recent)
-    let ids: Vec<u64> = trajectories.iter().map(|t| t.query_id).collect();
+    let ids: Vec<u64> = trajectories.iter().map(|t| t.query_hash).collect();
     assert!(ids.contains(&5));
     assert!(ids.contains(&9));
 }
