@@ -17,7 +17,7 @@ production-crypto = ["pqcrypto-dilithium", "pqcrypto-kyber"]
 # Post-quantum cryptography (optional, for production use)
 pqcrypto-dilithium = { version = "0.5", optional = true }
 pqcrypto-kyber = { version = "0.8", optional = true }
-ruvector-core = { path = "../ruvector-core" }
+ruvector-core = { version = "0.1.29", path = "../ruvector-core" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
