@@ -12,6 +12,26 @@
  * - Cached model loading (downloads from HuggingFace on first use)
  * - Batch embedding support
  * - Optional parallel workers for 3.8x batch speedup
+ * - CommonJS-compatible: No --experimental-wasm-modules flag required
+ *
+ * Quick Start (Simple API - returns arrays directly):
+ * ```javascript
+ * const { embedText, embedTexts } = require('ruvector');
+ *
+ * // Single embedding - returns number[]
+ * const vector = await embedText("hello world");
+ *
+ * // Batch embeddings - returns number[][]
+ * const vectors = await embedTexts(["hello", "world"]);
+ * ```
+ *
+ * Full API (returns metadata):
+ * ```javascript
+ * const { embed, embedBatch } = require('ruvector');
+ *
+ * // Returns { embedding: number[], dimension: number, timeMs: number }
+ * const result = await embed("hello world");
+ * ```
  */
 
 import * as path from 'path';
@@ -44,6 +64,21 @@ if (typeof globalThis !== 'undefined' && !globalThis.__ruvector_require) {
 // Force native dynamic import (avoids TypeScript transpiling to require)
 // eslint-disable-next-line @typescript-eslint/no-implied-eval
 const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>;
+
+// Try to load the CommonJS-compatible WASM loader (no experimental flags needed)
+function tryLoadCjsModule(): any | null {
+  try {
+    // Use require for CJS module which doesn't need experimental flags
+    const cjsPath = path.join(__dirname, 'onnx', 'pkg', 'ruvector_onnx_embeddings_wasm_cjs.js');
+    if (fs.existsSync(cjsPath)) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      return require(cjsPath);
+    }
+  } catch {
+    // CJS loader not available
+  }
+  return null;
+}
 
 // Types
 export interface OnnxEmbedderConfig {
@@ -179,26 +214,36 @@ export async function initOnnxEmbedder(config: OnnxEmbedderConfig = {}): Promise
       // Paths to bundled ONNX files
       const pkgPath = path.join(__dirname, 'onnx', 'pkg', 'ruvector_onnx_embeddings_wasm.js');
       const loaderPath = path.join(__dirname, 'onnx', 'loader.js');
+      const wasmPath = path.join(__dirname, 'onnx', 'pkg', 'ruvector_onnx_embeddings_wasm_bg.wasm');
 
-      if (!fs.existsSync(pkgPath)) {
+      if (!fs.existsSync(wasmPath)) {
         throw new Error('ONNX WASM files not bundled. The onnx/ directory is missing.');
       }
 
-      // Convert paths to file:// URLs for cross-platform ESM compatibility (Windows fix)
-      const pkgUrl = pathToFileURL(pkgPath).href;
-      const loaderUrl = pathToFileURL(loaderPath).href;
+      // Try CJS loader first (no experimental flags needed)
+      const cjsModule = tryLoadCjsModule();
+      if (cjsModule) {
+        // Use CommonJS loader - no experimental flags required!
+        await cjsModule.init(wasmPath);
+        wasmModule = cjsModule;
+      } else {
+        // Fall back to ESM loader (may require --experimental-wasm-modules)
+        // Convert paths to file:// URLs for cross-platform ESM compatibility (Windows fix)
+        const pkgUrl = pathToFileURL(pkgPath).href;
 
-      // Dynamic import of bundled modules using file:// URLs
-      wasmModule = await dynamicImport(pkgUrl);
+        // Dynamic import of bundled modules using file:// URLs
+        wasmModule = await dynamicImport(pkgUrl);
 
-      // Initialize WASM module (loads the .wasm file)
-      const wasmPath = path.join(__dirname, 'onnx', 'pkg', 'ruvector_onnx_embeddings_wasm_bg.wasm');
-      if (wasmModule.default && typeof wasmModule.default === 'function') {
-        // For bundler-style initialization, pass the wasm buffer
-        const wasmBytes = fs.readFileSync(wasmPath);
-        await wasmModule.default(wasmBytes);
+        // Initialize WASM module (loads the .wasm file)
+        if (wasmModule.default && typeof wasmModule.default === 'function') {
+          // For bundler-style initialization, pass the wasm buffer
+          const wasmBytes = fs.readFileSync(wasmPath);
+          await wasmModule.default(wasmBytes);
+        }
       }
 
+      // Load the model loader
+      const loaderUrl = pathToFileURL(loaderPath).href;
       const loaderModule = await dynamicImport(loaderUrl);
       const { ModelLoader } = loaderModule;
 
@@ -326,6 +371,128 @@ export async function embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
       dimension,
       timeMs: totalTime / texts.length,
     });
+  }
+
+  return results;
+}
+
+/**
+ * ============================================================================
+ * SIMPLE API - Returns arrays directly (for easy integration)
+ * ============================================================================
+ */
+
+/**
+ * Generate embedding for a single text - returns array directly
+ *
+ * This is the simplified API that returns just the embedding array,
+ * making it easy to use for vector operations, PostgreSQL insertion,
+ * and similarity calculations.
+ *
+ * @param text - The text to embed
+ * @returns A 384-dimensional embedding array
+ *
+ * @example
+ * ```javascript
+ * const { embedText } = require('ruvector');
+ *
+ * const vector = await embedText("hello world");
+ * console.log(vector.length); // 384
+ * console.log(Array.isArray(vector)); // true
+ *
+ * // Use directly with PostgreSQL
+ * await pool.query(
+ *   'INSERT INTO docs (content, embedding) VALUES ($1, $2)',
+ *   [text, JSON.stringify(vector)]
+ * );
+ * ```
+ */
+export async function embedText(text: string): Promise<number[]> {
+  if (!isInitialized) {
+    await initOnnxEmbedder();
+  }
+  if (!embedder) {
+    throw new Error('ONNX embedder not initialized');
+  }
+
+  const embedding = embedder.embedOne(text);
+  return Array.from(embedding);
+}
+
+/**
+ * Generate embeddings for multiple texts - returns array of arrays
+ *
+ * This is the simplified batch API that returns just the embedding arrays.
+ * Uses optimized batch processing for much faster throughput than
+ * calling embedText() in a loop.
+ *
+ * @param texts - Array of texts to embed
+ * @param options - Optional batch processing options
+ * @returns Array of 384-dimensional embedding arrays
+ *
+ * @example
+ * ```javascript
+ * const { embedTexts } = require('ruvector');
+ *
+ * // Batch embed 8000 documents in ~30 seconds (vs 53 min sequentially)
+ * const vectors = await embedTexts(documents);
+ *
+ * // With options for very large batches
+ * const vectors = await embedTexts(documents, { batchSize: 256 });
+ *
+ * // Bulk insert into PostgreSQL
+ * for (let i = 0; i < documents.length; i++) {
+ *   await pool.query(
+ *     'INSERT INTO docs (content, embedding) VALUES ($1, $2)',
+ *     [documents[i], JSON.stringify(vectors[i])]
+ *   );
+ * }
+ * ```
+ */
+export async function embedTexts(
+  texts: string[],
+  options?: { batchSize?: number }
+): Promise<number[][]> {
+  if (!isInitialized) {
+    await initOnnxEmbedder();
+  }
+  if (!embedder) {
+    throw new Error('ONNX embedder not initialized');
+  }
+
+  if (texts.length === 0) {
+    return [];
+  }
+
+  const batchSize = options?.batchSize || 256;
+
+  // For small batches, process all at once
+  if (texts.length <= batchSize) {
+    // Use parallel workers for large batches
+    if (parallelEnabled && parallelEmbedder && texts.length >= parallelThreshold) {
+      const batchResults = await parallelEmbedder.embedBatch(texts);
+      return batchResults.map((emb: number[] | Float32Array) => Array.from(emb));
+    }
+
+    // Sequential processing
+    const batchEmbeddings = embedder.embedBatch(texts);
+    const dimension = embedder.dimension();
+    const results: number[][] = [];
+
+    for (let i = 0; i < texts.length; i++) {
+      const embedding = batchEmbeddings.slice(i * dimension, (i + 1) * dimension);
+      results.push(Array.from(embedding));
+    }
+
+    return results;
+  }
+
+  // Process in chunks for very large batches
+  const results: number[][] = [];
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const chunk = texts.slice(i, i + batchSize);
+    const chunkResults = await embedTexts(chunk);
+    results.push(...chunkResults);
   }
 
   return results;

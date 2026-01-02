@@ -1,6 +1,6 @@
 {
   "name": "ruvector",
-  "version": "0.1.88",
+  "version": "0.1.95",
   "description": "High-performance vector database for Node.js with automatic native/WASM fallback",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,7 +8,7 @@
     "ruvector": "./bin/cli.js"
   },
   "scripts": {
-    "build": "tsc && cp src/core/onnx/pkg/package.json dist/core/onnx/pkg/",
+    "build": "tsc && cp src/core/onnx/pkg/package.json dist/core/onnx/pkg/ && cp src/core/onnx/pkg/ruvector_onnx_embeddings_wasm_cjs.js dist/core/onnx/pkg/",
     "prepublishOnly": "npm run build",
     "test": "node test/integration.js"
   },
@@ -60,6 +60,7 @@
     "@ruvector/core": "^0.1.25",
     "@ruvector/gnn": "^0.1.22",
     "@ruvector/sona": "^0.1.4",
+    "@xenova/transformers": "^2.17.2",
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
     "ora": "^5.4.1"
