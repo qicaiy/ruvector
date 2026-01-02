@@ -423,6 +423,22 @@ export class FirebaseSignaling extends EventEmitter {
             case 'ice-candidate':
                 this.emit('ice-candidate', { from: signal.from, candidate: signal.data, verified: !!signal.signature });
                 break;
+            // Task execution signal types
+            case 'task-assign':
+            case 'task-result':
+            case 'task-error':
+            case 'task-progress':
+            case 'task-cancel':
+                this.emit('signal', {
+                    type: signal.type,
+                    from: signal.from,
+                    data: signal.data,
+                    verified: !!signal.signature,
+                    signature: signal.signature,
+                    publicKey: signal.publicKey,
+                    timestamp: signal.timestamp,
+                });
+                break;
             default:
                 this.emit('signal', { ...signal, verified: !!signal.signature });
         }

@@ -888,6 +888,10 @@ class HealthCheckServer {
         });
     }
 
+    getHttpServer() {
+        return this.server;
+    }
+
     handleHealth(req, res) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'healthy', timestamp: Date.now() }));
@@ -982,11 +986,21 @@ class ProductionGenesisNode extends EventEmitter {
         // Start WebSocket server
         const { WebSocketServer } = await import('ws');
 
-        this.wss = new WebSocketServer({
-            port: CONFIG.port,
-            host: CONFIG.host,
-            perMessageDeflate: false,
-        });
+        // If ports are the same, attach to the existing HTTP server
+        if (CONFIG.port === CONFIG.healthPort) {
+            const httpServer = this.healthServer.getHttpServer();
+            this.wss = new WebSocketServer({
+                server: httpServer,
+                perMessageDeflate: false,
+            });
+            log.info('WebSocket attached to health server', { port: CONFIG.port });
+        } else {
+            this.wss = new WebSocketServer({
+                port: CONFIG.port,
+                host: CONFIG.host,
+                perMessageDeflate: false,
+            });
+        }
 
         this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
         this.wss.on('error', (err) => {

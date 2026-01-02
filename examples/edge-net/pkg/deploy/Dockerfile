@@ -46,12 +46,13 @@ RUN apk add --no-cache \
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy application files
-COPY package.json ./
-COPY *.js ./
-COPY *.d.ts ./
-COPY *.wasm ./
-COPY node/ ./node/
-COPY deploy/genesis-prod.js ./deploy/
+COPY --chown=edgenet:nodejs package.json ./
+COPY --chown=edgenet:nodejs *.js ./
+COPY --chown=edgenet:nodejs *.d.ts ./
+COPY --chown=edgenet:nodejs *.wasm ./
+COPY --chown=edgenet:nodejs node/ ./node/
+COPY --chown=edgenet:nodejs deploy/genesis-prod.js ./deploy/
+COPY --chown=edgenet:nodejs deploy/health-check.js ./deploy/
 
 # Create data directory with correct permissions
 RUN mkdir -p /data/genesis && \
