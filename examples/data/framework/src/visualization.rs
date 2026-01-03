@@ -40,6 +40,11 @@ fn domain_color(domain: Domain) -> &'static str {
         Domain::Research => COLOR_RESEARCH,
         Domain::Medical => COLOR_MEDICAL,
         Domain::Economic => "\x1b[38;5;214m", // Orange color for Economic
+        Domain::Genomics => "\x1b[38;5;46m", // Green color for Genomics
+        Domain::Physics => "\x1b[38;5;33m", // Blue color for Physics
+        Domain::Seismic => "\x1b[38;5;130m", // Brown color for Seismic
+        Domain::Ocean => "\x1b[38;5;39m", // Cyan color for Ocean
+        Domain::Space => "\x1b[38;5;141m", // Purple color for Space
         Domain::CrossDomain => COLOR_CROSS,
     }
 }
@@ -52,6 +57,11 @@ fn domain_char(domain: Domain) -> char {
         Domain::Research => 'R',
         Domain::Medical => 'M',
         Domain::Economic => 'E',
+        Domain::Genomics => 'G',
+        Domain::Physics => 'P',
+        Domain::Seismic => 'S',
+        Domain::Ocean => 'O',
+        Domain::Space => 'A', // A for Astronomy/Aerospace
         Domain::CrossDomain => 'X',
     }
 }
