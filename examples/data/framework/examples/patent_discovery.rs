@@ -83,7 +83,7 @@ async fn main() -> Result<()> {
         Ok(Some(patent)) => {
             println!("Patent Details:");
             println!("  ID: {}", patent.id);
-            println!("  Title: {}", patent.metadata.get("title").unwrap_or(&"N/A".to_string()));
+            println!("  Title: {}", patent.metadata.get("title").map(|s| s.as_str()).unwrap_or("N/A"));
             println!("  Abstract: {}",
                 patent.metadata.get("abstract")
                     .map(|s| if s.len() > 200 { format!("{}...", &s[..200]) } else { s.clone() })

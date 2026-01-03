@@ -31,6 +31,11 @@ pub enum Domain {
     Research,
     Medical,
     Economic,
+    Genomics,
+    Physics,
+    Seismic,
+    Ocean,
+    Space,
     CrossDomain,
 }
 

@@ -32,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         window_seconds: 86400 * 7,   // Weekly windows
         hnsw_m: 16,
         hnsw_ef_construction: 200,
+        ..Default::default()
     };
 
     let mut engine = NativeDiscoveryEngine::new(config);
