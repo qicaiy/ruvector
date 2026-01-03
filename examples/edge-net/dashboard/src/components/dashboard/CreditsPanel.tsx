@@ -1,18 +1,68 @@
+import { useState } from 'react';
 import { Card, CardBody, Button, Progress } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { Coins, ArrowUpRight, ArrowDownRight, Clock, Wallet, TrendingUp } from 'lucide-react';
+import {
+  Coins,
+  ArrowUpRight,
+  ArrowDownRight,
+  Clock,
+  Wallet,
+  TrendingUp,
+  Play,
+  Zap,
+  Brain,
+  Database,
+  AlertCircle,
+} from 'lucide-react';
 import { useNetworkStore } from '../../stores/networkStore';
+import { useCredits } from '../../hooks/useCredits';
+import type { JobSubmission } from '../../services/creditsService';
 
 export function CreditsPanel() {
-  const { credits, stats } = useNetworkStore();
+  const { stats } = useNetworkStore();
+  const {
+    available,
+    pending,
+    earned,
+    spent,
+    transactions,
+    jobs,
+    earningRate,
+    submitJob,
+    canAfford,
+    getJobCost,
+    formatCredits,
+    isEarning,
+  } = useCredits();
 
-  const transactions = [
-    { id: '1', type: 'earn' as const, amount: 25.50, description: 'Compute contribution', time: '2 min ago' },
-    { id: '2', type: 'earn' as const, amount: 12.75, description: 'Task completion bonus', time: '15 min ago' },
-    { id: '3', type: 'spend' as const, amount: -5.00, description: 'API request', time: '1 hour ago' },
-    { id: '4', type: 'earn' as const, amount: 45.00, description: 'Neural training reward', time: '2 hours ago' },
-    { id: '5', type: 'spend' as const, amount: -15.00, description: 'Premium feature', time: '3 hours ago' },
+  const [submittingJob, setSubmittingJob] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmitJob = async (type: JobSubmission['type']) => {
+    setSubmittingJob(type);
+    setError(null);
+    try {
+      await submitJob(type, { demo: true, timestamp: Date.now() });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Job submission failed');
+    } finally {
+      setSubmittingJob(null);
+    }
+  };
+
+  const jobTypes: { type: JobSubmission['type']; label: string; icon: typeof Zap }[] = [
+    { type: 'compute', label: 'Compute', icon: Zap },
+    { type: 'inference', label: 'Inference', icon: Brain },
+    { type: 'training', label: 'Training', icon: TrendingUp },
+    { type: 'storage', label: 'Storage', icon: Database },
   ];
+
+  const formatTime = (date: Date) => {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ago`;
+  };
 
   return (
     <div className="space-y-6">
@@ -28,7 +78,7 @@ export function CreditsPanel() {
                 <Wallet className="text-emerald-400" size={24} />
                 <span className="text-xs text-emerald-400/70">Available</span>
               </div>
-              <p className="text-3xl font-bold text-white">{credits.available.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-white">{available.toFixed(2)}</p>
               <p className="text-sm text-emerald-400 mt-1">Credits</p>
             </CardBody>
           </Card>
@@ -45,7 +95,7 @@ export function CreditsPanel() {
                 <Clock className="text-amber-400" size={24} />
                 <span className="text-xs text-amber-400/70">Pending</span>
               </div>
-              <p className="text-3xl font-bold text-white">{credits.pending.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-white">{pending.toFixed(2)}</p>
               <p className="text-sm text-amber-400 mt-1">Credits</p>
             </CardBody>
           </Card>
@@ -62,7 +112,7 @@ export function CreditsPanel() {
                 <TrendingUp className="text-sky-400" size={24} />
                 <span className="text-xs text-sky-400/70">Total Earned</span>
               </div>
-              <p className="text-3xl font-bold text-white">{credits.earned.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-white">{earned.toFixed(2)}</p>
               <p className="text-sm text-sky-400 mt-1">Credits</p>
             </CardBody>
           </Card>
@@ -80,7 +130,7 @@ export function CreditsPanel() {
                 <span className="text-xs text-violet-400/70">Net Balance</span>
               </div>
               <p className="text-3xl font-bold text-white">
-                {(credits.earned - credits.spent).toFixed(2)}
+                {(earned - spent).toFixed(2)}
               </p>
               <p className="text-sm text-violet-400 mt-1">Credits</p>
             </CardBody>
@@ -88,12 +138,98 @@ export function CreditsPanel() {
         </motion.div>
       </div>
 
-      {/* Earning Progress */}
+      {/* Earning Rate Indicator */}
+      {isEarning && (
+        <motion.div
+          className="flex items-center gap-3 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.35 }}
+        >
+          <div className="relative">
+            <Zap className="text-emerald-400" size={24} />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-emerald-400">Actively Contributing</p>
+            <p className="text-xs text-zinc-400">
+              Earning {formatCredits(earningRate)} rUv/second
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-bold text-emerald-400">{formatCredits(earningRate * 3600)}</p>
+            <p className="text-xs text-zinc-500">rUv/hour</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Job Submission */}
       <motion.div
         className="crystal-card p-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
+      >
+        <h3 className="text-lg font-semibold mb-4">Deploy Jobs</h3>
+        <p className="text-sm text-zinc-400 mb-4">Use your credits to run compute tasks on the network</p>
+
+        {error && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 mb-4">
+            <AlertCircle className="text-red-400" size={16} />
+            <span className="text-sm text-red-400">{error}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {jobTypes.map(({ type, label, icon: Icon }) => {
+            const cost = getJobCost(type);
+            const affordable = canAfford(type);
+            return (
+              <Button
+                key={type}
+                className={`flex flex-col items-center gap-2 p-4 h-auto ${
+                  affordable
+                    ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 hover:bg-sky-500/30'
+                    : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700'
+                }`}
+                isDisabled={!affordable || submittingJob === type}
+                onPress={() => handleSubmitJob(type)}
+              >
+                {submittingJob === type ? (
+                  <Play className="animate-spin" size={24} />
+                ) : (
+                  <Icon size={24} />
+                )}
+                <span className="font-medium">{label}</span>
+                <span className="text-xs opacity-70">{cost} rUv</span>
+              </Button>
+            );
+          })}
+        </div>
+
+        {/* Active Jobs */}
+        {jobs.filter(j => j.status === 'running' || j.status === 'pending').length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <h4 className="text-sm font-medium text-zinc-400 mb-2">Active Jobs</h4>
+            <div className="space-y-2">
+              {jobs.filter(j => j.status === 'running' || j.status === 'pending').map(job => (
+                <div key={job.id} className="flex items-center gap-3 p-2 rounded bg-zinc-800/50">
+                  <Play className="text-amber-400 animate-pulse" size={14} />
+                  <span className="text-sm text-white">{job.type}</span>
+                  <span className="text-xs text-zinc-500 ml-auto">{job.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Earning Progress */}
+      <motion.div
+        className="crystal-card p-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.45 }}
       >
         <h3 className="text-lg font-semibold mb-4">Daily Earning Progress</h3>
         <div className="space-y-4">
@@ -177,8 +313,8 @@ export function CreditsPanel() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{tx.description}</p>
-                  <p className="text-xs text-zinc-500">{tx.time}</p>
+                  <p className="text-sm font-medium text-white">{tx.reason}</p>
+                  <p className="text-xs text-zinc-500">{formatTime(tx.timestamp)}</p>
                 </div>
               </div>
               <span
