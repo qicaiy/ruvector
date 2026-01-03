@@ -39,6 +39,7 @@ fn domain_color(domain: Domain) -> &'static str {
         Domain::Finance => COLOR_FINANCE,
         Domain::Research => COLOR_RESEARCH,
         Domain::Medical => COLOR_MEDICAL,
+        Domain::Economic => "\x1b[38;5;214m", // Orange color for Economic
         Domain::CrossDomain => COLOR_CROSS,
     }
 }
@@ -50,6 +51,7 @@ fn domain_char(domain: Domain) -> char {
         Domain::Finance => 'F',
         Domain::Research => 'R',
         Domain::Medical => 'M',
+        Domain::Economic => 'E',
         Domain::CrossDomain => 'X',
     }
 }

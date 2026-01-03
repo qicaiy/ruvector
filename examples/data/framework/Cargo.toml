@@ -84,6 +84,10 @@ path = "examples/medical_discovery.rs"
 name = "wiki_discovery"
 path = "examples/wiki_discovery.rs"
 
+[[example]]
+name = "arxiv_discovery"
+path = "examples/arxiv_discovery.rs"
+
 [[bin]]
 name = "discover"
 path = "src/bin/discover.rs"

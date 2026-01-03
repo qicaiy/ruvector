@@ -34,14 +34,17 @@
 #![warn(clippy::all)]
 
 pub mod api_clients;
+pub mod arxiv_client;
 pub mod coherence;
 pub mod discovery;
+pub mod economic_clients;
 pub mod export;
 pub mod forecasting;
 pub mod hnsw;
 pub mod ingester;
 pub mod medical_clients;
 pub mod optimized;
+pub mod patent_clients;
 pub mod persistence;
 pub mod realtime;
 pub mod ruvector_native;
@@ -59,7 +62,10 @@ use thiserror::Error;
 
 // Re-exports
 pub use api_clients::{EdgarClient, NoaaClient, OpenAlexClient, SimpleEmbedder};
+pub use arxiv_client::ArxivClient;
+pub use economic_clients::{AlphaVantageClient, FredClient, WorldBankClient};
 pub use medical_clients::{ClinicalTrialsClient, FdaClient, PubMedClient};
+pub use patent_clients::{EpoClient, UsptoPatentClient};
 pub use wiki_clients::{WikidataClient, WikidataEntity, WikipediaClient};
 pub use coherence::{
     CoherenceBoundary, CoherenceConfig, CoherenceEngine, CoherenceEvent, CoherenceSignal,
@@ -74,6 +80,9 @@ pub use export::{
 pub use forecasting::{CoherenceForecaster, CrossDomainForecaster, Forecast, Trend};
 pub use ingester::{DataIngester, IngestionConfig, IngestionStats, SourceConfig};
 pub use realtime::{FeedItem, FeedSource, NewsAggregator, NewsSource, RealTimeEngine};
+pub use ruvector_native::{
+    Domain, NativeDiscoveryEngine, NativeEngineConfig, SemanticVector,
+};
 pub use streaming::{StreamingConfig, StreamingEngine, StreamingEngineBuilder, StreamingMetrics};
 
 /// Framework error types

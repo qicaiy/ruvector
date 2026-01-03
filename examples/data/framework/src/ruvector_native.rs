@@ -30,6 +30,7 @@ pub enum Domain {
     Finance,
     Research,
     Medical,
+    Economic,
     CrossDomain,
 }
 
