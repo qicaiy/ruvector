@@ -1,6 +1,6 @@
 {
   "name": "@ruvector/edge-net",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "type": "module",
   "description": "Distributed compute intelligence network with WASM cryptographic security - contribute browser compute, spawn distributed AI agents, earn credits. Features Ed25519 signing, PiKey identity, Time Crystal coordination, Neural DAG attention, P2P swarm intelligence, ONNX inference, WebRTC signaling, CRDT ledger, and multi-agent workflows.",
   "main": "ruvector_edge_net.js",
@@ -11,7 +11,8 @@
     "ruvector-edge": "./cli.js",
     "edge-net-join": "./join.js",
     "edge-net-genesis": "./genesis.js",
-    "edge-net-firebase-setup": "./firebase-setup.js"
+    "edge-net-firebase-setup": "./firebase-setup.js",
+    "edge-net-plugins": "./plugins/cli.js"
   },
   "keywords": [
     "wasm",
@@ -105,6 +106,7 @@
     "secure-access.js",
     "credits.js",
     "task-execution-handler.js",
+    "plugins/",
     "README.md",
     "LICENSE"
   ],
@@ -178,6 +180,15 @@
     },
     "./task-execution": {
       "import": "./task-execution-handler.js"
+    },
+    "./plugins": {
+      "import": "./plugins/index.js"
+    },
+    "./plugins/sdk": {
+      "import": "./plugins/plugin-sdk.js"
+    },
+    "./plugins/catalog": {
+      "import": "./plugins/plugin-manifest.js"
     }
   },
   "sideEffects": [
