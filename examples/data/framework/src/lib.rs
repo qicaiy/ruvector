@@ -36,12 +36,15 @@
 pub mod api_clients;
 pub mod coherence;
 pub mod discovery;
+pub mod export;
+pub mod forecasting;
 pub mod hnsw;
 pub mod ingester;
 pub mod optimized;
 pub mod persistence;
 pub mod ruvector_native;
 pub mod streaming;
+pub mod visualization;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -59,6 +62,11 @@ pub use coherence::{
 pub use discovery::{
     DiscoveryConfig, DiscoveryEngine, DiscoveryPattern, PatternCategory, PatternStrength,
 };
+pub use export::{
+    export_all, export_coherence_csv, export_dot, export_graphml, export_patterns_csv,
+    export_patterns_with_evidence_csv, ExportFilter,
+};
+pub use forecasting::{CoherenceForecaster, CrossDomainForecaster, Forecast, Trend};
 pub use ingester::{DataIngester, IngestionConfig, IngestionStats, SourceConfig};
 pub use streaming::{StreamingConfig, StreamingEngine, StreamingEngineBuilder, StreamingMetrics};
 

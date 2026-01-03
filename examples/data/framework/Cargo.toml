@@ -61,6 +61,10 @@ path = "examples/discovery_hunter.rs"
 name = "api_client_demo"
 path = "examples/api_client_demo.rs"
 
+[[example]]
+name = "real_data_discovery"
+path = "examples/real_data_discovery.rs"
+
 [[bin]]
 name = "discover"
 path = "src/bin/discover.rs"
