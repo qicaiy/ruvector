@@ -11,7 +11,8 @@ use std::time::{Duration, Instant};
 
 use crate::artifact::ModelArtifact;
 use crate::backend::{
-    crc32, protocol, BackendStats, RequestFrame, ResponseFrame, TransformerBackend,
+    commands, compute_topk, crc32, protocol, read_lock, validate_tokens, write_lock,
+    BackendStats, RequestFrame, ResponseFrame, TransformerBackend,
 };
 use crate::error::{Error, Result};
 use crate::types::{
@@ -281,6 +282,92 @@ impl FpgaDaemonBackend {
         Ok((logits, response))
     }
 
+    /// Send load model command to daemon
+    fn send_load_command(&self, stream: &mut dyn ReadWrite, artifact: &ModelArtifact) -> Result<()> {
+        // Pack artifact
+        let artifact_bytes = crate::artifact::pack::pack_artifact(artifact)?;
+
+        // Build command packet:
+        // [command: 1] [model_id: 32] [artifact_len: 4] [artifact_data: N] [checksum: 4]
+        let mut payload = Vec::with_capacity(1 + 32 + 4 + artifact_bytes.len() + 4);
+
+        // Command byte
+        payload.push(commands::LOAD_MODEL);
+
+        // Model ID (32 bytes)
+        payload.extend_from_slice(artifact.model_id().as_bytes());
+
+        // Artifact length (u32 LE)
+        payload.extend_from_slice(&(artifact_bytes.len() as u32).to_le_bytes());
+
+        // Artifact data
+        payload.extend_from_slice(&artifact_bytes);
+
+        // Checksum
+        let checksum = crc32(&payload);
+        payload.extend_from_slice(&checksum.to_le_bytes());
+
+        // Send
+        stream
+            .write_all(&payload)
+            .map_err(|e| Error::backend(format!("Write load command failed: {}", e)))?;
+        stream
+            .flush()
+            .map_err(|e| Error::backend(format!("Flush failed: {}", e)))?;
+
+        // Read response: [status: 1] [message_len: 2] [message: N]
+        let mut status = [0u8; 1];
+        stream
+            .read_exact(&mut status)
+            .map_err(|e| Error::backend(format!("Read status failed: {}", e)))?;
+
+        if status[0] != 0 {
+            // Read error message
+            let mut msg_len = [0u8; 2];
+            stream.read_exact(&mut msg_len).ok();
+            let len = u16::from_le_bytes(msg_len) as usize;
+            let mut msg = vec![0u8; len.min(256)];
+            stream.read_exact(&mut msg).ok();
+            let error_msg = String::from_utf8_lossy(&msg);
+            return Err(Error::backend(format!(
+                "Daemon rejected load: {}",
+                error_msg
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Send unload model command to daemon
+    fn send_unload_command(&self, stream: &mut dyn ReadWrite, model_id: ModelId) -> Result<()> {
+        // Build command packet: [command: 1] [model_id: 32] [checksum: 4]
+        let mut payload = Vec::with_capacity(1 + 32 + 4);
+        payload.push(commands::UNLOAD_MODEL);
+        payload.extend_from_slice(model_id.as_bytes());
+        let checksum = crc32(&payload);
+        payload.extend_from_slice(&checksum.to_le_bytes());
+
+        // Send
+        stream
+            .write_all(&payload)
+            .map_err(|e| Error::backend(format!("Write unload command failed: {}", e)))?;
+        stream
+            .flush()
+            .map_err(|e| Error::backend(format!("Flush failed: {}", e)))?;
+
+        // Read response status
+        let mut status = [0u8; 1];
+        stream
+            .read_exact(&mut status)
+            .map_err(|e| Error::backend(format!("Read status failed: {}", e)))?;
+
+        if status[0] != 0 {
+            return Err(Error::backend("Daemon rejected unload"));
+        }
+
+        Ok(())
+    }
+
     /// Execute with retries
     fn with_retries<T, F>(&self, mut f: F) -> Result<T>
     where
@@ -316,26 +403,28 @@ impl TransformerBackend for FpgaDaemonBackend {
 
         let model_id = artifact.model_id();
 
-        // For daemon backend, we just cache metadata locally
-        // The actual model loading is done by the daemon
+        // Send load command to daemon to preload the model
+        self.with_retries(|| {
+            let mut stream = self.connect()?;
+            self.send_load_command(stream.as_mut(), artifact)
+        })?;
+
+        // Cache metadata locally
         {
-            let mut models = self.models.write().unwrap();
-            models.insert(
-                model_id,
-                ModelMetadata {
-                    artifact: artifact.clone(),
-                    loaded_at: Instant::now(),
-                },
-            );
+            let mut models = write_lock(&self.models, |m| {
+                m.insert(
+                    model_id,
+                    ModelMetadata {
+                        artifact: artifact.clone(),
+                        loaded_at: Instant::now(),
+                    },
+                );
+            })?;
         }
 
-        // TODO: Send load command to daemon to preload the model
-        // This would involve sending the artifact bytes to the daemon
-
-        {
-            let mut stats = self.stats.write().unwrap();
-            stats.models_loaded += 1;
-        }
+        write_lock(&self.stats, |s| {
+            s.models_loaded += 1;
+        })?;
 
         Ok(model_id)
     }
@@ -346,14 +435,15 @@ impl TransformerBackend for FpgaDaemonBackend {
         // Validate request
         req.validate()?;
 
-        // Check model is loaded locally
-        let model_metadata = {
-            let models = self.models.read().unwrap();
+        // Check model is loaded locally and validate tokens
+        let model_metadata = read_lock(&self.models, |models| {
             models
                 .get(&req.model)
                 .map(|m| m.artifact.clone())
-                .ok_or_else(|| Error::ModelNotFound(req.model))?
-        };
+        })?.ok_or_else(|| Error::ModelNotFound(req.model))?;
+
+        // Validate tokens against vocabulary
+        validate_tokens(req.tokens, model_metadata.manifest.shape.vocab)?;
 
         // Execute with retries
         let (logits, response) = self.with_retries(|| {
@@ -381,16 +471,8 @@ impl TransformerBackend for FpgaDaemonBackend {
                 .collect();
             (vec![], Some(pairs))
         } else {
-            // Full logits
-            let topk: Vec<(u16, i16)> = {
-                let mut indexed: Vec<_> = logits.iter().enumerate().collect();
-                indexed.sort_by(|a, b| b.1.cmp(a.1));
-                indexed
-                    .into_iter()
-                    .take(16)
-                    .map(|(i, &v)| (i as u16, v))
-                    .collect()
-            };
+            // Full logits - use common compute_topk
+            let topk = compute_topk(&logits, 16);
             (logits, Some(topk))
         };
 
@@ -404,13 +486,12 @@ impl TransformerBackend for FpgaDaemonBackend {
             model_metadata.quant_hash(),
             BackendKind::FpgaDaemon,
             resp_cycles,
-            latency_ns.min(resp_latency_ns.max(latency_ns)), // Use FPGA's measurement
+            latency_ns.min(resp_latency_ns.max(latency_ns)),
             gate_decision,
         );
 
-        // Update stats
-        {
-            let mut stats = self.stats.write().unwrap();
+        // Update stats (with poison handling)
+        write_lock(&self.stats, |stats| {
             stats.total_inferences += 1;
             stats.total_cycles += resp_cycles as u64;
             let n = stats.total_inferences;
@@ -420,16 +501,25 @@ impl TransformerBackend for FpgaDaemonBackend {
                 GateDecision::Skipped { .. } => stats.skipped += 1,
                 _ => {}
             }
-        }
+        })?;
 
         Ok(InferenceResult::new(logits_q, topk, witness))
     }
 
     fn unload(&self, model: ModelId) -> Result<()> {
-        let mut models = self.models.write().unwrap();
-        if models.remove(&model).is_some() {
-            let mut stats = self.stats.write().unwrap();
-            stats.models_loaded = stats.models_loaded.saturating_sub(1);
+        // Send unload command to daemon
+        self.with_retries(|| {
+            let mut stream = self.connect()?;
+            self.send_unload_command(stream.as_mut(), model)
+        })?;
+
+        // Remove from local cache
+        let removed = write_lock(&self.models, |models| models.remove(&model).is_some())?;
+
+        if removed {
+            write_lock(&self.stats, |s| {
+                s.models_loaded = s.models_loaded.saturating_sub(1);
+            })?;
             Ok(())
         } else {
             Err(Error::ModelNotFound(model))
@@ -437,8 +527,7 @@ impl TransformerBackend for FpgaDaemonBackend {
     }
 
     fn is_loaded(&self, model: ModelId) -> bool {
-        let models = self.models.read().unwrap();
-        models.contains_key(&model)
+        read_lock(&self.models, |m| m.contains_key(&model)).unwrap_or(false)
     }
 
     fn kind(&self) -> BackendKind {

@@ -8,7 +8,9 @@ use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use crate::artifact::ModelArtifact;
-use crate::backend::{BackendStats, TransformerBackend};
+use crate::backend::{
+    compute_topk, read_lock, validate_tokens, write_lock, BackendStats, TransformerBackend,
+};
 use crate::error::{Error, Result};
 use crate::gating::CoherenceGate;
 use crate::quant::{dequantize_i8, quantize_i16, softmax_lut};
@@ -336,25 +338,24 @@ impl TransformerBackend for NativeSimBackend {
         let model = self.prepare_model(artifact)?;
         let model_id = artifact.model_id();
 
-        // Check capacity
-        {
-            let models = self.models.read().unwrap();
-            if models.len() >= self.config.max_models && !models.contains_key(&model_id) {
-                return Err(Error::ResourceExhausted("Max models reached".into()));
-            }
+        // Check capacity (with poison handling)
+        let at_capacity = read_lock(&self.models, |models| {
+            models.len() >= self.config.max_models && !models.contains_key(&model_id)
+        })?;
+
+        if at_capacity {
+            return Err(Error::ResourceExhausted("Max models reached".into()));
         }
 
         // Store model
-        {
-            let mut models = self.models.write().unwrap();
+        write_lock(&self.models, |models| {
             models.insert(model_id, Arc::new(model));
-        }
+        })?;
 
         // Update stats
-        {
-            let mut stats = self.stats.write().unwrap();
+        write_lock(&self.stats, |stats| {
             stats.models_loaded += 1;
-        }
+        })?;
 
         Ok(model_id)
     }
@@ -365,14 +366,10 @@ impl TransformerBackend for NativeSimBackend {
         // Validate request
         req.validate()?;
 
-        // Get model
-        let model = {
-            let models = self.models.read().unwrap();
-            models
-                .get(&req.model)
-                .cloned()
-                .ok_or_else(|| Error::ModelNotFound(req.model))?
-        };
+        // Get model (with poison handling)
+        let model = read_lock(&self.models, |models| {
+            models.get(&req.model).cloned()
+        })?.ok_or_else(|| Error::ModelNotFound(req.model))?;
 
         // Validate shape
         if model.artifact.manifest.shape != req.shape {
@@ -382,13 +379,16 @@ impl TransformerBackend for NativeSimBackend {
             });
         }
 
+        // Validate tokens against vocabulary
+        validate_tokens(req.tokens, model.artifact.manifest.shape.vocab)?;
+
         // Run inference
         let (logits_q, gate_decision) =
             self.run_inference(&model, req.tokens, req.attn_mask, &req.gate_hint)?;
 
         let latency_ns = start.elapsed().as_nanos() as u32;
 
-        // Compute top-K
+        // Compute top-K using common utility
         let topk = compute_topk(&logits_q, 16);
 
         // Create witness
@@ -401,9 +401,8 @@ impl TransformerBackend for NativeSimBackend {
             gate_decision,
         );
 
-        // Update stats
-        {
-            let mut stats = self.stats.write().unwrap();
+        // Update stats (with poison handling)
+        write_lock(&self.stats, |stats| {
             stats.total_inferences += 1;
             let n = stats.total_inferences;
             stats.avg_latency_ns =
@@ -413,16 +412,18 @@ impl TransformerBackend for NativeSimBackend {
                 GateDecision::Skipped { .. } => stats.skipped += 1,
                 _ => {}
             }
-        }
+        })?;
 
         Ok(InferenceResult::new(logits_q, Some(topk), witness))
     }
 
     fn unload(&self, model: ModelId) -> Result<()> {
-        let mut models = self.models.write().unwrap();
-        if models.remove(&model).is_some() {
-            let mut stats = self.stats.write().unwrap();
-            stats.models_loaded = stats.models_loaded.saturating_sub(1);
+        let removed = write_lock(&self.models, |models| models.remove(&model).is_some())?;
+
+        if removed {
+            write_lock(&self.stats, |stats| {
+                stats.models_loaded = stats.models_loaded.saturating_sub(1);
+            })?;
             Ok(())
         } else {
             Err(Error::ModelNotFound(model))
@@ -430,8 +431,7 @@ impl TransformerBackend for NativeSimBackend {
     }
 
     fn is_loaded(&self, model: ModelId) -> bool {
-        let models = self.models.read().unwrap();
-        models.contains_key(&model)
+        read_lock(&self.models, |m| m.contains_key(&model)).unwrap_or(false)
     }
 
     fn kind(&self) -> BackendKind {
@@ -439,7 +439,7 @@ impl TransformerBackend for NativeSimBackend {
     }
 
     fn stats(&self) -> BackendStats {
-        self.stats.read().unwrap().clone()
+        read_lock(&self.stats, |s| s.clone()).unwrap_or_default()
     }
 }
 
@@ -466,19 +466,11 @@ fn softmax_f32(x: &mut [f32]) {
         *v = (*v - max).exp();
         sum += *v;
     }
-    for v in x.iter_mut() {
-        *v /= sum;
+    if sum > 0.0 {
+        for v in x.iter_mut() {
+            *v /= sum;
+        }
     }
-}
-
-fn compute_topk(logits: &[i16], k: usize) -> Vec<(u16, i16)> {
-    let mut indexed: Vec<(usize, i16)> = logits.iter().cloned().enumerate().map(|(i, v)| (i, v)).collect();
-    indexed.sort_by(|a, b| b.1.cmp(&a.1));
-    indexed
-        .into_iter()
-        .take(k)
-        .map(|(i, v)| (i as u16, v))
-        .collect()
 }
 
 #[cfg(test)]

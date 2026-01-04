@@ -247,6 +247,121 @@ pub fn crc32(data: &[u8]) -> u32 {
     !crc
 }
 
+// ============================================================================
+// Common utilities shared across backends
+// ============================================================================
+
+/// Compute top-K predictions from logits
+/// Returns sorted (token_id, logit) pairs, descending by logit value
+#[inline]
+pub fn compute_topk(logits: &[i16], k: usize) -> Vec<(u16, i16)> {
+    if logits.is_empty() {
+        return vec![];
+    }
+
+    // For small K, partial sort is faster
+    if k <= 32 && logits.len() > 100 {
+        // Use partial heap-based selection
+        let mut heap: Vec<(i16, u16)> = Vec::with_capacity(k + 1);
+        for (i, &v) in logits.iter().enumerate() {
+            if heap.len() < k {
+                heap.push((v, i as u16));
+                if heap.len() == k {
+                    // Heapify
+                    heap.sort_by(|a, b| a.0.cmp(&b.0));
+                }
+            } else if v > heap[0].0 {
+                heap[0] = (v, i as u16);
+                // Maintain min-heap property
+                let mut idx = 0;
+                while idx * 2 + 1 < heap.len() {
+                    let left = idx * 2 + 1;
+                    let right = idx * 2 + 2;
+                    let mut smallest = idx;
+                    if heap[left].0 < heap[smallest].0 {
+                        smallest = left;
+                    }
+                    if right < heap.len() && heap[right].0 < heap[smallest].0 {
+                        smallest = right;
+                    }
+                    if smallest == idx {
+                        break;
+                    }
+                    heap.swap(idx, smallest);
+                    idx = smallest;
+                }
+            }
+        }
+        heap.sort_by(|a, b| b.0.cmp(&a.0));
+        heap.into_iter().map(|(v, i)| (i, v)).collect()
+    } else {
+        // Full sort for small arrays
+        let mut indexed: Vec<(usize, i16)> = logits.iter().cloned().enumerate().collect();
+        indexed.sort_by(|a, b| b.1.cmp(&a.1));
+        indexed.into_iter().take(k).map(|(i, v)| (i as u16, v)).collect()
+    }
+}
+
+/// Helper to safely read from RwLock, returning error on poison
+pub fn read_lock<T, R>(
+    lock: &std::sync::RwLock<T>,
+    f: impl FnOnce(&T) -> R,
+) -> crate::error::Result<R> {
+    lock.read()
+        .map(|guard| f(&*guard))
+        .map_err(|_| crate::error::Error::BackendError("Lock poisoned (read)".into()))
+}
+
+/// Helper to safely write to RwLock, returning error on poison
+pub fn write_lock<T, R>(
+    lock: &std::sync::RwLock<T>,
+    f: impl FnOnce(&mut T) -> R,
+) -> crate::error::Result<R> {
+    lock.write()
+        .map(|mut guard| f(&mut *guard))
+        .map_err(|_| crate::error::Error::BackendError("Lock poisoned (write)".into()))
+}
+
+/// Validate token indices against vocabulary size
+#[inline]
+pub fn validate_tokens(tokens: &[u16], vocab_size: u32) -> crate::error::Result<()> {
+    for (i, &token) in tokens.iter().enumerate() {
+        if token as u32 >= vocab_size {
+            return Err(crate::error::Error::InvalidConfig(format!(
+                "Token {} at index {} exceeds vocabulary size {}",
+                token, i, vocab_size
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Build witness log from inference metadata
+pub fn build_witness(
+    model_hash: [u8; 32],
+    quant_hash: [u8; 32],
+    backend: crate::types::BackendKind,
+    cycles: u32,
+    latency_ns: u32,
+    gate_decision: crate::types::GateDecision,
+) -> crate::types::WitnessLog {
+    crate::types::WitnessLog::new(model_hash, quant_hash, backend, cycles, latency_ns, gate_decision)
+}
+
+/// Command types for daemon protocol
+pub mod commands {
+    /// Load model command
+    pub const LOAD_MODEL: u8 = 0x01;
+    /// Unload model command
+    pub const UNLOAD_MODEL: u8 = 0x02;
+    /// Inference request command
+    pub const INFER: u8 = 0x03;
+    /// Ping/health check command
+    pub const PING: u8 = 0x04;
+    /// Get status command
+    pub const STATUS: u8 = 0x05;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,5 +382,36 @@ mod tests {
         let crc = crc32(data);
         // CRC should be consistent
         assert_eq!(crc, crc32(data));
+    }
+
+    #[test]
+    fn test_compute_topk() {
+        let logits: Vec<i16> = vec![100, 50, 300, 200, 150];
+        let topk = compute_topk(&logits, 3);
+
+        assert_eq!(topk.len(), 3);
+        assert_eq!(topk[0], (2, 300)); // Index 2, value 300
+        assert_eq!(topk[1], (3, 200)); // Index 3, value 200
+        assert_eq!(topk[2], (4, 150)); // Index 4, value 150
+    }
+
+    #[test]
+    fn test_compute_topk_large() {
+        let logits: Vec<i16> = (0..1000).map(|i| (i * 7 % 500) as i16).collect();
+        let topk = compute_topk(&logits, 10);
+
+        assert_eq!(topk.len(), 10);
+        // Should be sorted descending
+        for i in 1..topk.len() {
+            assert!(topk[i - 1].1 >= topk[i].1);
+        }
+    }
+
+    #[test]
+    fn test_validate_tokens() {
+        assert!(validate_tokens(&[0, 1, 2], 100).is_ok());
+        assert!(validate_tokens(&[99], 100).is_ok());
+        assert!(validate_tokens(&[100], 100).is_err());
+        assert!(validate_tokens(&[0, 50, 101], 100).is_err());
     }
 }
