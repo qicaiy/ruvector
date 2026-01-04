@@ -10,6 +10,20 @@ use crate::error::{Error, Result};
 const ARTIFACT_MAGIC: &[u8; 4] = b"RVAT"; // RuVector ArTifact
 const ARTIFACT_VERSION: u16 = 1;
 
+// Security: Maximum size limits to prevent DoS via unbounded allocations
+/// Maximum manifest size (1 MB)
+const MAX_MANIFEST_SIZE: usize = 1024 * 1024;
+/// Maximum weights size (1 GB)
+const MAX_WEIGHTS_SIZE: usize = 1024 * 1024 * 1024;
+/// Maximum bitstream/calibration size (100 MB)
+const MAX_BLOB_SIZE: usize = 100 * 1024 * 1024;
+/// Maximum number of test vectors
+const MAX_TEST_VECTORS: usize = 10_000;
+/// Maximum tokens per test vector
+const MAX_TOKENS_PER_VECTOR: usize = 65_536;
+/// Maximum expected values per test vector
+const MAX_EXPECTED_PER_VECTOR: usize = 1_000_000;
+
 /// Pack an artifact to bytes
 pub fn pack_artifact(artifact: &ModelArtifact) -> Result<Vec<u8>> {
     let mut buffer = Vec::new();
@@ -94,6 +108,12 @@ pub fn unpack_artifact(data: &[u8]) -> Result<ModelArtifact> {
     // Read manifest
     cursor.read_exact(&mut read_buf[..4])?;
     let manifest_len = u32::from_le_bytes(read_buf[..4].try_into().unwrap()) as usize;
+    if manifest_len > MAX_MANIFEST_SIZE {
+        return Err(Error::InvalidArtifact(format!(
+            "Manifest size {} exceeds maximum {}",
+            manifest_len, MAX_MANIFEST_SIZE
+        )));
+    }
     let mut manifest_bytes = vec![0u8; manifest_len];
     cursor.read_exact(&mut manifest_bytes)?;
     let manifest = serde_json::from_slice(&manifest_bytes)?;
@@ -101,6 +121,12 @@ pub fn unpack_artifact(data: &[u8]) -> Result<ModelArtifact> {
     // Read weights
     cursor.read_exact(&mut read_buf)?;
     let weights_len = u64::from_le_bytes(read_buf) as usize;
+    if weights_len > MAX_WEIGHTS_SIZE {
+        return Err(Error::InvalidArtifact(format!(
+            "Weights size {} exceeds maximum {}",
+            weights_len, MAX_WEIGHTS_SIZE
+        )));
+    }
     let mut weights = vec![0u8; weights_len];
     cursor.read_exact(&mut weights)?;
 
@@ -109,6 +135,12 @@ pub fn unpack_artifact(data: &[u8]) -> Result<ModelArtifact> {
     let bitstream = if read_buf[0] == 1 {
         cursor.read_exact(&mut read_buf)?;
         let len = u64::from_le_bytes(read_buf) as usize;
+        if len > MAX_BLOB_SIZE {
+            return Err(Error::InvalidArtifact(format!(
+                "Bitstream size {} exceeds maximum {}",
+                len, MAX_BLOB_SIZE
+            )));
+        }
         let mut data = vec![0u8; len];
         cursor.read_exact(&mut data)?;
         Some(data)
@@ -121,6 +153,12 @@ pub fn unpack_artifact(data: &[u8]) -> Result<ModelArtifact> {
     let calibration = if read_buf[0] == 1 {
         cursor.read_exact(&mut read_buf)?;
         let len = u64::from_le_bytes(read_buf) as usize;
+        if len > MAX_BLOB_SIZE {
+            return Err(Error::InvalidArtifact(format!(
+                "Calibration size {} exceeds maximum {}",
+                len, MAX_BLOB_SIZE
+            )));
+        }
         let mut data = vec![0u8; len];
         cursor.read_exact(&mut data)?;
         Some(data)
@@ -131,12 +169,24 @@ pub fn unpack_artifact(data: &[u8]) -> Result<ModelArtifact> {
     // Read test vectors
     cursor.read_exact(&mut read_buf[..4])?;
     let num_vectors = u32::from_le_bytes(read_buf[..4].try_into().unwrap()) as usize;
+    if num_vectors > MAX_TEST_VECTORS {
+        return Err(Error::InvalidArtifact(format!(
+            "Test vector count {} exceeds maximum {}",
+            num_vectors, MAX_TEST_VECTORS
+        )));
+    }
     let mut test_vectors = Vec::with_capacity(num_vectors);
 
     for _ in 0..num_vectors {
         // Read tokens
         cursor.read_exact(&mut read_buf[..2])?;
         let num_tokens = u16::from_le_bytes([read_buf[0], read_buf[1]]) as usize;
+        if num_tokens > MAX_TOKENS_PER_VECTOR {
+            return Err(Error::InvalidArtifact(format!(
+                "Token count {} exceeds maximum {}",
+                num_tokens, MAX_TOKENS_PER_VECTOR
+            )));
+        }
         let mut tokens = Vec::with_capacity(num_tokens);
         for _ in 0..num_tokens {
             cursor.read_exact(&mut read_buf[..2])?;
@@ -146,6 +196,12 @@ pub fn unpack_artifact(data: &[u8]) -> Result<ModelArtifact> {
         // Read expected
         cursor.read_exact(&mut read_buf[..4])?;
         let num_expected = u32::from_le_bytes(read_buf[..4].try_into().unwrap()) as usize;
+        if num_expected > MAX_EXPECTED_PER_VECTOR {
+            return Err(Error::InvalidArtifact(format!(
+                "Expected values count {} exceeds maximum {}",
+                num_expected, MAX_EXPECTED_PER_VECTOR
+            )));
+        }
         let mut expected = Vec::with_capacity(num_expected);
         for _ in 0..num_expected {
             cursor.read_exact(&mut read_buf[..2])?;

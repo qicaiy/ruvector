@@ -162,38 +162,43 @@ pub extern "C" fn fpga_infer(
     // Run inference
     match engine.backend.infer(req) {
         Ok(result) => {
-            // Allocate logits
+            // Allocate logits with checked allocation (prevents panic on overflow)
             let logits_len = result.logits_q.len();
             let logits = if logits_len > 0 {
-                let ptr = unsafe {
-                    std::alloc::alloc(std::alloc::Layout::array::<i16>(logits_len).unwrap())
-                        as *mut i16
-                };
-                if !ptr.is_null() {
-                    unsafe {
-                        ptr::copy_nonoverlapping(result.logits_q.as_ptr(), ptr, logits_len);
+                match std::alloc::Layout::array::<i16>(logits_len) {
+                    Ok(layout) if layout.size() > 0 => {
+                        let ptr = unsafe { std::alloc::alloc(layout) as *mut i16 };
+                        if !ptr.is_null() {
+                            unsafe {
+                                ptr::copy_nonoverlapping(result.logits_q.as_ptr(), ptr, logits_len);
+                            }
+                        }
+                        ptr
                     }
+                    _ => ptr::null_mut(), // Return null on allocation failure
                 }
-                ptr
             } else {
                 ptr::null_mut()
             };
 
-            // Allocate top-K
+            // Allocate top-K with checked allocation
             let (topk, topk_len) = if let Some(ref tk) = result.topk {
                 let len = tk.len() * 2; // (token, logit) pairs
-                let ptr = unsafe {
-                    std::alloc::alloc(std::alloc::Layout::array::<u32>(len).unwrap()) as *mut u32
-                };
-                if !ptr.is_null() {
-                    for (i, (token, logit)) in tk.iter().enumerate() {
-                        unsafe {
-                            *ptr.add(i * 2) = *token as u32;
-                            *ptr.add(i * 2 + 1) = *logit as u32;
+                match std::alloc::Layout::array::<u32>(len) {
+                    Ok(layout) if layout.size() > 0 => {
+                        let ptr = unsafe { std::alloc::alloc(layout) as *mut u32 };
+                        if !ptr.is_null() {
+                            for (i, (token, logit)) in tk.iter().enumerate() {
+                                unsafe {
+                                    *ptr.add(i * 2) = *token as u32;
+                                    *ptr.add(i * 2 + 1) = *logit as u32;
+                                }
+                            }
                         }
+                        (ptr, tk.len())
                     }
+                    _ => (ptr::null_mut(), 0), // Return null on allocation failure
                 }
-                (ptr, tk.len())
             } else {
                 (ptr::null_mut(), 0)
             };

@@ -55,12 +55,23 @@ pub fn q15_mul(a: Q15, b: Q15) -> Q15 {
 }
 
 /// Fixed-point dot product with accumulator
+/// Note: For very large vectors (>65536 elements), use q15_dot_saturating
 #[inline]
 pub fn q15_dot(a: &[Q15], b: &[Q15]) -> i32 {
     a.iter()
         .zip(b.iter())
         .map(|(&x, &y)| x as i32 * y as i32)
         .sum()
+}
+
+/// Saturating fixed-point dot product (prevents overflow for large vectors)
+#[inline]
+pub fn q15_dot_saturating(a: &[Q15], b: &[Q15]) -> i32 {
+    a.iter()
+        .zip(b.iter())
+        .fold(0i32, |acc, (&x, &y)| {
+            acc.saturating_add((x as i32).saturating_mul(y as i32))
+        })
 }
 
 /// Fixed-point dot product normalized to Q15
