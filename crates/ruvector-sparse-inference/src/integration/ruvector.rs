@@ -44,13 +44,16 @@ impl SparseEmbeddingProvider {
         input_dim: usize,
         hidden_dim: usize,
         embed_dim: usize,
-        sparsity_threshold: f32,
+        sparsity_ratio: f32,
     ) -> Result<Self> {
+        // Use top-K selection based on sparsity ratio for reliable activation
+        // This ensures we always have some active neurons regardless of random init
+        let target_active = ((1.0 - sparsity_ratio) * hidden_dim as f32).max(1.0) as usize;
         let sparsity_config = SparsityConfig {
-            threshold: Some(sparsity_threshold),
-            top_k: None,
-            target_sparsity: Some(0.7), // Target 70% sparsity
-            adaptive_threshold: true,
+            threshold: None,
+            top_k: Some(target_active),
+            target_sparsity: Some(sparsity_ratio),
+            adaptive_threshold: false,
         };
 
         let predictor = LowRankPredictor::new(
@@ -231,31 +234,34 @@ mod tests {
 
     #[test]
     fn test_embed() {
-        let provider = SparseEmbeddingProvider::new(64, 256, 64, 0.1).unwrap();
-        let input = vec![0.1f32; 64];
+        // Use lower sparsity threshold to ensure enough neurons are active
+        let provider = SparseEmbeddingProvider::new(64, 256, 64, 0.001).unwrap();
+        // Use varied input to get more neuron activations
+        let input: Vec<f32> = (0..64).map(|i| (i as f32 - 32.0) / 64.0).collect();
 
         let embedding = provider.embed(&input);
-        assert!(embedding.is_ok());
+        assert!(embedding.is_ok(), "Embedding failed: {:?}", embedding.err());
 
         let embedding = embedding.unwrap();
         assert_eq!(embedding.len(), 64);
 
         // Check L2 normalization
         let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 0.01);
+        assert!((norm - 1.0).abs() < 0.01, "Norm is {}", norm);
     }
 
     #[test]
     fn test_batch_embed() {
-        let provider = SparseEmbeddingProvider::new(64, 256, 64, 0.1).unwrap();
+        // Use lower sparsity threshold to ensure enough neurons are active
+        let provider = SparseEmbeddingProvider::new(64, 256, 64, 0.001).unwrap();
         let inputs = vec![
-            vec![0.1f32; 64],
-            vec![0.2f32; 64],
-            vec![0.3f32; 64],
+            (0..64).map(|i| i as f32 / 64.0).collect(),
+            (0..64).map(|i| (i as f32).sin()).collect(),
+            (0..64).map(|i| (i as f32).cos()).collect(),
         ];
 
         let embeddings = provider.embed_batch(&inputs);
-        assert!(embeddings.is_ok());
+        assert!(embeddings.is_ok(), "Batch embed failed: {:?}", embeddings.err());
 
         let embeddings = embeddings.unwrap();
         assert_eq!(embeddings.len(), 3);

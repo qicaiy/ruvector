@@ -119,7 +119,7 @@ impl LlamaMLP {
         let up = self.up_proj.forward(x);
 
         // SwiGLU: silu(gate) ⊙ up
-        let mut hidden: Vec<f32> = gate
+        let hidden: Vec<f32> = gate
             .iter()
             .zip(up.iter())
             .map(|(&g, &u)| silu(g) * u)

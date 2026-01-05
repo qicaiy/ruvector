@@ -53,7 +53,10 @@ impl Backend for CpuBackend {
         for (i, &col_idx) in cols.iter().enumerate() {
             let col = matrix.column(col_idx);
             let scalar = input[i];
-            self.axpy(output, col.as_slice().unwrap(), scalar);
+            // Column view may not be contiguous, iterate element-by-element
+            for (j, &val) in col.iter().enumerate() {
+                output[j] += val * scalar;
+            }
         }
     }
 

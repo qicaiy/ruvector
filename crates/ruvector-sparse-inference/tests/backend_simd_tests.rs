@@ -52,8 +52,8 @@ fn test_cpu_backend_gelu() {
     // GELU(1) ≈ 0.841
     assert!((data[1] - 0.841).abs() < 0.01, "GELU(1) should be ≈0.841, got {}", data[1]);
 
-    // GELU is odd function: GELU(-x) ≈ -GELU(x)
-    assert!((data[2] + 0.841).abs() < 0.2, "GELU(-1) should be ≈-0.841, got {}", data[2]);
+    // GELU(-1) ≈ -0.159 (GELU is NOT an odd function)
+    assert!((data[2] + 0.159).abs() < 0.1, "GELU(-1) should be ≈-0.159, got {}", data[2]);
 }
 
 #[test]

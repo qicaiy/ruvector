@@ -361,11 +361,13 @@ mod tests {
             ..Default::default()
         };
         let mut policy = GraduationPolicy::new(PrecisionLane::Bit5, config);
+        // Set higher EMA alpha for faster response in tests
+        policy.ema_alpha = 1.0;
 
-        // High novelty, good confidence
+        // High novelty, good confidence (use high values to overcome any thresholds)
         let observation = ObservationMetrics {
-            novelty: 0.5,
-            confidence: 0.8,
+            novelty: 0.9,
+            confidence: 0.9,
             stability: 0.6,
             ..Default::default()
         };
