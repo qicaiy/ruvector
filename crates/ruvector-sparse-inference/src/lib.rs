@@ -14,6 +14,8 @@
 //! - **SIMD Optimization**: AVX2, SSE4.1, NEON, and WASM SIMD support
 //! - **GGUF Support**: Full compatibility with quantized Llama models
 //! - **Hot/Cold Caching**: Intelligent neuron weight management
+//! - **π Integration**: Structural constants for calibration, drift detection, and chaos
+//! - **Precision Lanes**: 3/5/7-bit layered quantization with graduation policies
 //!
 //! ## Performance Targets
 //!
@@ -21,13 +23,25 @@
 //! - Llama 7B: 50-100ms per token (5-10x speedup)
 //! - Memory: 1.5-2x reduction via weight offloading
 //!
+//! ## π Integration
+//!
+//! π is irrational, non-repeating, and structure-rich. This makes it ideal for:
+//! - **Calibration**: π-derived constants avoid power-of-2 resonance artifacts
+//! - **Drift Detection**: Quantization honesty signals using π transforms
+//! - **Angular Embeddings**: Hyperspherical projections with π phase encoding
+//! - **Chaos Seeding**: Deterministic pseudo-randomness without RNG state
+//!
 //! ## Example
 //!
 //! ```rust,ignore
-//! use ruvector_sparse_inference::{SparseInferenceEngine, SparsityConfig};
+//! use ruvector_sparse_inference::{SparseInferenceEngine, SparsityConfig, PiContext};
 //!
 //! // Create sparse inference engine
 //! let engine = SparseInferenceEngine::new_sparse(512, 2048, 0.1)?;
+//!
+//! // Use π context for calibration
+//! let pi_ctx = PiContext::new(PrecisionLane::Bit5);
+//! let calibrated = pi_ctx.calibrate(input_value);
 //!
 //! // Run inference
 //! let input = vec![0.1f32; 512];
@@ -44,6 +58,7 @@ pub mod backend;
 pub mod ops;
 pub mod integration;
 pub mod precision;
+pub mod pi;
 
 pub use config::{SparsityConfig, ActivationType, CacheConfig, ModelConfig, CacheStrategy};
 pub use error::{SparseInferenceError, Result};
@@ -55,6 +70,12 @@ pub use integration::{SparseEmbeddingProvider, SparseInferenceBackend};
 pub use precision::{
     PrecisionLane, LaneConfig, GraduationPolicy, GraduationDecision,
     Quantizer3Bit, Quantizer5Bit, Quantizer7Bit, LaneTelemetry,
+};
+pub use pi::{
+    PiContext, PiCalibration, DriftDetector, DriftReport, QuantizationHonesty,
+    AngularEmbedding, PhaseEncoder, HypersphericalProjection,
+    PiChaos, DeterministicJitter, PiScheduler,
+    PI_SCALE_3BIT, PI_SCALE_5BIT, PI_SCALE_7BIT,
 };
 
 /// Sparse inference engine that coordinates prediction and computation
