@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "PowerInfer-style sparse inference engine for efficient neural network inference on edge devices"
+keywords = ["sparse-inference", "neural-network", "quantization", "simd", "edge-ai"]
+categories = ["science", "algorithms"]
+readme = "README.md"
 
 [dependencies]
 # Math and numerics
