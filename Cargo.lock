@@ -6444,7 +6444,7 @@ dependencies = [
 
 [[package]]
 name = "ruvector-attention"
-version = "0.1.0"
+version = "0.1.31"
 dependencies = [
  "approx",
  "criterion",
@@ -6982,7 +6982,7 @@ name = "ruvector-math-wasm"
 version = "0.1.31"
 dependencies = [
  "console_error_panic_hook",
- "getrandom 0.3.4",
+ "getrandom 0.2.16",
  "js-sys",
  "rayon",
  "ruvector-math",
