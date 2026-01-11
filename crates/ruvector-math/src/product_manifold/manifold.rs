@@ -80,8 +80,9 @@ impl ProductManifold {
         }
 
         let mut result = point.to_vec();
-        let (e_range, h_range, s_range) = self.config.component_ranges();
+        let (_e_range, h_range, s_range) = self.config.component_ranges();
 
+        // Euclidean: no projection needed (kept as-is)
         // Hyperbolic: project to Poincaré ball (||x|| < 1)
         if !h_range.is_empty() {
             let h_part = &mut result[h_range.clone()];
@@ -119,6 +120,7 @@ impl ProductManifold {
     /// Compute distance in product manifold
     ///
     /// d(x, y)² = w_e d_E(x_e, y_e)² + w_h d_H(x_h, y_h)² + w_s d_S(x_s, y_s)²
+    #[inline]
     pub fn distance(&self, x: &[f64], y: &[f64]) -> Result<f64> {
         if x.len() != self.dim() || y.len() != self.dim() {
             return Err(MathError::dimension_mismatch(self.dim(), x.len()));
@@ -129,13 +131,9 @@ impl ProductManifold {
 
         let mut dist_sq = 0.0;
 
-        // Euclidean distance
+        // Euclidean distance with SIMD-friendly accumulation
         if !e_range.is_empty() && w_e > 0.0 {
-            let d_e: f64 = x[e_range.clone()]
-                .iter()
-                .zip(y[e_range.clone()].iter())
-                .map(|(&xi, &yi)| (xi - yi).powi(2))
-                .sum();
+            let d_e = self.euclidean_distance_sq(&x[e_range.clone()], &y[e_range.clone()]);
             dist_sq += w_e * d_e;
         }
 
@@ -158,13 +156,91 @@ impl ProductManifold {
         Ok(dist_sq.sqrt())
     }
 
+    /// SIMD-friendly squared Euclidean distance using 4-way unrolled accumulator
+    #[inline(always)]
+    fn euclidean_distance_sq(&self, x: &[f64], y: &[f64]) -> f64 {
+        let len = x.len();
+        let chunks = len / 4;
+        let remainder = len % 4;
+
+        let mut sum0 = 0.0f64;
+        let mut sum1 = 0.0f64;
+        let mut sum2 = 0.0f64;
+        let mut sum3 = 0.0f64;
+
+        // Process 4 elements at a time for SIMD vectorization
+        for i in 0..chunks {
+            let base = i * 4;
+            let d0 = x[base] - y[base];
+            let d1 = x[base + 1] - y[base + 1];
+            let d2 = x[base + 2] - y[base + 2];
+            let d3 = x[base + 3] - y[base + 3];
+            sum0 += d0 * d0;
+            sum1 += d1 * d1;
+            sum2 += d2 * d2;
+            sum3 += d3 * d3;
+        }
+
+        // Handle remainder
+        let base = chunks * 4;
+        for i in 0..remainder {
+            let d = x[base + i] - y[base + i];
+            sum0 += d * d;
+        }
+
+        sum0 + sum1 + sum2 + sum3
+    }
+
     /// Poincaré ball distance
     ///
     /// d(x, y) = arcosh(1 + 2 ||x - y||² / ((1 - ||x||²)(1 - ||y||²)))
+    ///
+    /// Optimized with SIMD-friendly 4-way accumulator for computing norms
+    #[inline]
     fn poincare_distance(&self, x: &[f64], y: &[f64]) -> Result<f64> {
-        let x_norm_sq: f64 = x.iter().map(|&v| v * v).sum();
-        let y_norm_sq: f64 = y.iter().map(|&v| v * v).sum();
-        let diff_sq: f64 = x.iter().zip(y.iter()).map(|(&a, &b)| (a - b).powi(2)).sum();
+        let len = x.len();
+        let chunks = len / 4;
+        let remainder = len % 4;
+
+        // Compute all three values in one pass for better cache utilization
+        let mut x_norm_sq = 0.0f64;
+        let mut y_norm_sq = 0.0f64;
+        let mut diff_sq = 0.0f64;
+
+        // 4-way unrolled for SIMD
+        for i in 0..chunks {
+            let base = i * 4;
+
+            let x0 = x[base];
+            let x1 = x[base + 1];
+            let x2 = x[base + 2];
+            let x3 = x[base + 3];
+
+            let y0 = y[base];
+            let y1 = y[base + 1];
+            let y2 = y[base + 2];
+            let y3 = y[base + 3];
+
+            x_norm_sq += x0 * x0 + x1 * x1 + x2 * x2 + x3 * x3;
+            y_norm_sq += y0 * y0 + y1 * y1 + y2 * y2 + y3 * y3;
+
+            let d0 = x0 - y0;
+            let d1 = x1 - y1;
+            let d2 = x2 - y2;
+            let d3 = x3 - y3;
+            diff_sq += d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3;
+        }
+
+        // Handle remainder
+        let base = chunks * 4;
+        for i in 0..remainder {
+            let xi = x[base + i];
+            let yi = y[base + i];
+            x_norm_sq += xi * xi;
+            y_norm_sq += yi * yi;
+            let d = xi - yi;
+            diff_sq += d * d;
+        }
 
         let denom = (1.0 - x_norm_sq).max(EPS) * (1.0 - y_norm_sq).max(EPS);
         let arg = 1.0 + 2.0 * diff_sq / denom;

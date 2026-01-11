@@ -4,11 +4,30 @@ use crate::error::{MathError, Result};
 use crate::utils::{norm, EPS};
 use super::ProductManifold;
 
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
+
 /// Batch operations on product manifolds
 impl ProductManifold {
     /// Compute pairwise distances between all points
+    /// Uses parallel computation when 'parallel' feature is enabled
     pub fn pairwise_distances(&self, points: &[Vec<f64>]) -> Result<Vec<Vec<f64>>> {
         let n = points.len();
+
+        #[cfg(feature = "parallel")]
+        {
+            self.pairwise_distances_parallel(points, n)
+        }
+
+        #[cfg(not(feature = "parallel"))]
+        {
+            self.pairwise_distances_sequential(points, n)
+        }
+    }
+
+    /// Sequential pairwise distance computation
+    #[inline]
+    fn pairwise_distances_sequential(&self, points: &[Vec<f64>], n: usize) -> Result<Vec<Vec<f64>>> {
         let mut distances = vec![vec![0.0; n]; n];
 
         for i in 0..n {
@@ -22,15 +41,73 @@ impl ProductManifold {
         Ok(distances)
     }
 
+    /// Parallel pairwise distance computation using rayon
+    #[cfg(feature = "parallel")]
+    fn pairwise_distances_parallel(&self, points: &[Vec<f64>], n: usize) -> Result<Vec<Vec<f64>>> {
+        // Compute upper triangle in parallel
+        let pairs: Vec<_> = (0..n)
+            .flat_map(|i| ((i + 1)..n).map(move |j| (i, j)))
+            .collect();
+
+        let results: Vec<(usize, usize, f64)> = pairs
+            .par_iter()
+            .filter_map(|&(i, j)| {
+                self.distance(&points[i], &points[j])
+                    .ok()
+                    .map(|d| (i, j, d))
+            })
+            .collect();
+
+        let mut distances = vec![vec![0.0; n]; n];
+        for (i, j, d) in results {
+            distances[i][j] = d;
+            distances[j][i] = d;
+        }
+
+        Ok(distances)
+    }
+
     /// Find k-nearest neighbors
+    /// Uses parallel computation when 'parallel' feature is enabled
     pub fn knn(&self, query: &[f64], points: &[Vec<f64>], k: usize) -> Result<Vec<(usize, f64)>> {
+        #[cfg(feature = "parallel")]
+        {
+            self.knn_parallel(query, points, k)
+        }
+
+        #[cfg(not(feature = "parallel"))]
+        {
+            self.knn_sequential(query, points, k)
+        }
+    }
+
+    /// Sequential k-nearest neighbors
+    #[inline]
+    fn knn_sequential(&self, query: &[f64], points: &[Vec<f64>], k: usize) -> Result<Vec<(usize, f64)>> {
         let mut distances: Vec<(usize, f64)> = points
             .iter()
             .enumerate()
             .filter_map(|(i, p)| self.distance(query, p).ok().map(|d| (i, d)))
             .collect();
 
-        distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        // Use sort_unstable_by for better performance
+        distances.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        distances.truncate(k);
+
+        Ok(distances)
+    }
+
+    /// Parallel k-nearest neighbors using rayon
+    #[cfg(feature = "parallel")]
+    fn knn_parallel(&self, query: &[f64], points: &[Vec<f64>], k: usize) -> Result<Vec<(usize, f64)>> {
+        let mut distances: Vec<(usize, f64)> = points
+            .par_iter()
+            .enumerate()
+            .filter_map(|(i, p)| self.distance(query, p).ok().map(|d| (i, d)))
+            .collect();
+
+        // Use sort_unstable_by for better performance
+        distances.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         distances.truncate(k);
 
         Ok(distances)
@@ -200,10 +277,9 @@ impl ProductManifold {
         }
 
         let mut result = gradient.to_vec();
-        let (e_range, h_range, s_range) = self.config().component_ranges();
+        let (_e_range, h_range, s_range) = self.config().component_ranges();
 
-        // Euclidean: gradient is already in tangent space
-        // (no modification needed)
+        // Euclidean: gradient is already in tangent space (no modification needed)
 
         // Hyperbolic: scale by (1 - ||x||²)² / 4
         if !h_range.is_empty() {

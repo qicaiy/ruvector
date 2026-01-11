@@ -236,7 +236,7 @@ impl GromovWasserstein {
         let mut loss = Self::compute_gw_loss(&dist_x, &dist_y, &gamma);
         let mut converged = false;
 
-        for iter in 0..self.max_iterations {
+        for _iter in 0..self.max_iterations {
             // Compute gradient (cost matrix for linearized problem)
             let gradient = Self::compute_gradient(&dist_x, &dist_y, &gamma);
 

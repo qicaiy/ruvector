@@ -5,12 +5,11 @@
 //! with optimal transport, information geometry, and product manifolds.
 
 use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 use ruvector_math::{
     optimal_transport::{SlicedWasserstein, SinkhornSolver, GromovWasserstein},
     information_geometry::{FisherInformation, NaturalGradient},
     spherical::SphericalSpace,
-    product_manifold::{ProductManifold, ProductManifoldConfig},
+    product_manifold::ProductManifold,
 };
 
 #[wasm_bindgen(start)]
@@ -246,7 +245,7 @@ impl WasmFisherInformation {
 
     /// Compute diagonal FIM from gradient samples
     #[wasm_bindgen(js_name = diagonalFim)]
-    pub fn diagonal_fim(&self, gradients: &[f64], num_samples: usize, dim: usize) -> Result<Vec<f64>, JsError> {
+    pub fn diagonal_fim(&self, gradients: &[f64], _num_samples: usize, dim: usize) -> Result<Vec<f64>, JsError> {
         let grads = to_points(gradients, dim);
         self.inner
             .diagonal_fim(&grads)
@@ -471,7 +470,7 @@ impl WasmProductManifold {
 
     /// Fréchet mean
     #[wasm_bindgen(js_name = frechetMean)]
-    pub fn frechet_mean(&self, points: &[f64], num_points: usize) -> Result<Vec<f64>, JsError> {
+    pub fn frechet_mean(&self, points: &[f64], _num_points: usize) -> Result<Vec<f64>, JsError> {
         let dim = self.inner.dim();
         let pts = to_points(points, dim);
         self.inner

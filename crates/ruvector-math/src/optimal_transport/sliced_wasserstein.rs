@@ -97,42 +97,129 @@ impl SlicedWasserstein {
             .collect()
     }
 
-    /// Project points onto a direction
-    #[inline]
+    /// Project points onto a direction (SIMD-friendly dot product)
+    #[inline(always)]
     fn project(points: &[Vec<f64>], direction: &[f64]) -> Vec<f64> {
         points
             .iter()
-            .map(|p| {
-                p.iter()
-                    .zip(direction.iter())
-                    .map(|(&pi, &di)| pi * di)
-                    .sum()
-            })
+            .map(|p| Self::dot_product(p, direction))
             .collect()
+    }
+
+    /// Project points into pre-allocated buffer (reduces allocations)
+    #[inline(always)]
+    fn project_into(points: &[Vec<f64>], direction: &[f64], out: &mut [f64]) {
+        for (i, p) in points.iter().enumerate() {
+            out[i] = Self::dot_product(p, direction);
+        }
+    }
+
+    /// SIMD-friendly dot product using fold pattern
+    /// Compiler can auto-vectorize this pattern effectively
+    #[inline(always)]
+    fn dot_product(a: &[f64], b: &[f64]) -> f64 {
+        // Use 4-way unrolled accumulator for better SIMD utilization
+        let len = a.len();
+        let chunks = len / 4;
+        let remainder = len % 4;
+
+        let mut sum0 = 0.0f64;
+        let mut sum1 = 0.0f64;
+        let mut sum2 = 0.0f64;
+        let mut sum3 = 0.0f64;
+
+        // Process 4 elements at a time (helps SIMD vectorization)
+        for i in 0..chunks {
+            let base = i * 4;
+            sum0 += a[base] * b[base];
+            sum1 += a[base + 1] * b[base + 1];
+            sum2 += a[base + 2] * b[base + 2];
+            sum3 += a[base + 3] * b[base + 3];
+        }
+
+        // Handle remainder
+        let base = chunks * 4;
+        for i in 0..remainder {
+            sum0 += a[base + i] * b[base + i];
+        }
+
+        sum0 + sum1 + sum2 + sum3
     }
 
     /// Compute 1D Wasserstein distance between two sorted distributions
     ///
     /// For uniform weights, this is simply the sum of |sorted_a[i] - sorted_b[i]|^p
+    #[inline]
     fn wasserstein_1d_uniform(&self, mut proj_a: Vec<f64>, mut proj_b: Vec<f64>) -> f64 {
         let n = proj_a.len();
         let m = proj_b.len();
 
-        // Sort projections
-        proj_a.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        proj_b.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        // Sort projections using fast f64 comparison
+        proj_a.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        proj_b.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         if n == m {
-            // Same size: direct comparison
-            proj_a
-                .iter()
-                .zip(proj_b.iter())
-                .map(|(&a, &b)| (a - b).abs().powf(self.p))
-                .sum::<f64>()
-                / n as f64
+            // Same size: direct comparison with SIMD-friendly accumulator
+            self.wasserstein_1d_equal_size(&proj_a, &proj_b)
         } else {
             // Different sizes: interpolate via quantiles
             self.wasserstein_1d_quantile(&proj_a, &proj_b, n.max(m))
+        }
+    }
+
+    /// Optimized equal-size 1D Wasserstein with SIMD-friendly pattern
+    #[inline(always)]
+    fn wasserstein_1d_equal_size(&self, sorted_a: &[f64], sorted_b: &[f64]) -> f64 {
+        let n = sorted_a.len();
+        if n == 0 {
+            return 0.0;
+        }
+
+        // Use p=2 fast path (most common case)
+        if (self.p - 2.0).abs() < 1e-10 {
+            // L2 Wasserstein: sum of squared differences
+            let mut sum0 = 0.0f64;
+            let mut sum1 = 0.0f64;
+            let mut sum2 = 0.0f64;
+            let mut sum3 = 0.0f64;
+
+            let chunks = n / 4;
+            let remainder = n % 4;
+
+            for i in 0..chunks {
+                let base = i * 4;
+                let d0 = sorted_a[base] - sorted_b[base];
+                let d1 = sorted_a[base + 1] - sorted_b[base + 1];
+                let d2 = sorted_a[base + 2] - sorted_b[base + 2];
+                let d3 = sorted_a[base + 3] - sorted_b[base + 3];
+                sum0 += d0 * d0;
+                sum1 += d1 * d1;
+                sum2 += d2 * d2;
+                sum3 += d3 * d3;
+            }
+
+            let base = chunks * 4;
+            for i in 0..remainder {
+                let d = sorted_a[base + i] - sorted_b[base + i];
+                sum0 += d * d;
+            }
+
+            (sum0 + sum1 + sum2 + sum3) / n as f64
+        } else if (self.p - 1.0).abs() < 1e-10 {
+            // L1 Wasserstein: sum of absolute differences
+            let mut sum = 0.0f64;
+            for i in 0..n {
+                sum += (sorted_a[i] - sorted_b[i]).abs();
+            }
+            sum / n as f64
+        } else {
+            // General case
+            sorted_a
+                .iter()
+                .zip(sorted_b.iter())
+                .map(|(&a, &b)| (a - b).abs().powf(self.p))
+                .sum::<f64>()
+                / n as f64
         }
     }
 
@@ -246,13 +333,22 @@ impl OptimalTransport for SlicedWasserstein {
         }
 
         let directions = self.generate_directions(dim);
+        let n_source = source.len();
+        let n_target = target.len();
+
+        // Pre-allocate projection buffers (reduces allocations per direction)
+        let mut proj_source = vec![0.0; n_source];
+        let mut proj_target = vec![0.0; n_target];
 
         let total: f64 = directions
             .iter()
             .map(|dir| {
-                let proj_source = Self::project(source, dir);
-                let proj_target = Self::project(target, dir);
-                self.wasserstein_1d_uniform(proj_source, proj_target)
+                // Project into pre-allocated buffers
+                Self::project_into(source, dir, &mut proj_source);
+                Self::project_into(target, dir, &mut proj_target);
+
+                // Clone for sorting (wasserstein_1d_uniform sorts in place)
+                self.wasserstein_1d_uniform(proj_source.clone(), proj_target.clone())
             })
             .sum();
 

@@ -17,21 +17,31 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use ruvector_math::optimal_transport::{SlicedWasserstein, SinkhornSolver};
+//! use ruvector_math::optimal_transport::{SlicedWasserstein, SinkhornSolver, OptimalTransport};
 //! use ruvector_math::information_geometry::FisherInformation;
 //! use ruvector_math::product_manifold::ProductManifold;
 //!
 //! // Sliced Wasserstein distance between point clouds
-//! let sw = SlicedWasserstein::new(100); // 100 projections
+//! let sw = SlicedWasserstein::new(100).with_seed(42);
+//! let points_a = vec![vec![0.0, 0.0], vec![1.0, 0.0]];
+//! let points_b = vec![vec![0.5, 0.5], vec![1.5, 0.5]];
 //! let dist = sw.distance(&points_a, &points_b);
+//! assert!(dist > 0.0);
 //!
 //! // Sinkhorn optimal transport
-//! let solver = SinkhornSolver::new(0.1, 100); // regularization, max_iters
-//! let (transport_plan, cost) = solver.solve(&cost_matrix, &weights_a, &weights_b);
+//! let solver = SinkhornSolver::new(0.1, 100);
+//! let cost_matrix = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
+//! let weights_a = vec![0.5, 0.5];
+//! let weights_b = vec![0.5, 0.5];
+//! let result = solver.solve(&cost_matrix, &weights_a, &weights_b).unwrap();
+//! assert!(result.converged);
 //!
-//! // Product manifold operations
-//! let manifold = ProductManifold::new(64, 16, 8); // E^64 × H^16 × S^8
-//! let dist = manifold.distance(&point_a, &point_b);
+//! // Product manifold operations (Euclidean only for simplicity)
+//! let manifold = ProductManifold::new(2, 0, 0);
+//! let point_a = vec![0.0, 0.0];
+//! let point_b = vec![3.0, 4.0];
+//! let dist = manifold.distance(&point_a, &point_b).unwrap();
+//! assert!((dist - 5.0).abs() < 1e-10);
 //! ```
 
 #![warn(missing_docs)]

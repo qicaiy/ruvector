@@ -83,8 +83,6 @@ impl NaturalGradient {
         gradient: &[f64],
         gradient_samples: Option<&[Vec<f64>]>,
     ) -> Result<Vec<f64>> {
-        let dim = gradient.len();
-
         // Update FIM estimate if samples provided
         if let Some(samples) = gradient_samples {
             self.update_fim(samples)?;

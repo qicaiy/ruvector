@@ -24,4 +24,9 @@ mod operations;
 
 pub use config::{ProductManifoldConfig, CurvatureType};
 pub use manifold::ProductManifold;
-pub use operations::*;
+
+// Re-export batch operations (used internally by ProductManifold impl)
+#[doc(hidden)]
+pub mod ops {
+    pub use super::operations::*;
+}

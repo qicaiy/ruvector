@@ -68,21 +68,51 @@ impl SinkhornSolver {
     }
 
     /// Compute the cost matrix for squared Euclidean distance
+    /// Uses SIMD-friendly 4-way unrolled accumulator for better performance
+    #[inline]
     pub fn compute_cost_matrix(source: &[Vec<f64>], target: &[Vec<f64>]) -> Vec<Vec<f64>> {
         source
             .iter()
             .map(|s| {
                 target
                     .iter()
-                    .map(|t| {
-                        s.iter()
-                            .zip(t.iter())
-                            .map(|(&si, &ti)| (si - ti).powi(2))
-                            .sum()
-                    })
+                    .map(|t| Self::squared_euclidean(s, t))
                     .collect()
             })
             .collect()
+    }
+
+    /// SIMD-friendly squared Euclidean distance
+    #[inline(always)]
+    fn squared_euclidean(a: &[f64], b: &[f64]) -> f64 {
+        let len = a.len();
+        let chunks = len / 4;
+        let remainder = len % 4;
+
+        let mut sum0 = 0.0f64;
+        let mut sum1 = 0.0f64;
+        let mut sum2 = 0.0f64;
+        let mut sum3 = 0.0f64;
+
+        for i in 0..chunks {
+            let base = i * 4;
+            let d0 = a[base] - b[base];
+            let d1 = a[base + 1] - b[base + 1];
+            let d2 = a[base + 2] - b[base + 2];
+            let d3 = a[base + 3] - b[base + 3];
+            sum0 += d0 * d0;
+            sum1 += d1 * d1;
+            sum2 += d2 * d2;
+            sum3 += d3 * d3;
+        }
+
+        let base = chunks * 4;
+        for i in 0..remainder {
+            let d = a[base + i] - b[base + i];
+            sum0 += d * d;
+        }
+
+        sum0 + sum1 + sum2 + sum3
     }
 
     /// Solve optimal transport using log-stabilized Sinkhorn
@@ -132,6 +162,10 @@ impl SinkhornSolver {
         let mut iterations = 0;
         let mut marginal_error = f64::INFINITY;
 
+        // Pre-allocate buffers for log-sum-exp computation (reduces allocations per iteration)
+        let mut log_terms_row = vec![0.0; m];
+        let mut log_terms_col = vec![0.0; n];
+
         // Sinkhorn iterations in log domain
         for iter in 0..self.max_iterations {
             iterations = iter + 1;
@@ -140,10 +174,11 @@ impl SinkhornSolver {
             let mut max_u_change: f64 = 0.0;
             for i in 0..n {
                 let old_log_u = log_u[i];
-                let log_terms: Vec<f64> = (0..m)
-                    .map(|j| log_v[j] + log_k[i][j])
-                    .collect();
-                let lse = log_sum_exp(&log_terms);
+                // Compute into pre-allocated buffer
+                for j in 0..m {
+                    log_terms_row[j] = log_v[j] + log_k[i][j];
+                }
+                let lse = log_sum_exp(&log_terms_row);
                 log_u[i] = log_a[i] - lse;
                 max_u_change = max_u_change.max((log_u[i] - old_log_u).abs());
             }
@@ -152,10 +187,11 @@ impl SinkhornSolver {
             let mut max_v_change: f64 = 0.0;
             for j in 0..m {
                 let old_log_v = log_v[j];
-                let log_terms: Vec<f64> = (0..n)
-                    .map(|i| log_u[i] + log_k[i][j])
-                    .collect();
-                let lse = log_sum_exp(&log_terms);
+                // Compute into pre-allocated buffer
+                for i in 0..n {
+                    log_terms_col[i] = log_u[i] + log_k[i][j];
+                }
+                let lse = log_sum_exp(&log_terms_col);
                 log_v[j] = log_b[j] - lse;
                 max_v_change = max_v_change.max((log_v[j] - old_log_v).abs());
             }
