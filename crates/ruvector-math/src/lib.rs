@@ -1,11 +1,21 @@
 //! # RuVector Math
 //!
-//! Advanced mathematics for next-generation vector search, featuring:
+//! Advanced mathematics for next-generation vector search and AI governance, featuring:
+//!
+//! ## Core Modules
 //!
 //! - **Optimal Transport**: Wasserstein distances, Sinkhorn algorithm, Sliced Wasserstein
 //! - **Information Geometry**: Fisher Information, Natural Gradient, K-FAC
 //! - **Product Manifolds**: Mixed-curvature spaces (Euclidean × Hyperbolic × Spherical)
 //! - **Spherical Geometry**: Geodesics on the n-sphere for cyclical patterns
+//!
+//! ## Theoretical CS Modules (New)
+//!
+//! - **Tropical Algebra**: Max-plus semiring for piecewise linear analysis and routing
+//! - **Tensor Networks**: TT/Tucker/CP decomposition for memory compression
+//! - **Spectral Methods**: Chebyshev polynomials for graph diffusion without eigendecomposition
+//! - **Persistent Homology**: TDA for topological drift detection and coherence monitoring
+//! - **Polynomial Optimization**: SOS certificates for provable bounds on attention policies
 //!
 //! ## Design Principles
 //!
@@ -13,6 +23,36 @@
 //! 2. **SIMD-Ready**: Hot paths optimized for auto-vectorization
 //! 3. **Numerically Stable**: Log-domain arithmetic, clamping, and stable softmax
 //! 4. **Modular**: Each component usable independently
+//! 5. **Mincut as Spine**: All modules designed to integrate with mincut governance
+//!
+//! ## Architecture: Mincut as Unifying Signal
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────────┐
+//! │                    Mincut Governance                         │
+//! │  (Structural tension meter for attention graphs)            │
+//! └───────────────────────┬─────────────────────────────────────┘
+//!                         │
+//!     ┌───────────────────┼───────────────────┐
+//!     ▼                   ▼                   ▼
+//! ┌─────────┐       ┌───────────┐       ┌───────────┐
+//! │ Tensor  │       │ Spectral  │       │   TDA     │
+//! │ Networks│       │ Methods   │       │ Homology  │
+//! │ (TT)    │       │(Chebyshev)│       │           │
+//! └─────────┘       └───────────┘       └───────────┘
+//! Compress          Smooth within       Monitor drift
+//! representations   partitions          over time
+//!
+//!     ┌───────────────────┼───────────────────┐
+//!     ▼                   ▼                   ▼
+//! ┌─────────┐       ┌───────────┐       ┌───────────┐
+//! │Tropical │       │    SOS    │       │ Optimal   │
+//! │ Algebra │       │ Certs     │       │ Transport │
+//! └─────────┘       └───────────┘       └───────────┘
+//! Plan safe         Certify policy      Measure
+//! routing paths     constraints         distributional
+//!                                       distances
+//! ```
 //!
 //! ## Quick Start
 //!
@@ -51,6 +91,7 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+// Core modules
 pub mod error;
 pub mod optimal_transport;
 pub mod information_geometry;
@@ -58,7 +99,14 @@ pub mod spherical;
 pub mod product_manifold;
 pub mod utils;
 
-// Re-exports for convenience
+// New theoretical CS modules
+pub mod tropical;
+pub mod tensor_networks;
+pub mod spectral;
+pub mod homology;
+pub mod optimization;
+
+// Re-exports for convenience - Core
 pub use error::{MathError, Result};
 pub use optimal_transport::{
     SlicedWasserstein, SinkhornSolver, GromovWasserstein,
@@ -70,6 +118,31 @@ pub use information_geometry::{
 pub use spherical::{SphericalSpace, SphericalConfig};
 pub use product_manifold::{ProductManifold, ProductManifoldConfig, CurvatureType};
 
+// Re-exports - Tropical Algebra
+pub use tropical::{Tropical, TropicalSemiring, TropicalPolynomial, TropicalMatrix};
+pub use tropical::{LinearRegionCounter, TropicalNeuralAnalysis};
+
+// Re-exports - Tensor Networks
+pub use tensor_networks::{DenseTensor, TensorTrain, TensorTrainConfig};
+pub use tensor_networks::{TuckerDecomposition, TuckerConfig, CPDecomposition, CPConfig};
+pub use tensor_networks::{TensorNetwork, TensorNode};
+
+// Re-exports - Spectral Methods
+pub use spectral::{ChebyshevPolynomial, ChebyshevExpansion};
+pub use spectral::{SpectralFilter, GraphFilter, FilterType};
+pub use spectral::{SpectralWaveletTransform, GraphWavelet, SpectralClustering};
+pub use spectral::ScaledLaplacian;
+
+// Re-exports - Homology
+pub use homology::{PersistenceDiagram, PersistentHomology, BirthDeathPair};
+pub use homology::{Simplex, SimplicialComplex, Filtration, VietorisRips};
+pub use homology::{BottleneckDistance, WassersteinDistance as HomologyWasserstein};
+
+// Re-exports - Optimization
+pub use optimization::{Polynomial, Monomial, Term};
+pub use optimization::{SOSDecomposition, SOSResult};
+pub use optimization::{NonnegativityCertificate, BoundsCertificate};
+
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::optimal_transport::*;
@@ -77,6 +150,11 @@ pub mod prelude {
     pub use crate::spherical::*;
     pub use crate::product_manifold::*;
     pub use crate::error::*;
+    pub use crate::tropical::*;
+    pub use crate::tensor_networks::*;
+    pub use crate::spectral::*;
+    pub use crate::homology::*;
+    pub use crate::optimization::*;
 }
 
 #[cfg(test)]
