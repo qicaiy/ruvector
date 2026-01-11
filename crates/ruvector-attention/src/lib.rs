@@ -52,6 +52,11 @@ pub mod training;
 pub mod traits;
 pub mod utils;
 
+// Advanced attention mechanisms
+pub mod curvature;
+pub mod topology;
+pub mod transport;
+
 // Re-export main types
 pub use attention::{MultiHeadAttention, ScaledDotProductAttention};
 pub use config::{AttentionConfig, GraphAttentionConfig, SparseAttentionConfig};
@@ -91,6 +96,25 @@ pub use training::{
 
 // SDK exports
 pub use sdk::{presets, AttentionBuilder, AttentionPipeline};
+
+// Transport (OT-based attention) exports
+pub use transport::{
+    CentroidCache, CentroidOTAttention, CentroidOTConfig, ProjectionCache,
+    SlicedWassersteinAttention, SlicedWassersteinConfig, WindowCache,
+};
+
+// Curvature (Mixed curvature attention) exports
+pub use curvature::{
+    ComponentQuantizer, FusedCurvatureConfig, MixedCurvatureCache,
+    MixedCurvatureFusedAttention, QuantizationConfig, QuantizedVector, TangentSpaceMapper,
+    TangentSpaceConfig,
+};
+
+// Topology (Gated attention) exports
+pub use topology::{
+    AttentionMode, AttentionPolicy, CoherenceMetric, PolicyConfig, TopologyGatedAttention,
+    TopologyGatedConfig, WindowCoherence,
+};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

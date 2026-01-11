@@ -6452,6 +6452,7 @@ dependencies = [
  "napi-derive",
  "rand 0.8.5",
  "rayon",
+ "ruvector-math",
  "serde",
  "thiserror 1.0.69",
 ]
