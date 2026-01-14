@@ -207,9 +207,6 @@ impl TemporalSolver {
 
         let start_time = std::time::Instant::now();
 
-        // Determine search range from constraints
-        let range = self.determine_search_range(puzzle)?;
-
         // Rewrite constraints to explicit dates if calendar tool enabled
         let effective_puzzle = if self.calendar_tool {
             self.tool_calls += 1;
@@ -217,6 +214,9 @@ impl TemporalSolver {
         } else {
             puzzle.clone()
         };
+
+        // Determine search range from effective (rewritten) constraints
+        let range = self.determine_search_range(&effective_puzzle)?;
 
         // Search for solutions
         let mut found_solutions = Vec::new();
