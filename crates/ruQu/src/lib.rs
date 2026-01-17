@@ -120,7 +120,10 @@ pub use fabric::{
 pub use mincut::{DynamicMinCutEngine, MinCutResult};
 pub use decoder::{Correction, DecoderConfig, MWPMDecoder, StreamingDecoder};
 pub use attention::{AttentionConfig, AttentionStats, CoherenceAttention, GatePacketBridge};
-pub use adaptive::{AdaptiveStats, AdaptiveThresholds, LearningConfig};
+pub use adaptive::{
+    AdaptiveStats, AdaptiveThresholds, DriftConfig, DriftDetector, DriftDirection, DriftProfile,
+    LearningConfig,
+};
 pub use metrics::{Counter, Gauge, Histogram, MetricsCollector, MetricsConfig, MetricsSnapshot};
 pub use parallel::{ParallelConfig, ParallelFabric, ParallelStats, parallel_aggregate};
 pub use stim::{ErrorPatternGenerator, StimSyndromeSource, SurfaceCodeConfig, SyndromeStats};
@@ -174,7 +177,9 @@ pub mod prelude {
     pub use crate::{
         DEFAULT_BUFFER_CAPACITY, MAX_DETECTORS, TILE_COUNT, TILE_MEMORY_BUDGET, WORKER_TILE_COUNT,
     };
-    pub use crate::adaptive::{AdaptiveThresholds, AdaptiveStats, LearningConfig};
+    pub use crate::adaptive::{
+        AdaptiveThresholds, AdaptiveStats, DriftConfig, DriftDetector, DriftProfile, LearningConfig,
+    };
     pub use crate::metrics::{MetricsCollector, MetricsConfig, MetricsSnapshot};
     pub use crate::parallel::{ParallelFabric, ParallelConfig, ParallelStats};
     pub use crate::stim::{StimSyndromeSource, SurfaceCodeConfig, SyndromeStats};
