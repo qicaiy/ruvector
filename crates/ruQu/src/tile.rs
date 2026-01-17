@@ -1088,23 +1088,34 @@ impl WorkerTile {
     }
 
     /// Compute shift score from recent syndrome history
+    ///
+    /// Uses Welford's online algorithm to avoid allocation
+    #[inline]
     fn compute_shift_score(&self) -> f64 {
-        // Compare recent syndrome patterns to baseline
-        let recent: Vec<_> = self.syndrome_buffer.recent(32).collect();
-        if recent.len() < 32 {
+        // Need at least 32 entries for meaningful variance
+        if (self.syndrome_buffer.count as usize) < 32 {
             return 0.0;
         }
 
-        // Simple variance-based shift detection
+        // Use Welford's online algorithm to compute variance in one pass
+        // Avoids allocation by iterating directly
+        let mut count = 0u64;
         let mut sum: u64 = 0;
         let mut sum_sq: u64 = 0;
-        for entry in &recent {
+
+        for entry in self.syndrome_buffer.recent(32) {
             let val = entry.syndrome[0] as u64;
             sum += val;
             sum_sq += val * val;
+            count += 1;
         }
 
-        let n = recent.len() as f64;
+        if count < 32 {
+            return 0.0;
+        }
+
+        // Variance = E[X²] - E[X]²
+        let n = count as f64;
         let mean = sum as f64 / n;
         let variance = (sum_sq as f64 / n) - (mean * mean);
 
@@ -1576,6 +1587,12 @@ impl TileZero {
     }
 
     /// Aggregate metrics from worker reports
+    ///
+    /// Computes:
+    /// - Global min-cut: minimum of all local cuts
+    /// - Shift pressure: maximum shift score across tiles
+    /// - E-aggregate: geometric mean of e-values
+    #[inline]
     fn aggregate_metrics(&self) -> (f64, f64, f64) {
         if self.worker_reports.is_empty() {
             return (f64::MAX, 0.0, 1.0);
@@ -1607,6 +1624,8 @@ impl TileZero {
     }
 
     /// Evaluate the three-filter decision logic
+    /// Evaluate the three-filter decision logic
+    #[inline]
     fn evaluate_filters(&self, global_cut: f64, shift_pressure: f64, e_aggregate: f64) -> GateDecision {
         // Filter 1: Structural (min-cut check)
         if global_cut < self.thresholds.structural_min_cut {

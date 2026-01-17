@@ -7,6 +7,7 @@
 //! When the `structural` feature is enabled, this provides real subpolynomial
 //! min-cut computation. Otherwise, falls back to a degree-based heuristic.
 
+#[cfg(not(feature = "structural"))]
 use std::collections::HashMap;
 
 /// Vertex identifier for min-cut graphs
@@ -64,13 +65,15 @@ impl DynamicMinCutEngine {
     }
 
     /// Insert an edge
+    #[inline]
     pub fn insert_edge(&mut self, u: VertexId, v: VertexId, weight: Weight) {
-        self.inner.insert_edge(u as u64, v as u64, weight);
+        let _ = self.inner.insert_edge(u as u64, v as u64, weight);
         self.cached_cut = None;
         self.generation += 1;
     }
 
     /// Delete an edge
+    #[inline]
     pub fn delete_edge(&mut self, u: VertexId, v: VertexId) {
         let _ = self.inner.delete_edge(u as u64, v as u64);
         self.cached_cut = None;
@@ -78,15 +81,17 @@ impl DynamicMinCutEngine {
     }
 
     /// Update edge weight
+    #[inline]
     pub fn update_weight(&mut self, u: VertexId, v: VertexId, new_weight: Weight) {
         // Delete and re-insert with new weight
         let _ = self.inner.delete_edge(u as u64, v as u64);
-        self.inner.insert_edge(u as u64, v as u64, new_weight);
+        let _ = self.inner.insert_edge(u as u64, v as u64, new_weight);
         self.cached_cut = None;
         self.generation += 1;
     }
 
     /// Query the minimum cut value
+    #[inline]
     pub fn min_cut_value(&mut self) -> f64 {
         if let Some(cached) = self.cached_cut {
             return cached;
