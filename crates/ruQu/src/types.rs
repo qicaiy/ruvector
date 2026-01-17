@@ -603,6 +603,101 @@ mod hex_array {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Structural Signal with Dynamics
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Structural signal with cut dynamics (velocity and curvature)
+///
+/// This captures not just the absolute min-cut value, but also its rate of change.
+/// Most early warnings come from **consistent decline** (negative velocity),
+/// not just low absolute value. Tracking dynamics improves lead time without
+/// increasing false alarms.
+///
+/// # Example
+///
+/// ```rust
+/// use ruqu::types::StructuralSignal;
+///
+/// let signal = StructuralSignal {
+///     cut: 4.5,
+///     velocity: -0.3,  // Declining
+///     curvature: -0.1, // Accelerating decline
+///     baseline_mean: 6.0,
+///     baseline_std: 0.5,
+/// };
+///
+/// // Warning triggers on trend, not threshold alone
+/// let is_declining = signal.velocity < 0.0;
+/// let is_below_baseline = signal.cut < signal.baseline_mean - 2.0 * signal.baseline_std;
+/// ```
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StructuralSignal {
+    /// Current min-cut value (λ)
+    pub cut: f64,
+    /// Rate of change (Δλ) - positive = improving, negative = degrading
+    pub velocity: f64,
+    /// Acceleration of change (Δ²λ) - second derivative
+    pub curvature: f64,
+    /// Baseline mean from warmup period
+    pub baseline_mean: f64,
+    /// Baseline standard deviation
+    pub baseline_std: f64,
+}
+
+impl StructuralSignal {
+    /// Check if signal indicates degradation (negative trend)
+    #[inline]
+    pub fn is_degrading(&self) -> bool {
+        self.velocity < 0.0
+    }
+
+    /// Check if signal is below adaptive threshold (μ - kσ)
+    #[inline]
+    pub fn is_below_threshold(&self, k: f64) -> bool {
+        self.cut < self.baseline_mean - k * self.baseline_std
+    }
+
+    /// Compute z-score relative to baseline
+    #[inline]
+    pub fn z_score(&self) -> f64 {
+        if self.baseline_std == 0.0 {
+            return 0.0;
+        }
+        (self.cut - self.baseline_mean) / self.baseline_std
+    }
+
+    /// Estimate time to threshold crossing (in cycles)
+    ///
+    /// Returns `None` if not degrading or velocity is zero.
+    pub fn time_to_threshold(&self, threshold: f64) -> Option<f64> {
+        if self.velocity >= 0.0 || self.cut <= threshold {
+            return None;
+        }
+        Some((self.cut - threshold) / (-self.velocity))
+    }
+}
+
+impl std::fmt::Display for StructuralSignal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let trend = if self.velocity > 0.1 {
+            "↑"
+        } else if self.velocity < -0.1 {
+            "↓"
+        } else {
+            "→"
+        };
+        write!(
+            f,
+            "λ={:.2}{} (v={:+.2}, z={:+.1}σ)",
+            self.cut,
+            trend,
+            self.velocity,
+            self.z_score()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

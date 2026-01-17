@@ -109,3 +109,7 @@ bench = false
 [[bin]]
 name = "ruqu_demo"
 path = "src/bin/ruqu_demo.rs"
+
+[[bin]]
+name = "ruqu_predictive_eval"
+path = "src/bin/ruqu_predictive_eval.rs"
