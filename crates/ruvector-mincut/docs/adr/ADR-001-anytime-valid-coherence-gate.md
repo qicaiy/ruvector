@@ -1535,6 +1535,8 @@ Action safety is more fundamental. Policy consistency can be added as a separate
 
 If human doesn't respond within timeout, default to DENY (fail-safe).
 
+See **Hybrid Agent/Human Workflow** section for full details.
+
 ### Q5: Adversarial robustness — adaptive adversaries?
 
 **Decision**: Defense in depth + rate limiting + anomaly detection.
@@ -1606,6 +1608,232 @@ If human doesn't respond within timeout, default to DENY (fail-safe).
 | Audit log | ~256 B | 1 year | ~22 MB/day @ 1000 decisions/s |
 
 **90-day storage**: ~7 GB receipts + ~1 GB checkpoints ≈ **8 GB**
+
+---
+
+## Hybrid Agent/Human Workflow
+
+The coherence gate is designed for **bounded autonomy**, not full autonomy. Humans stay in the loop at critical decision points.
+
+### Design Philosophy
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│   "Agents handle the routine. Humans handle the novel."                │
+│                                                                         │
+│   PERMIT  → Agent proceeds autonomously (low risk, high confidence)    │
+│   DEFER   → Human decides (uncertain, boundary case, policy gap)       │
+│   DENY    → Blocked automatically (structural violation, unsafe)       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+The gate doesn't replace human judgment—it **routes decisions to humans when judgment is needed**.
+
+### Escalation Tiers
+
+| Tier | Trigger | Responder | SLA | Example |
+|------|---------|-----------|-----|---------|
+| **T0** | PERMIT | None (automated) | 0 | Routine config within stable partition |
+| **T1** | DEFER (shift) | On-call operator | 5 min | New dependency pattern detected |
+| **T2** | DEFER (boundary) | Senior engineer | 15 min | Action crosses partition boundary |
+| **T3** | DEFER (policy gap) | Policy team | 1 hour | No precedent for this action type |
+| **T4** | DENY override request | Security + Management | 4 hours | Agent requesting exception to denial |
+
+### Human Decision Interface
+
+When a DEFER is escalated, humans see:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  DECISION REQUIRED                                    Timeout: 4:32    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Agent: ops-agent-12                                                   │
+│  Action: Push config to router-west-03 /network/interfaces/eth0        │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  WHY DEFERRED                                                    │   │
+│  │                                                                  │   │
+│  │  • Shift detected: New dependency pattern (0.73 > 0.5 threshold)│   │
+│  │  • This device was added to the graph 2 hours ago               │   │
+│  │  • Similar actions on established devices: 847 permits, 0 denies│   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  CONTEXT                                                         │   │
+│  │                                                                  │   │
+│  │  Structural coherence: 11.2 (healthy)                           │   │
+│  │  Prediction set size: 18 outcomes (moderate uncertainty)        │   │
+│  │  Evidence accumulator: 3.2 (inconclusive)                       │   │
+│  │                                                                  │   │
+│  │  [View full witness receipt] [View similar past decisions]      │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────────────────┐   │
+│  │   APPROVE     │  │    DENY       │  │  ESCALATE TO T3           │   │
+│  │   (proceed)   │  │   (block)     │  │  (need policy guidance)   │   │
+│  └───────────────┘  └───────────────┘  └───────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Human Decision Recording
+
+Human decisions become part of the audit trail:
+
+```rust
+pub struct HumanDecision {
+    /// Original deferred receipt
+    pub deferred_receipt_seq: u64,
+
+    /// Human's decision
+    pub decision: HumanVerdict,
+
+    /// Human identity (authenticated)
+    pub decider_id: AuthenticatedUserId,
+
+    /// Reasoning (required for audit)
+    pub rationale: String,
+
+    /// Timestamp
+    pub decided_at: u64,
+
+    /// Signature (human signs their decision)
+    pub signature: Ed25519Signature,
+}
+
+pub enum HumanVerdict {
+    /// Approve the action
+    Approve {
+        /// Add to training data for future automation
+        learn_from_this: bool,
+    },
+    /// Deny the action
+    Deny {
+        /// Reason for denial
+        reason: String,
+    },
+    /// Escalate to higher tier
+    Escalate {
+        to_tier: EscalationTier,
+        reason: String,
+    },
+    /// Request more information
+    NeedMoreInfo {
+        questions: Vec<String>,
+    },
+}
+```
+
+### Override Protocol
+
+Humans can override DENY decisions, but with friction and accountability:
+
+```rust
+pub struct DenyOverride {
+    /// Which denial is being overridden
+    pub denied_receipt_seq: u64,
+
+    /// Who is overriding (must be T4 authority)
+    pub overrider_id: AuthenticatedUserId,
+
+    /// Second approver required
+    pub second_approver_id: AuthenticatedUserId,
+
+    /// Business justification (required, min 50 chars)
+    pub justification: String,
+
+    /// Time-bounded: override expires
+    pub valid_until: u64,
+
+    /// Scope-limited: only this specific action
+    pub action_id: ActionId,
+
+    /// Both signatures required
+    pub overrider_signature: Ed25519Signature,
+    pub approver_signature: Ed25519Signature,
+}
+```
+
+**Override constraints**:
+- Two humans required (four-eyes principle)
+- Must provide written justification
+- Time-limited (max 24 hours)
+- Scope-limited (only the specific action)
+- All overrides flagged for security review
+
+### Learning from Human Decisions
+
+Human decisions improve the gate over time:
+
+```rust
+/// When human approves a DEFER, optionally learn from it
+pub fn learn_from_approval(
+    deferred: &WitnessReceipt,
+    human: &HumanDecision,
+) {
+    if human.decision.learn_from_this() {
+        // Add to calibration data
+        conformal_calibrator.add_observation(
+            deferred.context.clone(),
+            Outcome::Safe,  // Human judged it safe
+        );
+
+        // Update e-process null hypothesis
+        eprocess_trainer.add_positive_example(
+            deferred.action.clone(),
+        );
+
+        // Adjust threshold candidates (for meta-learning in v1)
+        threshold_learner.record_human_permit(
+            deferred.signals.clone(),
+        );
+    }
+}
+```
+
+### Workload Distribution Target
+
+The goal is **minimal human burden** while maintaining safety:
+
+| Decision | Target Rate | Human Workload |
+|----------|-------------|----------------|
+| PERMIT | 90-95% | Zero |
+| DEFER | 4-9% | Human decides |
+| DENY | 1-2% | Zero (unless override requested) |
+
+If DEFER rate exceeds 10%, the gate is too conservative—tune thresholds.
+If DENY rate exceeds 5%, something is wrong—investigate root cause.
+
+### Integration Channels
+
+| Channel | Use Case | Response Format |
+|---------|----------|-----------------|
+| **Slack** | On-call escalation | Interactive buttons |
+| **PagerDuty** | Critical/timed decisions | Acknowledge + decision API |
+| **Dashboard** | Batch review | Web UI with full context |
+| **CLI** | Developer/ops workflow | `ruvector gate approve <seq>` |
+| **API** | Programmatic integration | REST/gRPC |
+
+### Audit Trail for Human Decisions
+
+Every human decision is:
+1. **Authenticated**: Decider identity verified via SSO/MFA
+2. **Signed**: Human signs their decision with personal key
+3. **Chained**: Added to the same receipt chain as gate decisions
+4. **Timestamped**: Immutable record of when decision was made
+5. **Justified**: Rationale captured for later review
+
+```
+Receipt Chain:
+  [1847392] PERMIT (automated) → agent executed
+  [1847393] DEFER (automated) → escalated to human
+  [1847393-H] APPROVE (human: alice@corp) → agent executed
+  [1847394] DENY (automated) → blocked
+  [1847394-O] OVERRIDE (humans: bob@corp + carol@corp) → exception granted
+```
 
 ---
 
