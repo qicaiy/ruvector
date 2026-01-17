@@ -16,9 +16,12 @@ categories = ["science", "algorithms", "hardware-support"]
 ruvector-mincut = { path = "../ruvector-mincut", optional = true, features = ["exact"] }
 cognitum-gate-tilezero = { path = "../cognitum-gate-tilezero", optional = true }
 
+# Quantum error decoding
+fusion-blossom = { version = "0.2", optional = true }
+
 # Cryptography
 blake3 = "1.5"
-ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+ed25519-dalek = { version = "2.1", features = ["rand_core", "hazmat"] }
 subtle = "2.5"  # Constant-time operations
 rand = { workspace = true }  # For key generation
 
@@ -79,7 +82,8 @@ simd = []  # SIMD acceleration for bitmap operations
 wasm = []  # WASM-compatible mode (no SIMD)
 structural = ["ruvector-mincut"]  # Min-cut based structural filter
 tilezero = ["cognitum-gate-tilezero"]  # TileZero arbiter integration
-full = ["structural", "tilezero", "simd"]  # All features enabled
+decoder = ["fusion-blossom"]  # MWPM decoder via fusion-blossom
+full = ["structural", "tilezero", "simd", "decoder"]  # All features enabled
 
 [lib]
 crate-type = ["rlib"]

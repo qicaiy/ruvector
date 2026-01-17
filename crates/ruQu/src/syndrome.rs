@@ -248,8 +248,9 @@ impl DetectorBitmap {
     ///
     /// # Performance
     ///
-    /// Uses hardware `popcnt` instruction on x86_64, falling back to
-    /// portable implementation on other architectures.
+    /// - Uses hardware `popcnt` instruction on x86_64
+    /// - With `simd` feature, uses AVX2 parallel popcount for additional speedup
+    /// - Falls back to portable implementation on other architectures
     #[inline]
     #[must_use]
     pub fn popcount(&self) -> usize {
@@ -257,11 +258,81 @@ impl DetectorBitmap {
         let full_words = self.count / 64;
         let remaining_bits = self.count % 64;
 
+        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        {
+            // AVX2 SIMD popcount using lookup table method
+            if is_x86_feature_detected!("avx2") && full_words >= 4 {
+                unsafe {
+                    return self.popcount_avx2(full_words, remaining_bits);
+                }
+            }
+        }
+
+        // Scalar path with hardware popcnt
         let mut total = 0usize;
 
         // Count full words
         for word in &self.bits[..full_words] {
             total += word.count_ones() as usize;
+        }
+
+        // Count partial word if any
+        if remaining_bits > 0 && full_words < BITMAP_WORDS {
+            let mask = (1u64 << remaining_bits) - 1;
+            total += (self.bits[full_words] & mask).count_ones() as usize;
+        }
+
+        total
+    }
+
+    /// AVX2 SIMD popcount implementation
+    ///
+    /// Uses the lookup table method: count bits in each nibble using vpshufb
+    #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    unsafe fn popcount_avx2(&self, full_words: usize, remaining_bits: usize) -> usize {
+        use std::arch::x86_64::*;
+
+        // Lookup table for 4-bit popcount
+        let lookup = _mm256_setr_epi8(
+            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+            0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+        );
+        let low_mask = _mm256_set1_epi8(0x0f);
+
+        let mut total_vec = _mm256_setzero_si256();
+        let mut i = 0;
+
+        // Process 4 u64s (256 bits) at a time
+        while i + 4 <= full_words {
+            let data = _mm256_loadu_si256(self.bits.as_ptr().add(i) as *const __m256i);
+
+            // Split into low and high nibbles
+            let lo = _mm256_and_si256(data, low_mask);
+            let hi = _mm256_and_si256(_mm256_srli_epi16(data, 4), low_mask);
+
+            // Lookup popcount for each nibble
+            let popcnt_lo = _mm256_shuffle_epi8(lookup, lo);
+            let popcnt_hi = _mm256_shuffle_epi8(lookup, hi);
+
+            // Sum nibble popcounts (sad accumulates byte sums into u64)
+            let popcnt = _mm256_add_epi8(popcnt_lo, popcnt_hi);
+            total_vec = _mm256_add_epi64(total_vec, _mm256_sad_epu8(popcnt, _mm256_setzero_si256()));
+
+            i += 4;
+        }
+
+        // Horizontal sum of the 4 u64 accumulators
+        let mut total = 0usize;
+        let mut buf = [0u64; 4];
+        _mm256_storeu_si256(buf.as_mut_ptr() as *mut __m256i, total_vec);
+        total += buf[0] as usize + buf[1] as usize + buf[2] as usize + buf[3] as usize;
+
+        // Handle remaining full words with scalar popcnt
+        while i < full_words {
+            total += self.bits[i].count_ones() as usize;
+            i += 1;
         }
 
         // Count partial word if any
@@ -303,6 +374,11 @@ impl DetectorBitmap {
     /// The result shows which detectors changed state between the two bitmaps.
     /// The count is set to the maximum of the two input counts.
     ///
+    /// # Performance
+    ///
+    /// When the `simd` feature is enabled on x86_64, uses AVX2 instructions
+    /// for 4x speedup on the XOR operation.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -326,7 +402,40 @@ impl DetectorBitmap {
     pub fn xor(&self, other: &DetectorBitmap) -> DetectorBitmap {
         let mut result = DetectorBitmap::new(self.count.max(other.count));
 
-        // SIMD-friendly unrolled XOR
+        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        {
+            // AVX2 SIMD: process 256 bits (4 u64s) at a time
+            if is_x86_feature_detected!("avx2") {
+                unsafe {
+                    use std::arch::x86_64::*;
+                    // Process first 8 words (512 bits) with two AVX2 operations
+                    let a0 = _mm256_loadu_si256(self.bits.as_ptr() as *const __m256i);
+                    let b0 = _mm256_loadu_si256(other.bits.as_ptr() as *const __m256i);
+                    let r0 = _mm256_xor_si256(a0, b0);
+                    _mm256_storeu_si256(result.bits.as_mut_ptr() as *mut __m256i, r0);
+
+                    let a1 = _mm256_loadu_si256(self.bits.as_ptr().add(4) as *const __m256i);
+                    let b1 = _mm256_loadu_si256(other.bits.as_ptr().add(4) as *const __m256i);
+                    let r1 = _mm256_xor_si256(a1, b1);
+                    _mm256_storeu_si256(result.bits.as_mut_ptr().add(4) as *mut __m256i, r1);
+
+                    // Process remaining 8 words
+                    let a2 = _mm256_loadu_si256(self.bits.as_ptr().add(8) as *const __m256i);
+                    let b2 = _mm256_loadu_si256(other.bits.as_ptr().add(8) as *const __m256i);
+                    let r2 = _mm256_xor_si256(a2, b2);
+                    _mm256_storeu_si256(result.bits.as_mut_ptr().add(8) as *mut __m256i, r2);
+
+                    let a3 = _mm256_loadu_si256(self.bits.as_ptr().add(12) as *const __m256i);
+                    let b3 = _mm256_loadu_si256(other.bits.as_ptr().add(12) as *const __m256i);
+                    let r3 = _mm256_xor_si256(a3, b3);
+                    _mm256_storeu_si256(result.bits.as_mut_ptr().add(12) as *mut __m256i, r3);
+
+                    return result;
+                }
+            }
+        }
+
+        // Scalar fallback: SIMD-friendly unrolled XOR
         for i in 0..BITMAP_WORDS {
             result.bits[i] = self.bits[i] ^ other.bits[i];
         }
@@ -337,10 +446,30 @@ impl DetectorBitmap {
     /// Computes the AND of two bitmaps.
     ///
     /// Returns detectors that are fired in both bitmaps.
+    ///
+    /// # Performance
+    ///
+    /// With `simd` feature on x86_64, uses AVX2 for vectorized AND.
     #[inline]
     #[must_use]
     pub fn and(&self, other: &DetectorBitmap) -> DetectorBitmap {
         let mut result = DetectorBitmap::new(self.count.min(other.count));
+
+        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                unsafe {
+                    use std::arch::x86_64::*;
+                    for i in (0..BITMAP_WORDS).step_by(4) {
+                        let a = _mm256_loadu_si256(self.bits.as_ptr().add(i) as *const __m256i);
+                        let b = _mm256_loadu_si256(other.bits.as_ptr().add(i) as *const __m256i);
+                        let r = _mm256_and_si256(a, b);
+                        _mm256_storeu_si256(result.bits.as_mut_ptr().add(i) as *mut __m256i, r);
+                    }
+                    return result;
+                }
+            }
+        }
 
         for i in 0..BITMAP_WORDS {
             result.bits[i] = self.bits[i] & other.bits[i];
@@ -352,13 +481,85 @@ impl DetectorBitmap {
     /// Computes the OR of two bitmaps.
     ///
     /// Returns detectors that are fired in either bitmap.
+    ///
+    /// # Performance
+    ///
+    /// With `simd` feature on x86_64, uses AVX2 for vectorized OR.
     #[inline]
     #[must_use]
     pub fn or(&self, other: &DetectorBitmap) -> DetectorBitmap {
         let mut result = DetectorBitmap::new(self.count.max(other.count));
 
+        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                unsafe {
+                    use std::arch::x86_64::*;
+                    for i in (0..BITMAP_WORDS).step_by(4) {
+                        let a = _mm256_loadu_si256(self.bits.as_ptr().add(i) as *const __m256i);
+                        let b = _mm256_loadu_si256(other.bits.as_ptr().add(i) as *const __m256i);
+                        let r = _mm256_or_si256(a, b);
+                        _mm256_storeu_si256(result.bits.as_mut_ptr().add(i) as *mut __m256i, r);
+                    }
+                    return result;
+                }
+            }
+        }
+
         for i in 0..BITMAP_WORDS {
             result.bits[i] = self.bits[i] | other.bits[i];
+        }
+
+        result
+    }
+
+    /// Computes the NOT of this bitmap (inverts all bits).
+    ///
+    /// # Performance
+    ///
+    /// With `simd` feature on x86_64, uses AVX2 for vectorized NOT.
+    #[inline]
+    #[must_use]
+    pub fn not(&self) -> DetectorBitmap {
+        let mut result = DetectorBitmap::new(self.count);
+
+        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                unsafe {
+                    use std::arch::x86_64::*;
+                    let ones = _mm256_set1_epi64x(-1i64);
+                    for i in (0..BITMAP_WORDS).step_by(4) {
+                        let a = _mm256_loadu_si256(self.bits.as_ptr().add(i) as *const __m256i);
+                        let r = _mm256_xor_si256(a, ones);
+                        _mm256_storeu_si256(result.bits.as_mut_ptr().add(i) as *mut __m256i, r);
+                    }
+                    // Mask off bits beyond count
+                    let full_words = self.count / 64;
+                    let remaining_bits = self.count % 64;
+                    if remaining_bits > 0 && full_words < BITMAP_WORDS {
+                        let mask = (1u64 << remaining_bits) - 1;
+                        result.bits[full_words] &= mask;
+                    }
+                    // Zero out words beyond count
+                    for i in (full_words + 1)..BITMAP_WORDS {
+                        result.bits[i] = 0;
+                    }
+                    return result;
+                }
+            }
+        }
+
+        let full_words = self.count / 64;
+        let remaining_bits = self.count % 64;
+
+        for i in 0..full_words {
+            result.bits[i] = !self.bits[i];
+        }
+
+        if remaining_bits > 0 && full_words < BITMAP_WORDS {
+            let mask = (1u64 << remaining_bits) - 1;
+            result.bits[full_words] = (!self.bits[full_words]) & mask;
         }
 
         result

@@ -37,7 +37,7 @@
 use std::mem::size_of;
 
 // Cryptographic imports
-use ed25519_dalek::{Signature, VerifyingKey};
+use ed25519_dalek::{Signature, SigningKey, VerifyingKey, Signer};
 use subtle::ConstantTimeEq;
 
 // ============================================================================
@@ -1422,17 +1422,67 @@ pub struct TileZero {
     pub receipt_log: ReceiptLog,
     /// Sequence counter
     sequence: u64,
+    /// Ed25519 signing key for permit tokens
+    /// SECURITY: In production, this key should be stored in a secure enclave/HSM
+    signing_key: Option<SigningKey>,
 }
 
 impl TileZero {
-    /// Create a new TileZero coordinator
+    /// Create a new TileZero coordinator without signing capability
+    ///
+    /// Tokens issued by this coordinator will have placeholder signatures
+    /// and MUST NOT be trusted in production.
     pub fn new(thresholds: GateThresholds) -> Self {
         Self {
             thresholds,
             worker_reports: Vec::with_capacity(NUM_WORKERS),
             receipt_log: ReceiptLog::new(),
             sequence: 0,
+            signing_key: None,
         }
+    }
+
+    /// Create a new TileZero coordinator with Ed25519 signing capability
+    ///
+    /// # Security
+    /// The signing key enables cryptographic token signing. In production:
+    /// - Store the key in a secure enclave or HSM
+    /// - Never log or expose the key bytes
+    /// - Rotate keys periodically
+    ///
+    /// # Arguments
+    /// * `thresholds` - Gate thresholds for decision logic
+    /// * `signing_key` - Ed25519 signing key for token authentication
+    pub fn with_signing_key(thresholds: GateThresholds, signing_key: SigningKey) -> Self {
+        Self {
+            thresholds,
+            worker_reports: Vec::with_capacity(NUM_WORKERS),
+            receipt_log: ReceiptLog::new(),
+            sequence: 0,
+            signing_key: Some(signing_key),
+        }
+    }
+
+    /// Create a new TileZero coordinator with a randomly generated signing key
+    ///
+    /// This is convenient for testing but in production, keys should be
+    /// deterministically derived from secure key material.
+    pub fn with_random_key(thresholds: GateThresholds) -> Self {
+        use rand::rngs::OsRng;
+        let signing_key = SigningKey::generate(&mut OsRng);
+        Self::with_signing_key(thresholds, signing_key)
+    }
+
+    /// Get the verifying (public) key if signing is enabled
+    ///
+    /// Use this to verify tokens issued by this TileZero.
+    pub fn verifying_key(&self) -> Option<VerifyingKey> {
+        self.signing_key.as_ref().map(|sk| sk.verifying_key())
+    }
+
+    /// Check if cryptographic signing is enabled
+    pub fn has_signing_key(&self) -> bool {
+        self.signing_key.is_some()
     }
 
     /// Merge reports from worker tiles and produce a gate decision
@@ -1460,11 +1510,21 @@ impl TileZero {
 
     /// Issue a permit token for the current decision
     ///
-    /// SECURITY: This method creates a token with a placeholder signature.
-    /// Production deployments MUST:
-    /// 1. Maintain a secure Ed25519 signing key
-    /// 2. Use proper key management (HSM, secure enclave, etc.)
-    /// 3. Replace the placeholder signature with actual Ed25519 signing
+    /// # Security
+    ///
+    /// If a signing key is configured (via `with_signing_key` or `with_random_key`),
+    /// tokens are cryptographically signed with Ed25519 and can be verified.
+    ///
+    /// If no signing key is configured, tokens have placeholder signatures marked
+    /// with byte 63 = 0xFF. These tokens MUST NOT be trusted in production.
+    ///
+    /// # Returns
+    ///
+    /// A `PermitToken` containing:
+    /// - The gate decision
+    /// - Sequence number and timestamp
+    /// - Witness hash of the current state
+    /// - Ed25519 signature (real if key available, placeholder otherwise)
     pub fn issue_permit(&self, decision: &GateDecision) -> PermitToken {
         let timestamp = self.receipt_log.last_hash()[0..8]
             .try_into()
@@ -1473,30 +1533,46 @@ impl TileZero {
 
         let witness_hash = self.compute_witness_hash();
 
-        // SECURITY: Generate signature
-        // In production, use Ed25519 signing with a secure key:
-        // let keypair = self.signing_key;
-        // let msg = token.signature_message();
-        // let signature = keypair.sign(&msg).to_bytes();
-
-        // Placeholder signature - includes some entropy to distinguish from zero
-        // SECURITY WARNING: This is NOT cryptographically secure!
-        let mut signature = [0u8; 64];
-        // Include sequence and timestamp in signature bytes for minimal uniqueness
-        signature[0..8].copy_from_slice(&self.sequence.saturating_sub(1).to_le_bytes());
-        signature[8..16].copy_from_slice(&timestamp.to_le_bytes());
-        signature[16..48].copy_from_slice(&witness_hash);
-        // Mark as placeholder (byte 63 = 0xFF indicates unverified)
-        signature[63] = 0xFF;
-
-        PermitToken {
+        // Build token structure first (signature will be computed over this)
+        let mut token = PermitToken {
             decision: *decision,
             sequence: self.sequence.saturating_sub(1),
             timestamp,
             ttl_ns: self.thresholds.permit_ttl_ns,
             witness_hash,
-            signature,
+            signature: [0u8; 64],
+        };
+
+        // Sign the token
+        if let Some(ref signing_key) = self.signing_key {
+            // Real Ed25519 signature
+            let message = token.signature_message();
+            let hash = blake3::hash(&message);
+            let signature = signing_key.sign(hash.as_bytes());
+            token.signature = signature.to_bytes();
+        } else {
+            // Placeholder signature - includes entropy but is NOT cryptographically secure
+            // SECURITY WARNING: Tokens without real signatures MUST NOT be trusted!
+            token.signature[0..8].copy_from_slice(&token.sequence.to_le_bytes());
+            token.signature[8..16].copy_from_slice(&timestamp.to_le_bytes());
+            token.signature[16..48].copy_from_slice(&witness_hash);
+            // Mark as placeholder (byte 63 = 0xFF indicates unsigned)
+            token.signature[63] = 0xFF;
         }
+
+        token
+    }
+
+    /// Check if a token was signed by this TileZero
+    ///
+    /// # Returns
+    ///
+    /// - `Some(true)` if the signature is valid
+    /// - `Some(false)` if the signature is invalid
+    /// - `None` if no signing key is configured (cannot verify)
+    pub fn verify_token(&self, token: &PermitToken) -> Option<bool> {
+        let verifying_key = self.verifying_key()?;
+        Some(token.verify_signature(&verifying_key.to_bytes()))
     }
 
     /// Aggregate metrics from worker reports
@@ -1827,5 +1903,150 @@ mod tests {
 
         // Chain should verify correctly
         assert!(log.verify_chain());
+    }
+
+    #[test]
+    fn test_tilezero_with_signing_key() {
+        use rand::rngs::OsRng;
+        use ed25519_dalek::SigningKey;
+
+        // Create TileZero with a random signing key
+        let thresholds = GateThresholds::default();
+        let tilezero = TileZero::with_random_key(thresholds);
+
+        // Should have signing capability
+        assert!(tilezero.has_signing_key());
+        assert!(tilezero.verifying_key().is_some());
+    }
+
+    #[test]
+    fn test_permit_token_real_signature() {
+        // Create TileZero with signing key
+        let thresholds = GateThresholds::default();
+        let mut tilezero = TileZero::with_random_key(thresholds);
+
+        // Create some reports and make a decision
+        let reports: Vec<TileReport> = (1..=5)
+            .map(|i| {
+                let mut report = TileReport::new(i);
+                report.local_cut = 10.0;
+                report.shift_score = 0.1;
+                report.e_value = 200.0;
+                report
+            })
+            .collect();
+
+        let decision = tilezero.merge_reports(reports);
+        assert_eq!(decision, GateDecision::Permit);
+
+        // Issue a permit token
+        let token = tilezero.issue_permit(&decision);
+
+        // Token should have a real signature (byte 63 != 0xFF)
+        assert_ne!(token.signature[63], 0xFF, "Token has placeholder signature");
+
+        // Get the verifying key and verify the token
+        let verifying_key = tilezero.verifying_key().expect("Should have verifying key");
+        let is_valid = token.verify_signature(&verifying_key.to_bytes());
+        assert!(is_valid, "Token signature should be valid");
+
+        // Also test via the verify_token method
+        let result = tilezero.verify_token(&token);
+        assert_eq!(result, Some(true), "verify_token should return Some(true)");
+    }
+
+    #[test]
+    fn test_permit_token_placeholder_signature() {
+        // Create TileZero WITHOUT signing key
+        let thresholds = GateThresholds::default();
+        let mut tilezero = TileZero::new(thresholds);
+
+        // Should not have signing capability
+        assert!(!tilezero.has_signing_key());
+        assert!(tilezero.verifying_key().is_none());
+
+        // Create reports and decision
+        let reports: Vec<TileReport> = (1..=5)
+            .map(|i| {
+                let mut report = TileReport::new(i);
+                report.local_cut = 10.0;
+                report.shift_score = 0.1;
+                report.e_value = 200.0;
+                report
+            })
+            .collect();
+
+        let decision = tilezero.merge_reports(reports);
+        let token = tilezero.issue_permit(&decision);
+
+        // Token should have placeholder marker
+        assert_eq!(token.signature[63], 0xFF, "Token should have placeholder signature marker");
+
+        // verify_token should return None when no key is configured
+        assert_eq!(tilezero.verify_token(&token), None);
+    }
+
+    #[test]
+    fn test_token_signature_tampering_detected() {
+        // Create TileZero with signing key
+        let thresholds = GateThresholds::default();
+        let mut tilezero = TileZero::with_random_key(thresholds);
+
+        let reports: Vec<TileReport> = (1..=5)
+            .map(|i| {
+                let mut report = TileReport::new(i);
+                report.local_cut = 10.0;
+                report.shift_score = 0.1;
+                report.e_value = 200.0;
+                report
+            })
+            .collect();
+
+        let decision = tilezero.merge_reports(reports);
+        let mut token = tilezero.issue_permit(&decision);
+
+        // Tamper with the token
+        token.sequence += 1;
+
+        // Signature should no longer verify
+        let verifying_key = tilezero.verifying_key().unwrap();
+        let is_valid = token.verify_signature(&verifying_key.to_bytes());
+        assert!(!is_valid, "Tampered token signature should be invalid");
+    }
+
+    #[test]
+    fn test_different_keys_different_signatures() {
+        let thresholds = GateThresholds::default();
+        let mut tilezero1 = TileZero::with_random_key(thresholds.clone());
+        let mut tilezero2 = TileZero::with_random_key(thresholds);
+
+        let reports: Vec<TileReport> = (1..=3)
+            .map(|i| {
+                let mut report = TileReport::new(i);
+                report.local_cut = 10.0;
+                report.shift_score = 0.1;
+                report.e_value = 200.0;
+                report
+            })
+            .collect();
+
+        // Make decisions and get tokens
+        let decision1 = tilezero1.merge_reports(reports.clone());
+        let decision2 = tilezero2.merge_reports(reports);
+
+        let token1 = tilezero1.issue_permit(&decision1);
+        let token2 = tilezero2.issue_permit(&decision2);
+
+        // Signatures should be different (different keys)
+        assert_ne!(token1.signature, token2.signature);
+
+        // Each token should only verify with its own key
+        let key1 = tilezero1.verifying_key().unwrap();
+        let key2 = tilezero2.verifying_key().unwrap();
+
+        assert!(token1.verify_signature(&key1.to_bytes()));
+        assert!(!token1.verify_signature(&key2.to_bytes())); // Wrong key
+        assert!(!token2.verify_signature(&key1.to_bytes())); // Wrong key
+        assert!(token2.verify_signature(&key2.to_bytes()));
     }
 }

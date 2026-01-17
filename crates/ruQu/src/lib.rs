@@ -78,6 +78,7 @@
 #![allow(clippy::cast_sign_loss)]
 
 // Core modules
+pub mod decoder;
 pub mod error;
 pub mod fabric;
 pub mod filters;
@@ -110,6 +111,7 @@ pub use fabric::{
     linear_patch_map, surface_code, surface_code_d7,
 };
 pub use mincut::{DynamicMinCutEngine, MinCutResult};
+pub use decoder::{Correction, DecoderConfig, MWPMDecoder, StreamingDecoder};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
