@@ -36,6 +36,10 @@
 
 use std::mem::size_of;
 
+// Cryptographic imports
+use ed25519_dalek::{Signature, VerifyingKey};
+use subtle::ConstantTimeEq;
+
 // ============================================================================
 // TYPE ALIASES
 // ============================================================================
@@ -1234,41 +1238,39 @@ impl PermitToken {
         msg
     }
 
-    /// Verify the token signature
+    /// Verify the token signature using Ed25519
     ///
-    /// SECURITY: This is a placeholder. Production code MUST:
-    /// 1. Use ed25519-dalek or similar for actual Ed25519 verification
-    /// 2. Use constant-time comparison (subtle::ConstantTimeEq)
-    /// 3. Obtain the public key from a trusted source
+    /// # Security
+    /// This method uses constant-time comparison to prevent timing attacks.
     ///
     /// # Arguments
     /// * `public_key` - The 32-byte Ed25519 public key of TileZero
     ///
     /// # Returns
     /// `true` if signature is valid, `false` otherwise
-    #[allow(unused_variables)]
     pub fn verify_signature(&self, public_key: &[u8; 32]) -> bool {
-        // SECURITY TODO: Implement actual Ed25519 verification
-        // For now, reject all-zero signatures as definitely invalid
-        if self.signature == [0u8; 64] {
+        // Reject all-zero signatures immediately
+        let zero_sig = [0u8; 64];
+        if self.signature.ct_eq(&zero_sig).into() {
             return false;
         }
 
-        // Placeholder: In production, use ed25519-dalek:
-        // let pk = PublicKey::from_bytes(public_key)?;
-        // let sig = Signature::from_bytes(&self.signature)?;
-        // pk.verify(&self.signature_message(), &sig).is_ok()
+        // Parse the public key
+        let verifying_key = match VerifyingKey::from_bytes(public_key) {
+            Ok(key) => key,
+            Err(_) => return false,
+        };
 
-        // SECURITY WARNING: Returning true here is ONLY for development.
-        // This MUST be replaced with actual verification before production.
-        #[cfg(debug_assertions)]
-        {
-            true // Allow in debug builds for testing
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            false // Reject in release builds until implemented
-        }
+        // Parse the signature (from_slice returns Result, from_bytes takes array)
+        let sig_bytes: [u8; 64] = self.signature;
+        let signature = Signature::from_bytes(&sig_bytes);
+
+        // Compute message hash using Blake3 for domain separation
+        let message = self.signature_message();
+        let hash = blake3::hash(&message);
+
+        // Verify signature over the hash
+        verifying_key.verify_strict(hash.as_bytes(), &signature).is_ok()
     }
 }
 
@@ -1314,57 +1316,20 @@ impl ReceiptLog {
         }
     }
 
-    /// Append a receipt with cryptographic hash chaining
+    /// Append a receipt with cryptographic hash chaining using Blake3
     ///
-    /// SECURITY: Uses a structured hash computation that includes all fields.
-    /// Production deployments should use Blake3 via the `blake3` crate.
+    /// # Security
+    /// Uses Blake3 for cryptographic hash chaining, ensuring tamper-evidence.
+    /// The hash is computed as: H(prev_hash || sequence || decision || timestamp || witness_hash)
     pub fn append(&mut self, decision: GateDecision, sequence: u64, timestamp: u64, witness_hash: [u8; 32]) {
-        // SECURITY: Compute hash of all data including previous hash
-        // Structure: H(prev_hash || sequence || decision || timestamp || witness_hash)
-        //
-        // TODO: Replace with Blake3 in production:
-        // let mut hasher = blake3::Hasher::new();
-        // hasher.update(&self.last_hash);
-        // hasher.update(&sequence.to_le_bytes());
-        // hasher.update(&[decision as u8]);
-        // hasher.update(&timestamp.to_le_bytes());
-        // hasher.update(&witness_hash);
-        // let hash = hasher.finalize().into();
-
-        // Improved hash computation (still simplified, but more secure)
-        let mut hash = [0u8; 32];
-
-        // Mix in previous hash first (ensures chain integrity)
-        for (i, &prev) in self.last_hash.iter().enumerate() {
-            hash[i] = prev;
-        }
-
-        // XOR in sequence bytes with rotation
-        let seq_bytes = sequence.to_le_bytes();
-        for (i, &b) in seq_bytes.iter().enumerate() {
-            hash[i] ^= b;
-            hash[(i + 8) % 32] ^= b.rotate_left(4);
-        }
-
-        // XOR in decision
-        hash[16] ^= decision as u8;
-
-        // XOR in timestamp with offset
-        let ts_bytes = timestamp.to_le_bytes();
-        for (i, &b) in ts_bytes.iter().enumerate() {
-            hash[17 + i] ^= b;
-            hash[i] ^= b.rotate_right(2);
-        }
-
-        // XOR in full witness hash
-        for (i, &w) in witness_hash.iter().enumerate() {
-            hash[i] ^= w.rotate_left((i % 8) as u32);
-        }
-
-        // Final mixing pass
-        for i in 0..31 {
-            hash[i + 1] ^= hash[i].rotate_left(1);
-        }
+        // Compute Blake3 hash of all data including previous hash
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.last_hash);
+        hasher.update(&sequence.to_le_bytes());
+        hasher.update(&[decision as u8]);
+        hasher.update(&timestamp.to_le_bytes());
+        hasher.update(&witness_hash);
+        let hash: [u8; 32] = *hasher.finalize().as_bytes();
 
         let entry = ReceiptEntry {
             sequence,
@@ -1381,6 +1346,10 @@ impl ReceiptLog {
 
     /// Verify the integrity of the hash chain
     ///
+    /// # Security
+    /// Recomputes all hashes using Blake3 and verifies chain integrity.
+    /// Uses constant-time comparison to prevent timing attacks.
+    ///
     /// Returns `true` if all entries are correctly chained, `false` if tampering detected.
     pub fn verify_chain(&self) -> bool {
         if self.entries.is_empty() {
@@ -1391,14 +1360,30 @@ impl ReceiptLog {
         let mut expected_prev = [0u8; 32];
 
         for entry in &self.entries {
-            if entry.previous_hash != expected_prev {
+            // Verify previous hash link (constant-time)
+            if !bool::from(entry.previous_hash.ct_eq(&expected_prev)) {
                 return false;
             }
+
+            // Recompute hash to verify integrity
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(&entry.previous_hash);
+            hasher.update(&entry.sequence.to_le_bytes());
+            hasher.update(&[entry.decision as u8]);
+            hasher.update(&entry.timestamp.to_le_bytes());
+            hasher.update(&entry.witness_hash);
+            let computed_hash: [u8; 32] = *hasher.finalize().as_bytes();
+
+            // Verify hash matches (constant-time)
+            if !bool::from(entry.hash.ct_eq(&computed_hash)) {
+                return false;
+            }
+
             expected_prev = entry.hash;
         }
 
-        // Last hash should match our stored value
-        self.last_hash == expected_prev
+        // Last hash should match our stored value (constant-time)
+        bool::from(self.last_hash.ct_eq(&expected_prev))
     }
 
     /// Get last hash

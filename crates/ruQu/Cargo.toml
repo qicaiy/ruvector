@@ -16,6 +16,11 @@ categories = ["science", "algorithms", "hardware-support"]
 ruvector-mincut = { path = "../ruvector-mincut", optional = true }
 cognitum-gate-tilezero = { path = "../cognitum-gate-tilezero", optional = true }
 
+# Cryptography
+blake3 = "1.5"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+subtle = "2.5"  # Constant-time operations
+
 # Async runtime
 tokio = { workspace = true }
 

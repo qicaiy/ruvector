@@ -6329,12 +6329,15 @@ dependencies = [
 name = "ruqu"
 version = "0.1.31"
 dependencies = [
+ "blake3",
  "cognitum-gate-tilezero",
  "criterion",
+ "ed25519-dalek",
  "proptest",
  "ruvector-mincut",
  "serde",
  "serde_json",
+ "subtle",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
