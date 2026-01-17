@@ -22,6 +22,13 @@ fusion-blossom = { version = "0.2", optional = true }
 # Mincut-gated attention optimization
 ruvector-mincut-gated-transformer = { path = "../ruvector-mincut-gated-transformer", optional = true }
 
+# Parallel processing
+rayon = { version = "1.10", optional = true }
+
+# Tracing and metrics (optional)
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", optional = true }
+
 # Cryptography
 blake3 = "1.5"
 ed25519-dalek = { version = "2.1", features = ["rand_core", "hazmat"] }
@@ -40,9 +47,6 @@ serde_json = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }
-
-# Instrumentation
-tracing = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
@@ -87,7 +91,9 @@ structural = ["ruvector-mincut"]  # Min-cut based structural filter
 tilezero = ["cognitum-gate-tilezero"]  # TileZero arbiter integration
 decoder = ["fusion-blossom"]  # MWPM decoder via fusion-blossom
 attention = ["ruvector-mincut-gated-transformer"]  # Coherence-optimized attention (50% FLOPs reduction)
-full = ["structural", "tilezero", "simd", "decoder", "attention"]  # All features enabled
+parallel = ["rayon"]  # Multi-threaded tile processing (4-8× throughput)
+tracing = ["dep:tracing", "tracing-subscriber"]  # Observability and metrics
+full = ["structural", "tilezero", "simd", "decoder", "attention", "parallel", "tracing"]  # All features enabled
 
 [lib]
 crate-type = ["rlib"]
