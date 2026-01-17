@@ -2,8 +2,20 @@
 
 **Status**: Proposed
 **Date**: 2026-01-17
-**Authors**: Research Team
+**Authors**: ruv.io, RuVector Team
 **Deciders**: Architecture Review Board
+**SDK**: Claude-Flow
+
+## Version History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.1 | 2026-01-17 | ruv.io | Initial draft with three-filter architecture |
+| 0.2 | 2026-01-17 | ruv.io | Added security hardening, performance optimization |
+| 0.3 | 2026-01-17 | ruv.io | Added 256-tile WASM fabric mapping |
+| 0.4 | 2026-01-17 | ruv.io | Added API contract, migration, observability |
+| 0.5 | 2026-01-17 | ruv.io | Added hybrid agent/human workflow |
+| 0.6 | 2026-01-17 | ruv.io | Added testing strategy, config format, error recovery |
 
 ## Plain Language Summary
 
@@ -1899,6 +1911,286 @@ Where: k = prediction set size, T = history length, R = regional peers, N = clus
 ### AI Agent Control
 9. "Bounded Autonomy: A Pragmatic Response to Concerns About Fully Autonomous AI Agents." XMPRO, 2025.
 10. "Customizable Runtime Enforcement for Safe and Reliable LLM Agents." arXiv:2503.18666, 2025.
+
+## Testing Strategy
+
+### Unit Tests
+
+| Component | Coverage Target | Key Test Cases |
+|-----------|----------------|----------------|
+| `CompactGraph` | 95% | Add/remove edges, weight updates, min-cut estimation |
+| `EvidenceAccumulator` | 95% | Bounds checking, update rules, stopping decisions |
+| `TileReport` | 90% | Serialization roundtrip, checksum verification |
+| `PermitToken` | 95% | Signing, verification, TTL expiration |
+| `ReceiptLog` | 95% | Hash chain integrity, tamper detection |
+| `ThreeFilterDecision` | 100% | All Permit/Defer/Deny paths |
+
+### Integration Tests
+
+| Scenario | Description | Expected Outcome |
+|----------|-------------|------------------|
+| Happy path | Stable graph, safe action | PERMIT with valid receipt |
+| Boundary crossing | Action crosses fragile partition | DENY with boundary edges |
+| Shift detection | New dependency pattern | DEFER with escalation |
+| Human approval | DEFER → human approves | Token issued, learning recorded |
+| Replay verification | Replay historical decision | Deterministic match |
+| Hash chain audit | Verify 1000 receipts | All hashes valid |
+
+### Property-Based Tests
+
+```rust
+#[proptest]
+fn e_value_always_positive(e1: f64, e2: f64) {
+    let result = combine_evalues(e1.abs(), e2.abs());
+    prop_assert!(result > 0.0);
+}
+
+#[proptest]
+fn receipt_hash_deterministic(receipt: WitnessReceipt) {
+    let hash1 = receipt.compute_hash();
+    let hash2 = receipt.compute_hash();
+    prop_assert_eq!(hash1, hash2);
+}
+
+#[proptest]
+fn serialization_roundtrip(report: TileReport) {
+    let bytes = report.serialize();
+    let restored = TileReport::deserialize(&bytes);
+    prop_assert_eq!(report, restored);
+}
+```
+
+### Security Tests
+
+| Test | Attack Vector | Expected Behavior |
+|------|---------------|-------------------|
+| Forged signature | Invalid Ed25519 sig | Verification fails |
+| Replay attack | Duplicate action | ReplayGuard blocks |
+| E-value overflow | Extreme likelihood ratio | Clamped to bounds |
+| Race condition | Concurrent evaluations | Sequence numbers ordered |
+| Tampered receipt | Modified hash | Chain verification fails |
+
+### Benchmark Tests
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Gate decision latency | p99 < 50ms | `criterion` benchmark |
+| Receipt signing | < 5ms | `criterion` benchmark |
+| 255-tile report merge | < 10ms | `criterion` benchmark |
+| Hash chain verification (1000) | < 100ms | `criterion` benchmark |
+| Memory per worker tile | < 64KB | Static analysis |
+
+---
+
+## Configuration Format
+
+### TOML Configuration
+
+```toml
+# gate-config.toml
+
+[gate]
+# Gate identification
+gate_id = "gate-west-01"
+version = "0.1.0"
+
+[thresholds]
+# E-process thresholds
+tau_deny = 0.01          # E-value below this → DENY
+tau_permit = 100.0       # E-value above this → PERMIT
+
+# Structural thresholds
+min_cut = 5.0            # Cut value below this → DENY
+max_shift = 0.5          # Shift pressure above this → DEFER
+
+# Conformal thresholds
+max_prediction_set = 20  # Set size above this → DEFER
+coverage_target = 0.90   # Target coverage rate
+
+[timing]
+# Permit token TTL
+permit_ttl_seconds = 300
+
+# Decision timeout
+decision_timeout_ms = 50
+
+# Tick interval for worker tiles
+tick_interval_ms = 10
+
+[security]
+# Key rotation
+signing_key_rotation_days = 30
+threshold_key_rotation_days = 90
+
+# Replay prevention
+replay_window_seconds = 3600
+bloom_filter_size = 1000000
+
+[distributed]
+# Coordination settings
+regional_peers = ["gate-west-02", "gate-west-03"]
+global_coordinator = "coordinator-global-01"
+raft_heartbeat_ms = 100
+consensus_timeout_ms = 1000
+
+[escalation]
+# Human-in-loop settings
+default_timeout_seconds = 300
+default_on_timeout = "deny"
+
+[escalation.channels.slack]
+webhook_url = "${SLACK_WEBHOOK_URL}"
+channel = "#gate-escalations"
+
+[escalation.channels.pagerduty]
+api_key = "${PAGERDUTY_API_KEY}"
+service_id = "gate-critical"
+
+[observability]
+# Metrics endpoint
+metrics_port = 9090
+metrics_path = "/metrics"
+
+# Tracing
+tracing_enabled = true
+tracing_sample_rate = 0.1
+jaeger_endpoint = "http://jaeger:14268/api/traces"
+
+[storage]
+# Receipt storage
+receipt_backend = "postgresql"
+receipt_retention_days = 90
+checkpoint_interval = 100
+
+[storage.postgresql]
+host = "${DB_HOST}"
+port = 5432
+database = "gate_receipts"
+username = "${DB_USER}"
+password = "${DB_PASSWORD}"
+```
+
+### Environment Variables
+
+```bash
+# Required
+export GATE_SIGNING_KEY_PATH=/etc/gate/keys/signing.key
+export GATE_CONFIG_PATH=/etc/gate/config.toml
+
+# Optional overrides
+export GATE_TAU_DENY=0.01
+export GATE_TAU_PERMIT=100.0
+export GATE_MIN_CUT=5.0
+export GATE_MAX_SHIFT=0.5
+export GATE_PERMIT_TTL_SECONDS=300
+
+# Secrets (never in config file)
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+export PAGERDUTY_API_KEY=...
+export DB_PASSWORD=...
+```
+
+---
+
+## Error Recovery Procedures
+
+### Gate Decision Failures
+
+| Failure | Detection | Recovery | Fallback |
+|---------|-----------|----------|----------|
+| Min-cut timeout | Decision exceeds 50ms | Log, retry once | DEFER |
+| E-process NaN | `is_nan()` check | Reset accumulator | DENY |
+| Signing failure | Ed25519 error | Rotate to backup key | DENY (unsigned) |
+| Receipt log full | Capacity check | Archive, start new segment | DENY |
+
+### Distributed Failures
+
+```rust
+impl FaultRecovery {
+    pub async fn handle_regional_failure(&mut self, error: RegionalError) -> GateResult {
+        match error {
+            RegionalError::LeaderUnavailable => {
+                // Wait for new leader election
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                self.retry_with_new_leader().await
+            }
+
+            RegionalError::NetworkPartition => {
+                // Fall back to local-only decision
+                log::warn!("Network partition detected, using local gate");
+                self.local_gate.evaluate_standalone()
+            }
+
+            RegionalError::ConsensusTimeout => {
+                // Use conservative decision
+                Ok(GateResult {
+                    decision: GateDecision::Defer,
+                    reason: "Consensus timeout - escalating to human".into(),
+                    ..Default::default()
+                })
+            }
+        }
+    }
+}
+```
+
+### Receipt Chain Recovery
+
+```rust
+impl ReceiptLog {
+    /// Recover from corrupted receipt chain
+    pub fn recover_chain(&mut self, last_known_good: u64) -> Result<(), RecoveryError> {
+        // 1. Truncate corrupted entries
+        self.truncate_after(last_known_good)?;
+
+        // 2. Rebuild from checkpoint
+        let checkpoint = self.find_nearest_checkpoint(last_known_good)?;
+        self.rebuild_from_checkpoint(checkpoint)?;
+
+        // 3. Mark recovery in audit log
+        self.append_recovery_marker(last_known_good)?;
+
+        // 4. Alert operators
+        alert::send("Receipt chain recovery performed", Severity::Warning);
+
+        Ok(())
+    }
+}
+```
+
+### Worker Tile Recovery
+
+| Failure | Detection | Recovery Time | Data Loss |
+|---------|-----------|---------------|-----------|
+| Single tile crash | Heartbeat timeout | < 100ms | Last tick |
+| Tile memory corruption | Checksum mismatch | < 500ms | Current shard |
+| TileZero crash | Primary unavailable | < 1s | None (standbys) |
+| Full fabric restart | All tiles down | < 5s | Rebuild from checkpoint |
+
+### Runbook: Gate Unresponsive
+
+```bash
+# 1. Check gate health
+curl http://gate:9090/health
+
+# 2. If unhealthy, check logs
+kubectl logs -l app=gate --tail=100
+
+# 3. Check for resource exhaustion
+kubectl top pods -l app=gate
+
+# 4. If memory high, trigger GC
+curl -X POST http://gate:9090/admin/gc
+
+# 5. If still unresponsive, rolling restart
+kubectl rollout restart deployment/gate
+
+# 6. Verify recovery
+curl http://gate:9090/health
+curl http://gate:9090/metrics | grep gate_healthy
+```
+
+---
 
 ## Appendix: Mathematical Foundations
 

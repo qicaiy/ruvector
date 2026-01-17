@@ -59,6 +59,9 @@ members = [
     "crates/ruvector-math",
     "crates/ruvector-math-wasm",
     "examples/benchmarks",
+    "crates/cognitum-gate-kernel",
+    "crates/cognitum-gate-tilezero",
+    "crates/mcp-gate",
 ]
 resolver = "2"
 

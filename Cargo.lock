@@ -1060,6 +1060,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "cognitum-gate-kernel"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "libm",
+ "proptest",
+ "ruvector-mincut",
+]
+
+[[package]]
+name = "cognitum-gate-tilezero"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "blake3",
+ "criterion",
+ "ed25519-dalek",
+ "hex",
+ "proptest",
+ "rand 0.8.5",
+ "ruvector-mincut",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1860,6 +1889,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
  "pkcs8",
+ "serde",
  "signature",
 ]
 
@@ -2942,6 +2972,9 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "hf-hub"
@@ -3916,6 +3949,23 @@ checksum = "8ea1f30cedd69f0a2954655f7188c6a834246d2bcf1e315e2ac40c4b24dc9519"
 dependencies = [
  "cfg-if 1.0.4",
  "rayon",
+]
+
+[[package]]
+name = "mcp-gate"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.21.7",
+ "cognitum-gate-tilezero",
+ "futures",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
