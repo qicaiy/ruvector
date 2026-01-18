@@ -1,17 +1,17 @@
 # Ruvector Benchmark Results
 
-Generated: 2026-01-18 17:48:25 UTC
+Generated: 2026-01-18 21:59:06 UTC
 
 ## ruvector_optimized
 
-**Dataset:** synthetic (384D, 50000 vectors)
+**Dataset:** synthetic (384D, 10000 vectors)
 
 ### Performance
-- **QPS:** 508.40
-- **Latency (p50):** 1.54ms
-- **Latency (p95):** 1.55ms
-- **Latency (p99):** 1.55ms
-- **Latency (p99.9):** 1.55ms
+- **QPS:** 1215.90
+- **Latency (p50):** 0.78ms
+- **Latency (p95):** 0.78ms
+- **Latency (p99):** 0.78ms
+- **Latency (p99.9):** 0.78ms
 
 ### Recall
 - **Recall@1:** 100.00%
@@ -24,14 +24,14 @@ Generated: 2026-01-18 17:48:25 UTC
 
 ## ruvector_no_quant
 
-**Dataset:** synthetic (384D, 50000 vectors)
+**Dataset:** synthetic (384D, 10000 vectors)
 
 ### Performance
-- **QPS:** 557.44
-- **Latency (p50):** 1.45ms
-- **Latency (p95):** 1.45ms
-- **Latency (p99):** 1.45ms
-- **Latency (p99.9):** 1.45ms
+- **QPS:** 1218.00
+- **Latency (p50):** 0.78ms
+- **Latency (p95):** 0.78ms
+- **Latency (p99):** 0.78ms
+- **Latency (p99.9):** 0.78ms
 
 ### Recall
 - **Recall@1:** 100.00%
@@ -44,14 +44,14 @@ Generated: 2026-01-18 17:48:25 UTC
 
 ## python_baseline
 
-**Dataset:** synthetic (384D, 50000 vectors)
+**Dataset:** synthetic (384D, 10000 vectors)
 
 ### Performance
-- **QPS:** 38.83
-- **Latency (p50):** 21.68ms
-- **Latency (p95):** 22.02ms
-- **Latency (p99):** 22.02ms
-- **Latency (p99.9):** 22.02ms
+- **QPS:** 77.46
+- **Latency (p50):** 11.88ms
+- **Latency (p95):** 11.88ms
+- **Latency (p99):** 11.88ms
+- **Latency (p99.9):** 11.88ms
 
 ### Recall
 - **Recall@1:** 100.00%
@@ -64,14 +64,14 @@ Generated: 2026-01-18 17:48:25 UTC
 
 ## brute_force
 
-**Dataset:** synthetic (384D, 50000 vectors)
+**Dataset:** synthetic (384D, 10000 vectors)
 
 ### Performance
-- **QPS:** 2.41
-- **Latency (p50):** 324.61ms
-- **Latency (p95):** 325.63ms
-- **Latency (p99):** 325.63ms
-- **Latency (p99.9):** 325.63ms
+- **QPS:** 12.17
+- **Latency (p50):** 77.76ms
+- **Latency (p95):** 77.76ms
+- **Latency (p99):** 77.76ms
+- **Latency (p99.9):** 77.76ms
 
 ### Recall
 - **Recall@1:** 100.00%
