@@ -2,10 +2,20 @@
 //!
 //! This module provides arena-based memory allocation to reduce allocation
 //! overhead in hot paths and improve memory locality.
+//!
+//! ## Features (ADR-001)
+//!
+//! - **Cache-aligned allocations**: All allocations are aligned to cache line boundaries (64 bytes)
+//! - **Bump allocation**: O(1) allocation with minimal overhead
+//! - **Batch deallocation**: Free all allocations at once via `reset()`
+//! - **Thread-local arenas**: Per-thread allocation without synchronization
 
 use std::alloc::{alloc, dealloc, Layout};
 use std::cell::RefCell;
 use std::ptr;
+
+/// Cache line size (typically 64 bytes on modern CPUs)
+pub const CACHE_LINE_SIZE: usize = 64;
 
 /// Arena allocator for temporary allocations
 ///
@@ -231,6 +241,260 @@ pub fn thread_arena() -> impl std::ops::Deref<Target = Arena> {
 }
 */
 
+/// Cache-aligned vector storage for SIMD operations (ADR-001)
+///
+/// Ensures vectors are aligned to cache line boundaries (64 bytes) for
+/// optimal SIMD operations and minimal cache misses.
+#[repr(C, align(64))]
+pub struct CacheAlignedVec {
+    data: *mut f32,
+    len: usize,
+    capacity: usize,
+}
+
+impl CacheAlignedVec {
+    /// Create a new cache-aligned vector with the given capacity
+    pub fn with_capacity(capacity: usize) -> Self {
+        // Allocate cache-line aligned memory
+        let layout = Layout::from_size_align(
+            capacity * std::mem::size_of::<f32>(),
+            CACHE_LINE_SIZE,
+        )
+        .expect("Invalid layout");
+
+        let data = unsafe { alloc(layout) as *mut f32 };
+
+        Self {
+            data,
+            len: 0,
+            capacity,
+        }
+    }
+
+    /// Create from an existing slice, copying data to cache-aligned storage
+    pub fn from_slice(slice: &[f32]) -> Self {
+        let mut vec = Self::with_capacity(slice.len());
+        unsafe {
+            ptr::copy_nonoverlapping(slice.as_ptr(), vec.data, slice.len());
+        }
+        vec.len = slice.len();
+        vec
+    }
+
+    /// Push an element
+    pub fn push(&mut self, value: f32) {
+        assert!(self.len < self.capacity, "CacheAlignedVec capacity exceeded");
+        unsafe {
+            *self.data.add(self.len) = value;
+        }
+        self.len += 1;
+    }
+
+    /// Get length
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Check if empty
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Get capacity
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Get as slice
+    #[inline]
+    pub fn as_slice(&self) -> &[f32] {
+        unsafe { std::slice::from_raw_parts(self.data, self.len) }
+    }
+
+    /// Get as mutable slice
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut [f32] {
+        unsafe { std::slice::from_raw_parts_mut(self.data, self.len) }
+    }
+
+    /// Get raw pointer (for SIMD operations)
+    #[inline]
+    pub fn as_ptr(&self) -> *const f32 {
+        self.data
+    }
+
+    /// Get mutable raw pointer (for SIMD operations)
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut f32 {
+        self.data
+    }
+
+    /// Check if properly aligned for SIMD
+    #[inline]
+    pub fn is_aligned(&self) -> bool {
+        (self.data as usize) % CACHE_LINE_SIZE == 0
+    }
+
+    /// Clear the vector (sets len to 0, doesn't deallocate)
+    pub fn clear(&mut self) {
+        self.len = 0;
+    }
+}
+
+impl Drop for CacheAlignedVec {
+    fn drop(&mut self) {
+        if !self.data.is_null() && self.capacity > 0 {
+            let layout = Layout::from_size_align(
+                self.capacity * std::mem::size_of::<f32>(),
+                CACHE_LINE_SIZE,
+            )
+            .expect("Invalid layout");
+
+            unsafe {
+                dealloc(self.data as *mut u8, layout);
+            }
+        }
+    }
+}
+
+impl std::ops::Deref for CacheAlignedVec {
+    type Target = [f32];
+
+    fn deref(&self) -> &[f32] {
+        self.as_slice()
+    }
+}
+
+impl std::ops::DerefMut for CacheAlignedVec {
+    fn deref_mut(&mut self) -> &mut [f32] {
+        self.as_mut_slice()
+    }
+}
+
+// Safety: The raw pointer is owned and not shared
+unsafe impl Send for CacheAlignedVec {}
+unsafe impl Sync for CacheAlignedVec {}
+
+/// Batch vector allocator for processing multiple vectors (ADR-001)
+///
+/// Allocates contiguous, cache-aligned storage for a batch of vectors,
+/// enabling efficient SIMD processing and minimal cache misses.
+pub struct BatchVectorAllocator {
+    data: *mut f32,
+    dimensions: usize,
+    capacity: usize,
+    count: usize,
+}
+
+impl BatchVectorAllocator {
+    /// Create allocator for vectors of given dimensions
+    pub fn new(dimensions: usize, initial_capacity: usize) -> Self {
+        let total_floats = dimensions * initial_capacity;
+
+        let layout = Layout::from_size_align(
+            total_floats * std::mem::size_of::<f32>(),
+            CACHE_LINE_SIZE,
+        )
+        .expect("Invalid layout");
+
+        let data = unsafe { alloc(layout) as *mut f32 };
+
+        Self {
+            data,
+            dimensions,
+            capacity: initial_capacity,
+            count: 0,
+        }
+    }
+
+    /// Add a vector, returns its index
+    pub fn add(&mut self, vector: &[f32]) -> usize {
+        assert_eq!(
+            vector.len(),
+            self.dimensions,
+            "Vector dimension mismatch"
+        );
+        assert!(self.count < self.capacity, "Batch allocator full");
+
+        let offset = self.count * self.dimensions;
+        unsafe {
+            ptr::copy_nonoverlapping(vector.as_ptr(), self.data.add(offset), self.dimensions);
+        }
+
+        let index = self.count;
+        self.count += 1;
+        index
+    }
+
+    /// Get a vector by index
+    pub fn get(&self, index: usize) -> &[f32] {
+        assert!(index < self.count, "Index out of bounds");
+        let offset = index * self.dimensions;
+        unsafe { std::slice::from_raw_parts(self.data.add(offset), self.dimensions) }
+    }
+
+    /// Get mutable vector by index
+    pub fn get_mut(&mut self, index: usize) -> &mut [f32] {
+        assert!(index < self.count, "Index out of bounds");
+        let offset = index * self.dimensions;
+        unsafe { std::slice::from_raw_parts_mut(self.data.add(offset), self.dimensions) }
+    }
+
+    /// Get raw pointer to vector at index (for SIMD)
+    #[inline]
+    pub fn ptr_at(&self, index: usize) -> *const f32 {
+        assert!(index < self.count, "Index out of bounds");
+        let offset = index * self.dimensions;
+        unsafe { self.data.add(offset) }
+    }
+
+    /// Number of vectors stored
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.count
+    }
+
+    /// Check if empty
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    /// Dimensions per vector
+    #[inline]
+    pub fn dimensions(&self) -> usize {
+        self.dimensions
+    }
+
+    /// Reset allocator (keeps memory)
+    pub fn clear(&mut self) {
+        self.count = 0;
+    }
+}
+
+impl Drop for BatchVectorAllocator {
+    fn drop(&mut self) {
+        if !self.data.is_null() {
+            let layout = Layout::from_size_align(
+                self.dimensions * self.capacity * std::mem::size_of::<f32>(),
+                CACHE_LINE_SIZE,
+            )
+            .expect("Invalid layout");
+
+            unsafe {
+                dealloc(self.data as *mut u8, layout);
+            }
+        }
+    }
+}
+
+// Safety: The raw pointer is owned and not shared
+unsafe impl Send for BatchVectorAllocator {}
+unsafe impl Sync for BatchVectorAllocator {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +541,70 @@ mod tests {
         let used_after = arena.used_bytes();
 
         assert!(used_after < used_before);
+    }
+
+    #[test]
+    fn test_cache_aligned_vec() {
+        let mut vec = CacheAlignedVec::with_capacity(100);
+
+        // Check alignment
+        assert!(vec.is_aligned(), "Vector should be cache-aligned");
+
+        // Test push
+        for i in 0..50 {
+            vec.push(i as f32);
+        }
+        assert_eq!(vec.len(), 50);
+
+        // Test slice access
+        let slice = vec.as_slice();
+        assert_eq!(slice[0], 0.0);
+        assert_eq!(slice[49], 49.0);
+    }
+
+    #[test]
+    fn test_cache_aligned_vec_from_slice() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let aligned = CacheAlignedVec::from_slice(&data);
+
+        assert!(aligned.is_aligned());
+        assert_eq!(aligned.len(), 5);
+        assert_eq!(aligned.as_slice(), &data[..]);
+    }
+
+    #[test]
+    fn test_batch_vector_allocator() {
+        let mut allocator = BatchVectorAllocator::new(4, 10);
+
+        let v1 = vec![1.0, 2.0, 3.0, 4.0];
+        let v2 = vec![5.0, 6.0, 7.0, 8.0];
+
+        let idx1 = allocator.add(&v1);
+        let idx2 = allocator.add(&v2);
+
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 1);
+        assert_eq!(allocator.len(), 2);
+
+        // Test retrieval
+        assert_eq!(allocator.get(0), &v1[..]);
+        assert_eq!(allocator.get(1), &v2[..]);
+    }
+
+    #[test]
+    fn test_batch_allocator_clear() {
+        let mut allocator = BatchVectorAllocator::new(3, 5);
+
+        allocator.add(&[1.0, 2.0, 3.0]);
+        allocator.add(&[4.0, 5.0, 6.0]);
+
+        assert_eq!(allocator.len(), 2);
+
+        allocator.clear();
+        assert_eq!(allocator.len(), 0);
+
+        // Should be able to add again
+        allocator.add(&[7.0, 8.0, 9.0]);
+        assert_eq!(allocator.len(), 1);
     }
 }

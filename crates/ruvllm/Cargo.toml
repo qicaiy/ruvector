@@ -1,0 +1,52 @@
+[package]
+name = "ruvllm-integration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "LLM serving runtime with Ruvector integration - Paged attention, KV cache, and SONA learning"
+
+[dependencies]
+# Ruvector integration
+ruvector-core = { path = "../ruvector-core", default-features = false, features = ["storage"] }
+ruvector-sona = { path = "../sona", default-features = false, features = ["serde-support"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+# Performance
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+once_cell = { workspace = true }
+
+# Time and UUID
+chrono = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["v4", "serde"] }
+
+# Math
+ndarray = { workspace = true }
+rand = { workspace = true }
+
+# Async (optional for non-WASM)
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+tempfile = "3.13"
+tracing-subscriber = { workspace = true }
+
+[features]
+default = ["async-runtime"]
+async-runtime = ["tokio"]
+wasm = []
+
+[lib]
+crate-type = ["rlib"]

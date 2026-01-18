@@ -1,0 +1,85 @@
+//! Error types for RuvLLM
+//!
+//! This module defines the error hierarchy for the RuvLLM crate,
+//! providing detailed error information for debugging and handling.
+
+use thiserror::Error;
+
+/// Result type alias for RuvLLM operations
+pub type Result<T> = std::result::Result<T, RuvLLMError>;
+
+/// Main error type for RuvLLM
+#[derive(Error, Debug)]
+pub enum RuvLLMError {
+    /// Storage-related errors
+    #[error("Storage error: {0}")]
+    Storage(String),
+
+    /// Session management errors
+    #[error("Session error: {0}")]
+    Session(String),
+
+    /// KV cache errors
+    #[error("KV cache error: {0}")]
+    KvCache(String),
+
+    /// Paged attention errors
+    #[error("Paged attention error: {0}")]
+    PagedAttention(String),
+
+    /// Adapter management errors
+    #[error("Adapter error: {0}")]
+    Adapter(String),
+
+    /// Policy store errors
+    #[error("Policy error: {0}")]
+    Policy(String),
+
+    /// Witness log errors
+    #[error("Witness log error: {0}")]
+    WitnessLog(String),
+
+    /// SONA learning errors
+    #[error("SONA error: {0}")]
+    Sona(String),
+
+    /// Configuration errors
+    #[error("Configuration error: {0}")]
+    Config(String),
+
+    /// Resource exhaustion
+    #[error("Out of memory: {0}")]
+    OutOfMemory(String),
+
+    /// Invalid operation
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
+
+    /// Not found
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    /// Serialization errors
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
+    /// IO errors
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// Ruvector errors
+    #[error("Ruvector error: {0}")]
+    Ruvector(String),
+}
+
+impl From<ruvector_core::RuvectorError> for RuvLLMError {
+    fn from(err: ruvector_core::RuvectorError) -> Self {
+        RuvLLMError::Ruvector(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for RuvLLMError {
+    fn from(err: serde_json::Error) -> Self {
+        RuvLLMError::Serialization(err.to_string())
+    }
+}
