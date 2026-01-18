@@ -1,0 +1,5 @@
+name,dataset,dimensions,num_vectors,num_queries,k,qps,p50,p95,p99,p999,recall@1,recall@10,recall@100,memory_mb,build_time
+ruvector_optimized,synthetic,384,50000,1000,10,508.40,1.54,1.55,1.55,1.55,1.0000,1.0000,1.0000,0.00,0.00
+ruvector_no_quant,synthetic,384,50000,1000,10,557.44,1.45,1.45,1.45,1.45,1.0000,1.0000,1.0000,0.00,0.00
+python_baseline,synthetic,384,50000,1000,10,38.83,21.68,22.02,22.02,22.02,1.0000,1.0000,1.0000,0.00,0.00
+brute_force,synthetic,384,50000,1000,10,2.41,324.61,325.63,325.63,325.63,1.0000,1.0000,1.0000,0.00,0.00

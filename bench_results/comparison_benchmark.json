@@ -1,0 +1,89 @@
+[
+  {
+    "name": "ruvector_optimized",
+    "dataset": "synthetic",
+    "dimensions": 384,
+    "num_vectors": 50000,
+    "num_queries": 1000,
+    "k": 10,
+    "qps": 508.40199964532144,
+    "latency_p50": 1.544,
+    "latency_p95": 1.5510000000000002,
+    "latency_p99": 1.5510000000000002,
+    "latency_p999": 1.5510000000000002,
+    "recall_at_1": 1.0,
+    "recall_at_10": 1.0,
+    "recall_at_100": 1.0,
+    "memory_mb": 0.0,
+    "build_time_secs": 0.0,
+    "metadata": {
+      "system": "ruvector"
+    }
+  },
+  {
+    "name": "ruvector_no_quant",
+    "dataset": "synthetic",
+    "dimensions": 384,
+    "num_vectors": 50000,
+    "num_queries": 1000,
+    "k": 10,
+    "qps": 557.4412166043064,
+    "latency_p50": 1.446,
+    "latency_p95": 1.453,
+    "latency_p99": 1.453,
+    "latency_p999": 1.453,
+    "recall_at_1": 1.0,
+    "recall_at_10": 1.0,
+    "recall_at_100": 1.0,
+    "memory_mb": 0.0,
+    "build_time_secs": 0.0,
+    "metadata": {
+      "system": "ruvector_no_quant"
+    }
+  },
+  {
+    "name": "python_baseline",
+    "dataset": "synthetic",
+    "dimensions": 384,
+    "num_vectors": 50000,
+    "num_queries": 1000,
+    "k": 10,
+    "qps": 38.827068249628844,
+    "latency_p50": 21.679000000000002,
+    "latency_p95": 22.015,
+    "latency_p99": 22.015,
+    "latency_p999": 22.015,
+    "recall_at_1": 1.0,
+    "recall_at_10": 1.0,
+    "recall_at_100": 1.0,
+    "memory_mb": 0.0,
+    "build_time_secs": 0.0,
+    "metadata": {
+      "simulated": "true",
+      "system": "python_numpy"
+    }
+  },
+  {
+    "name": "brute_force",
+    "dataset": "synthetic",
+    "dimensions": 384,
+    "num_vectors": 50000,
+    "num_queries": 1000,
+    "k": 10,
+    "qps": 2.409808357048319,
+    "latency_p50": 324.60699999999997,
+    "latency_p95": 325.63100000000003,
+    "latency_p99": 325.63100000000003,
+    "latency_p999": 325.63100000000003,
+    "recall_at_1": 1.0,
+    "recall_at_10": 1.0,
+    "recall_at_100": 1.0,
+    "memory_mb": 0.0,
+    "build_time_secs": 0.0,
+    "metadata": {
+      "slowdown_factor": "223",
+      "system": "brute_force",
+      "simulated": "true"
+    }
+  }
+]
