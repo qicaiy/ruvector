@@ -164,3 +164,17 @@ harness = false
 [[bench]]
 name = "serving_bench"
 harness = false
+
+# Test configurations
+[[test]]
+name = "real_model_test"
+path = "tests/real_model_test.rs"
+
+# Example binaries
+[[example]]
+name = "download_test_model"
+path = "examples/download_test_model.rs"
+
+[[example]]
+name = "benchmark_model"
+path = "examples/benchmark_model.rs"
