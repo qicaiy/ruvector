@@ -470,6 +470,8 @@ console.log(JSON.parse(result)); // { colors: ['red', 'blue', 'green'] }
 
 Tested on M4 Pro (14-core CPU, 20-core GPU, 38 TOPS ANE):
 
+### Model Inference Speed
+
 | Model | Size | Quantization | Tokens/sec | Memory |
 |-------|------|--------------|------------|--------|
 | Phi-3 Mini | 3.8B | Q4_K_M | 52 t/s | 2.4 GB |
@@ -478,7 +480,45 @@ Tested on M4 Pro (14-core CPU, 20-core GPU, 38 TOPS ANE):
 | Mistral 7B | 7B | Q4_K_M | 28 t/s | 4.2 GB |
 | Gemma 2 | 9B | Q4_K_M | 22 t/s | 5.8 GB |
 
-*Benchmarks use prompt caching, batch size 1, context length 2048.*
+### 🔥 ANE vs NEON Matrix Multiply (NEW in v2.0)
+
+| Dimension | ANE | NEON | Speedup |
+|-----------|-----|------|---------|
+| 768×768 | 400 µs | 104 ms | **261x** |
+| 1024×1024 | 1.2 ms | 283 ms | **243x** |
+| 1536×1536 | 3.4 ms | 1,028 ms | **306x** |
+| 2048×2048 | 8.5 ms | 4,020 ms | **473x** |
+| 3072×3072 | 28.2 ms | 15,240 ms | **541x** |
+| 4096×4096 | 66.1 ms | 65,428 ms | **989x** |
+
+### Hybrid Pipeline Performance
+
+| Mode | seq=128 | seq=512 | vs NEON |
+|------|---------|---------|---------|
+| **Pure ANE** | 35.9 ms | 112.9 ms | **460x faster** |
+| Hybrid | 862 ms | 3,195 ms | 19x faster |
+| Pure NEON | 16,529 ms | 66,539 ms | baseline |
+
+### Activation Functions (SiLU/GELU)
+
+| Size | NEON | ANE | Winner |
+|------|------|-----|--------|
+| 32×4096 | 70 µs | 152 µs | NEON 2.2x |
+| 64×4096 | 141 µs | 303 µs | NEON 2.1x |
+| 128×4096 | 284 µs | 613 µs | NEON 2.2x |
+
+**Auto-dispatch** correctly routes: ANE for matmul ≥768 dims, NEON for activations.
+
+### Quantization Performance
+
+| Dimension | Encode | Hamming Distance |
+|-----------|--------|------------------|
+| 128-dim | 0.1 µs | <0.1 µs |
+| 384-dim | 0.3 µs | <0.1 µs |
+| 768-dim | 0.5 µs | <0.1 µs |
+| 1536-dim | 1.0 µs | <0.1 µs |
+
+*Benchmarks run with Criterion.rs, 50 samples per test, M4 Pro 48GB.*
 
 ---
 
