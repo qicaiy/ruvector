@@ -108,8 +108,12 @@ tempfile = "3.13"
 tracing-subscriber = { workspace = true }
 
 [features]
-default = ["async-runtime"]
+# Default includes candle for working inference out of the box
+default = ["async-runtime", "candle"]
 async-runtime = ["tokio", "tokio-stream"]
+
+# Minimal build without inference (for embedding/library use only)
+minimal = ["async-runtime"]
 wasm = []
 
 # Ruvector integration features

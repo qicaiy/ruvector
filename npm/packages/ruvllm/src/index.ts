@@ -83,6 +83,9 @@ export * from './training';
 // Model downloader and registry
 export * from './models';
 
+// Benchmarks for Claude Code use cases
+export * from './benchmarks';
+
 // Native bindings utilities
 export { version, hasSimdSupport } from './native';
 

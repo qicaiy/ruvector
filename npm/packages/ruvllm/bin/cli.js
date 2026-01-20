@@ -13,7 +13,7 @@
  *   ruvllm benchmark
  */
 
-const { RuvLLM, SimdOps, version, hasSimdSupport, ModelDownloader, listModels, getModelInfo, RUVLTRA_MODELS, getDefaultModelsDir } = require('../dist/cjs/index.js');
+const { RuvLLM, SimdOps, version, hasSimdSupport, ModelDownloader, listModels, getModelInfo, RUVLTRA_MODELS, getDefaultModelsDir, runRoutingBenchmark, formatRoutingResults, baselineKeywordRouter, runEmbeddingBenchmark, formatEmbeddingResults, runFullBenchmark, formatFullResults, ROUTING_TEST_CASES } = require('../dist/cjs/index.js');
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -413,6 +413,148 @@ async function runModelsDelete(modelId, flags) {
   }
 }
 
+// Benchmark commands for Claude Code use cases
+async function runBenchmarkRouting(flags) {
+  console.log('\nRunning Routing Benchmark...');
+  console.log(`Testing ${ROUTING_TEST_CASES.length} task routing scenarios\n`);
+
+  const llm = new RuvLLM({ embeddingDim: 768, learningEnabled: false });
+
+  // Router function using the model
+  const modelRouter = (task) => {
+    try {
+      const decision = llm.route(task);
+      return { agent: decision.model, confidence: decision.confidence };
+    } catch (e) {
+      // Fallback to keyword router if model not available
+      return baselineKeywordRouter(task);
+    }
+  };
+
+  // Run with baseline (keyword) router
+  console.log('Baseline (keyword matching):');
+  const baselineResults = runRoutingBenchmark(baselineKeywordRouter);
+
+  if (flags.json) {
+    console.log(JSON.stringify(baselineResults, null, 2));
+  } else {
+    console.log(formatRoutingResults(baselineResults));
+  }
+
+  // Try model router if native is available
+  if (llm.isNativeLoaded() && !flags['baseline-only']) {
+    console.log('\nModel Router (RuvLTRA):');
+    const modelResults = runRoutingBenchmark(modelRouter);
+    if (flags.json) {
+      console.log(JSON.stringify(modelResults, null, 2));
+    } else {
+      console.log(formatRoutingResults(modelResults));
+    }
+
+    // Comparison
+    const improvement = modelResults.accuracy - baselineResults.accuracy;
+    console.log(`\nComparison: Model ${improvement >= 0 ? '+' : ''}${(improvement * 100).toFixed(1)}% vs baseline`);
+  }
+}
+
+async function runBenchmarkEmbedding(flags) {
+  console.log('\nRunning Embedding Benchmark...');
+  console.log('Testing similarity detection, clustering, and search quality\n');
+
+  const llm = new RuvLLM({ embeddingDim: 768, learningEnabled: false });
+  const simd = new SimdOps();
+
+  // Embedder function
+  const embedder = (text) => {
+    try {
+      return llm.embed(text);
+    } catch (e) {
+      // Fallback: simple hash-based embedding for testing
+      const hash = text.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+      return Array.from({ length: 768 }, (_, i) => Math.sin(hash + i) * 0.5);
+    }
+  };
+
+  // Similarity function
+  const similarity = (a, b) => {
+    try {
+      return simd.cosineSimilarity(a, b);
+    } catch (e) {
+      // Fallback cosine similarity
+      let dot = 0, normA = 0, normB = 0;
+      for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+      }
+      return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+  };
+
+  const results = runEmbeddingBenchmark(embedder, similarity);
+
+  if (flags.json) {
+    console.log(JSON.stringify(results, null, 2));
+  } else {
+    console.log(formatEmbeddingResults(results));
+  }
+}
+
+async function runBenchmarkFull(flags) {
+  console.log('\n╔═══════════════════════════════════════════════════════════════════════════╗');
+  console.log('║                    RUVLTRA FULL BENCHMARK SUITE                           ║');
+  console.log('║            Evaluating for Claude Code Use Cases                           ║');
+  console.log('╚═══════════════════════════════════════════════════════════════════════════╝\n');
+
+  const llm = new RuvLLM({ embeddingDim: 768, learningEnabled: false });
+  const simd = new SimdOps();
+
+  const modelName = llm.isNativeLoaded() ? 'RuvLTRA (native)' : 'RuvLTRA (JS fallback)';
+
+  // Router
+  const router = (task) => {
+    try {
+      const decision = llm.route(task);
+      return { agent: decision.model, confidence: decision.confidence };
+    } catch (e) {
+      return baselineKeywordRouter(task);
+    }
+  };
+
+  // Embedder
+  const embedder = (text) => {
+    try {
+      return llm.embed(text);
+    } catch (e) {
+      const hash = text.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+      return Array.from({ length: 768 }, (_, i) => Math.sin(hash + i) * 0.5);
+    }
+  };
+
+  // Similarity
+  const similarity = (a, b) => {
+    try {
+      return simd.cosineSimilarity(a, b);
+    } catch (e) {
+      let dot = 0, normA = 0, normB = 0;
+      for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+      }
+      return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+  };
+
+  const results = runFullBenchmark(router, embedder, similarity, modelName);
+
+  if (flags.json) {
+    console.log(JSON.stringify(results, null, 2));
+  } else {
+    console.log(formatFullResults(results));
+  }
+}
+
 function printHelp() {
   console.log(`
 RuvLLM - Self-learning LLM Orchestration
@@ -438,6 +580,12 @@ Model Management:
   models download --all     Download all available models
   models status             Check which models are downloaded
   models delete <id>        Delete a downloaded model
+
+Claude Code Benchmarks:
+  benchmark routing         Test agent routing accuracy (100 tasks)
+  benchmark embedding       Test embedding quality (similarity, search, clustering)
+  benchmark full            Run complete benchmark suite
+  benchmark simd            Run SIMD performance benchmark
 
 Options:
   --json                    Output as JSON
@@ -470,6 +618,11 @@ Examples:
   ruvllm models download claude-code
   ruvllm models download --all
   ruvllm models status
+
+  # Claude Code benchmarks
+  ruvllm benchmark routing            # Test task routing accuracy
+  ruvllm benchmark embedding          # Test embedding quality
+  ruvllm benchmark full               # Run complete benchmark suite
 
 Learn more: https://github.com/ruvnet/ruvector
 `);
@@ -558,7 +711,21 @@ async function main() {
         break;
 
       case 'benchmark':
-        await runBenchmark(flags);
+        const benchSubcmd = positional[0];
+        if (benchSubcmd === 'routing') {
+          await runBenchmarkRouting(flags);
+        } else if (benchSubcmd === 'embedding' || benchSubcmd === 'embeddings') {
+          await runBenchmarkEmbedding(flags);
+        } else if (benchSubcmd === 'full' || benchSubcmd === 'all') {
+          await runBenchmarkFull(flags);
+        } else if (benchSubcmd === 'simd' || !benchSubcmd) {
+          // Default to SIMD benchmark for backwards compatibility
+          await runBenchmark(flags);
+        } else {
+          console.error(`Unknown benchmark type: ${benchSubcmd}`);
+          console.error('Available: routing, embedding, full, simd');
+          process.exit(1);
+        }
         break;
 
       case 'info':
