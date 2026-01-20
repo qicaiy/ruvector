@@ -172,6 +172,7 @@ pub struct PageTableEntry {
 }
 
 /// Page table managing sequence-to-block mappings
+#[derive(Debug)]
 pub struct PageTable {
     /// Configuration
     config: PagedAttentionConfig,
@@ -372,6 +373,7 @@ pub struct PageTableStats {
 }
 
 /// Paged attention implementation
+#[derive(Debug)]
 pub struct PagedAttention {
     /// Configuration
     config: PagedAttentionConfig,

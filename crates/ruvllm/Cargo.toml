@@ -80,6 +80,9 @@ half = "2.4"
 # Memory mapping for efficient large file access (optional)
 memmap2 = { version = "0.9", optional = true }
 
+# SHA256 hashing for model integrity verification
+sha2 = "0.10"
+
 # Metal GPU acceleration (macOS only)
 [target.'cfg(target_os = "macos")'.dependencies]
 metal = { version = "0.29", optional = true }

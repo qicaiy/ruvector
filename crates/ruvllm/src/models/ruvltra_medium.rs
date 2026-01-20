@@ -67,8 +67,11 @@ use crate::kernels::{
     apply_rope_neon, flash_attention_neon, rms_norm_neon, AttentionConfig,
 };
 use crate::kernels::rope::{precompute_rope_tables_with_config, RopeConfig, RopeTables};
-use crate::paged_attention::{PagedAttentionConfig, PagedKVCache};
+use crate::paged_attention::{PagedAttentionConfig, PagedAttention, PageTable};
 use crate::sona::{SonaConfig, SonaIntegration, Trajectory};
+
+/// Type alias for PagedAttention used as KV cache
+pub type PagedKVCache = PagedAttention;
 use crate::speculative::SpeculativeConfig;
 
 #[cfg(target_arch = "aarch64")]
@@ -844,7 +847,7 @@ impl RuvLtraMediumModel {
         };
 
         let paged_cache = if config.use_paged_attention {
-            Some(PagedKVCache::new(&config.paged_config))
+            Some(PagedKVCache::new(config.paged_config.clone()))
         } else {
             None
         };

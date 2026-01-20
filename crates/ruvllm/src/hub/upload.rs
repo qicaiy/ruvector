@@ -278,7 +278,7 @@ impl ModelUploader {
             .task(TaskType::TextGeneration)
             .framework(Framework::Gguf)
             .architecture(&metadata.architecture)
-            .parameters(metadata.params_b * 1e9)
+            .parameters((metadata.params_b * 1e9) as u64)
             .context_length(metadata.context_length);
 
         if let Some(quant) = &metadata.quantization {

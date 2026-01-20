@@ -1,8 +1,22 @@
-# RuvLLM v2.0 - High-Performance LLM Inference for Rust
+# RuvLLM v2.3 - High-Performance LLM Inference for Rust
 
 RuvLLM is a production-ready Rust LLM inference engine optimized for Apple Silicon (M1-M4), featuring real-time fine-tuning, NEON SIMD acceleration, Apple Neural Engine integration, and the SONA self-optimizing neural architecture.
 
-## What's New in v2.0
+## What's New in v2.3
+
+### Major Features
+
+| Feature | Description | Benefit |
+|---------|-------------|---------|
+| **RuvLTRA-Medium 3B** | Purpose-built 3B model for Claude Flow | 42 layers, 256K context, speculative decode |
+| **HuggingFace Hub** | Full Hub integration (download/upload) | Easy model sharing & distribution |
+| **Task-Specific LoRA** | 5 pre-trained adapters for agent types | Optimized for coder/researcher/security/architect/reviewer |
+| **Adapter Merging** | TIES, DARE, SLERP, Task Arithmetic | Combine adapters for multi-task models |
+| **Hot-Swap Adapters** | Zero-downtime adapter switching | Runtime task specialization |
+| **Claude Dataset** | 2,700+ Claude-style training examples | Optimized for Claude Flow integration |
+| **HNSW Routing** | 150x faster semantic pattern matching | <25µs pattern retrieval |
+
+### Previous v2.0-2.2 Features
 
 | Feature | Description | Benefit |
 |---------|-------------|---------|
@@ -154,11 +168,20 @@ ruvllm = { version = "2.0" }
 
 | Model Family | Sizes | Quantization | Backend |
 |--------------|-------|--------------|---------|
+| **RuvLTRA-Small** | 0.5B | Q4K, Q5K, Q8, FP16 | Candle/Metal/ANE |
+| **RuvLTRA-Medium** | 3B | Q4K, Q5K, Q8, FP16 | Candle/Metal |
 | Qwen 2.5 | 0.5B-72B | Q4K, Q8, FP16 | Candle/Metal |
 | Llama 3.x | 8B-70B | Q4K, Q8, FP16 | Candle/Metal |
 | Mistral | 7B-22B | Q4K, Q8, FP16 | Candle/Metal |
 | Phi-3 | 3.8B-14B | Q4K, Q8, FP16 | Candle/Metal |
 | Gemma-2 | 2B-27B | Q4K, Q8, FP16 | Candle/Metal |
+
+### RuvLTRA Models (Claude Flow Optimized)
+
+| Model | Parameters | Hidden | Layers | Context | Features |
+|-------|------------|--------|--------|---------|----------|
+| RuvLTRA-Small | 494M | 896 | 24 | 32K | GQA 7:1, SONA hooks |
+| RuvLTRA-Medium | 3.0B | 2560 | 42 | 256K | Flash Attention 2, Speculative Decode |
 
 ## Performance (M4 Pro 14-core)
 
@@ -447,6 +470,75 @@ cargo bench --bench metal_bench --features metal-compute
 # Serving benchmarks
 cargo bench --bench serving_bench --features inference-metal
 ```
+
+## HuggingFace Hub Integration (v2.3)
+
+Download and upload models to HuggingFace Hub:
+
+```rust
+use ruvllm::hub::{ModelDownloader, ModelUploader, RuvLtraRegistry, DownloadConfig};
+
+// Download from Hub
+let downloader = ModelDownloader::new(DownloadConfig::default());
+let model_path = downloader.download(
+    "ruvector/ruvltra-small-q4km",
+    Some("./models"),
+)?;
+
+// Or use the registry for RuvLTRA models
+let registry = RuvLtraRegistry::new();
+let model = registry.get("ruvltra-medium", "Q4_K_M")?;
+
+// Upload to Hub (requires HF_TOKEN)
+let uploader = ModelUploader::new("hf_your_token");
+let url = uploader.upload(
+    "./my-model.gguf",
+    "username/my-ruvltra-model",
+    Some(metadata),
+)?;
+println!("Uploaded to: {}", url);
+```
+
+## Task-Specific LoRA Adapters (v2.3)
+
+Pre-trained adapters optimized for Claude Flow agent types:
+
+```rust
+use ruvllm::lora::{RuvLtraAdapters, AdapterTrainer, AdapterMerger, HotSwapManager};
+
+// Create adapter for specific task
+let adapters = RuvLtraAdapters::new();
+let coder = adapters.create_lora("coder", 768)?;       // Rank 16, code generation
+let security = adapters.create_lora("security", 768)?; // Rank 16, vulnerability detection
+
+// Available adapters:
+// - coder:     Rank 16, Alpha 32.0, targets attention (Q,K,V,O)
+// - researcher: Rank 8, Alpha 16.0, targets Q,K,V
+// - security:  Rank 16, Alpha 32.0, targets attention + MLP
+// - architect: Rank 12, Alpha 24.0, targets Q,V + Gate,Up
+// - reviewer:  Rank 8, Alpha 16.0, targets Q,V
+
+// Merge adapters for multi-task models
+let merger = AdapterMerger::new(MergeConfig::weighted(weights));
+let multi_task = merger.merge(&[coder, security], &output_config, 768)?;
+
+// Hot-swap adapters at runtime
+let mut manager = HotSwapManager::new();
+manager.set_active(coder);
+manager.prepare_standby(security);
+manager.swap()?; // Zero-downtime switch
+```
+
+### Adapter Merging Strategies
+
+| Strategy | Description | Use Case |
+|----------|-------------|----------|
+| **Average** | Equal-weight averaging | Simple multi-task |
+| **WeightedSum** | User-defined weights | Task importance weighting |
+| **SLERP** | Spherical interpolation | Smooth transitions |
+| **TIES** | Trim, Elect, Merge | Robust multi-adapter |
+| **DARE** | Drop And REscale | Sparse merging |
+| **TaskArithmetic** | Add/subtract vectors | Task composition |
 
 ## Examples
 

@@ -168,10 +168,10 @@ pub use hub::{
     // Upload
     ModelUploader, UploadConfig, UploadProgress, UploadError, ModelMetadata,
     // Registry
-    RuvLtraRegistry, ModelInfo, ModelSize, QuantizationLevel,
+    RuvLtraRegistry, ModelInfo as HubModelInfo, ModelSize, QuantizationLevel,
     HardwareRequirements, get_model_info,
     // Model Card
-    ModelCard, ModelCardBuilder, TaskType, Framework, License, DatasetInfo, MetricResult,
+    ModelCard, ModelCardBuilder, TaskType as HubTaskType, Framework, License, DatasetInfo, MetricResult,
     // Progress
     ProgressBar, ProgressIndicator, ProgressStyle, ProgressCallback, MultiProgress,
     // Common
