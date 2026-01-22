@@ -107,6 +107,15 @@ pub enum RuvLLMError {
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 
+    /// Dimension mismatch errors
+    #[error("Dimension mismatch: expected {expected}, got {actual}")]
+    DimensionMismatch {
+        /// Expected dimension
+        expected: usize,
+        /// Actual dimension
+        actual: usize,
+    },
+
     /// Hybrid pipeline errors
     #[error("Hybrid pipeline error: {0}")]
     HybridPipeline(String),

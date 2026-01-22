@@ -9,14 +9,14 @@ repository.workspace = true
 description = "LLM serving runtime with Ruvector integration - Paged attention, KV cache, and SONA learning"
 
 [dependencies]
-# Ruvector integration
-ruvector-core = { path = "../ruvector-core", default-features = false, features = ["storage", "hnsw", "parallel", "simd"] }
-ruvector-sona = { path = "../sona", default-features = false, features = ["serde-support"] }
+# Ruvector integration (crates.io versions for publishing)
+ruvector-core = { version = "0.1.31", default-features = false, features = ["storage", "hnsw", "parallel", "simd"] }
+ruvector-sona = { version = "0.1.4", default-features = false, features = ["serde-support"] }
 
 # Optional Ruvector crates for advanced features
-ruvector-attention = { path = "../ruvector-attention", optional = true }
-ruvector-graph = { path = "../ruvector-graph", optional = true, default-features = false }
-ruvector-gnn = { path = "../ruvector-gnn", optional = true }
+ruvector-attention = { version = "0.1.31", optional = true }
+ruvector-graph = { version = "0.1.31", optional = true, default-features = false }
+ruvector-gnn = { version = "0.1.31", optional = true }
 
 # Serialization
 serde = { workspace = true }
@@ -32,6 +32,7 @@ dashmap = { workspace = true }
 parking_lot = { workspace = true }
 once_cell = { workspace = true }
 smallvec = "1.13"
+lru = "0.12"
 
 # Time and UUID
 chrono = { workspace = true, features = ["serde"] }
@@ -96,6 +97,14 @@ md5 = "0.7"
 metal = { version = "0.29", optional = true }
 objc = { version = "0.2", optional = true }
 
+# WASM dependencies (wasm32 target only)
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", optional = true, features = ["console", "Performance", "Window"] }
+getrandom = { version = "0.2", features = ["js"] }
+
 # Core ML bindings (macOS/iOS) - for Apple Neural Engine acceleration
 objc2 = { version = "0.6", optional = true }
 objc2-foundation = { version = "0.3", optional = true, features = ["NSString", "NSError", "NSURL", "NSArray", "NSDictionary", "NSData"] }
@@ -115,6 +124,11 @@ async-runtime = ["tokio", "tokio-stream"]
 # Minimal build without inference (for embedding/library use only)
 minimal = ["async-runtime"]
 wasm = []
+
+# RLM (Ruvector Language Model) features
+rlm-core = []
+rlm-wasm = ["rlm-core", "wasm", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys"]
+rlm-full = ["rlm-core", "async-runtime"]
 
 # Ruvector integration features
 attention = ["dep:ruvector-attention"]
@@ -212,6 +226,10 @@ harness = false
 
 [[bench]]
 name = "ruvltra_benchmark"
+harness = false
+
+[[bench]]
+name = "rlm_bench"
 harness = false
 
 # Test configurations

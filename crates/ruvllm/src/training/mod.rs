@@ -9,6 +9,8 @@
 //! - [`grpo`]: GRPO (Group Relative Policy Optimization) for RL
 //! - [`tool_dataset`]: MCP tool calling dataset generation (140+ tools)
 //! - [`mcp_tools`]: MCP tool trainer with GRPO-based fine-tuning
+//! - [`rlm_dataset`]: RLM task decomposition and synthesis dataset
+//! - [`rlm_trainer`]: RLM-specific trainer for RuvLTRA models
 //!
 //! ## Example: Tool Use Fine-Tuning
 //!
@@ -28,12 +30,35 @@
 //! let metrics = trainer.evaluate_tool_accuracy(&dataset.examples)?;
 //! println!("Baseline accuracy: {:.2}%", metrics.tool_accuracy * 100.0);
 //! ```
+//!
+//! ## Example: RLM Training Pipeline
+//!
+//! ```rust,ignore
+//! use ruvllm::training::{RlmTrainer, RlmTrainingConfig, RlmDataset};
+//! use ruvllm::models::ruvltra::RuvLtraModel;
+//!
+//! // Create trainer
+//! let config = RlmTrainingConfig::default();
+//! let model = Arc::new(RwLock::new(RuvLtraModel::new(&model_config)?));
+//! let mut trainer = RlmTrainer::new(model, config);
+//!
+//! // Train decomposition
+//! let dataset = RlmDataset::from_reasoning_bank(&bank, 0.7)?;
+//! let result = trainer.train_decomposition(&dataset)?;
+//!
+//! // Contrastive fine-tuning for routing
+//! let pairs = dataset.generate_contrastive_pairs();
+//! let routing_result = trainer.contrastive_finetune(&pairs)?;
+//! println!("Routing accuracy: {:.2}%", routing_result.accuracy * 100.0);
+//! ```
 
 pub mod claude_dataset;
 pub mod contrastive;
 pub mod grpo;
 pub mod mcp_tools;
 pub mod real_trainer;
+pub mod rlm_dataset;
+pub mod rlm_trainer;
 pub mod tool_dataset;
 
 #[cfg(test)]
@@ -53,8 +78,8 @@ pub use grpo::{
 // MCP tool training exports
 pub use mcp_tools::{
     EvaluationMetrics, McpToolTrainer, McpTrainingConfig, StepBuilder, ToolTrajectory,
-    TrajectoryBuilder, TrajectoryMetadata, TrajectoryStep, TrainingCheckpoint, TrainingResult,
-    TrainingStats,
+    TrainingCheckpoint, TrainingResult, TrainingStats, TrajectoryBuilder, TrajectoryMetadata,
+    TrajectoryStep,
 };
 
 // Tool dataset exports
@@ -65,14 +90,25 @@ pub use tool_dataset::{
 
 // Contrastive learning exports
 pub use contrastive::{
-    AgentEmbedding, ContrastiveConfig, ContrastiveTrainer,
-    TrainingResult as ContrastiveResult, TrainingStats as ContrastiveStats,
-    TrainingTriplet, AGENT_DESCRIPTIONS,
+    AgentEmbedding, ContrastiveConfig, ContrastiveTrainer, TrainingResult as ContrastiveResult,
+    TrainingStats as ContrastiveStats, TrainingTriplet, AGENT_DESCRIPTIONS,
 };
 
 // Real trainer exports (Candle-based with GGUF export)
 pub use real_trainer::{
-    EpochStats, GgufExportMetadata, GgufExportResult, GrpoEvaluator, GrpoFeedback,
-    LayerMetadata, RealContrastiveTrainer, RealTrainingConfig, RealTrainingResult,
-    TrainingConfigMeta, run_training_pipeline,
+    run_training_pipeline, EpochStats, GgufExportMetadata, GgufExportResult, GrpoEvaluator,
+    GrpoFeedback, LayerMetadata, RealContrastiveTrainer, RealTrainingConfig, RealTrainingResult,
+    TrainingConfigMeta,
+};
+
+// RLM dataset exports
+pub use rlm_dataset::{
+    ContrastivePair, DecompositionStrategy, QueryDecomposition, RlmDataset, RlmDatasetConfig,
+    RlmDatasetStats, RlmTrainingExample, RlmTrajectoryMetadata, SubAnswer, SubQuery, TrainingBatch,
+};
+
+// RLM trainer exports
+pub use rlm_trainer::{
+    GrpoStats as RlmGrpoStats, RlmTrainer, RlmTrainingConfig, RlmTrainingResult,
+    TrainingCheckpoint as RlmCheckpoint,
 };

@@ -111,9 +111,8 @@ pub use transport::{
 
 // Curvature (Mixed curvature attention) exports
 pub use curvature::{
-    ComponentQuantizer, FusedCurvatureConfig, MixedCurvatureCache,
-    MixedCurvatureFusedAttention, QuantizationConfig, QuantizedVector, TangentSpaceMapper,
-    TangentSpaceConfig,
+    ComponentQuantizer, FusedCurvatureConfig, MixedCurvatureCache, MixedCurvatureFusedAttention,
+    QuantizationConfig, QuantizedVector, TangentSpaceConfig, TangentSpaceMapper,
 };
 
 // Topology (Gated attention) exports
@@ -126,9 +125,7 @@ pub use topology::{
 pub use info_geometry::{FisherConfig, FisherMetric, NaturalGradient, NaturalGradientConfig};
 
 // Information Bottleneck exports
-pub use info_bottleneck::{
-    DiagonalGaussian, IBConfig, InformationBottleneck, KLDivergence,
-};
+pub use info_bottleneck::{DiagonalGaussian, IBConfig, InformationBottleneck, KLDivergence};
 
 // PDE Attention exports
 pub use pde_attention::{DiffusionAttention, DiffusionConfig, GraphLaplacian, LaplacianType};

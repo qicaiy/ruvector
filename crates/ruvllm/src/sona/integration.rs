@@ -84,8 +84,8 @@ impl Default for SonaConfig {
             background_learning_rate: 0.001,
             ewc_lambda: 0.1,
             pattern_capacity: 10000,
-            background_interval_secs: 3600,  // 1 hour
-            deep_interval_secs: 604800,      // 1 week
+            background_interval_secs: 3600, // 1 hour
+            deep_interval_secs: 604800,     // 1 week
             quality_threshold: 0.5,
         }
     }
@@ -124,7 +124,6 @@ pub struct Trajectory {
 }
 
 /// SONA integration for RuvLLM
-#[derive(Debug)]
 pub struct SonaIntegration {
     /// Configuration
     config: SonaConfig,
@@ -148,6 +147,36 @@ pub struct SonaIntegration {
     last_background: AtomicU64,
     /// Last deep loop timestamp
     last_deep: AtomicU64,
+}
+
+impl std::fmt::Debug for SonaIntegration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SonaIntegration")
+            .field("config", &self.config)
+            .field(
+                "total_trajectories",
+                &self
+                    .total_trajectories
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .field(
+                "instant_updates",
+                &self
+                    .instant_updates
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .field(
+                "background_updates",
+                &self
+                    .background_updates
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .field(
+                "deep_updates",
+                &self.deep_updates.load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .finish()
+    }
 }
 
 impl SonaIntegration {
@@ -322,9 +351,9 @@ impl SonaIntegration {
         {
             let mut rb = self.reasoning_bank.write();
             rb.prune_patterns(
-                0.3,     // min_quality
-                5,       // min_accesses
-                604800,  // max_age_secs (1 week)
+                0.3,    // min_quality
+                5,      // min_accesses
+                604800, // max_age_secs (1 week)
             );
         }
 
@@ -351,10 +380,7 @@ impl SonaIntegration {
     /// Search for similar patterns in ReasoningBank
     pub fn search_patterns(&self, query: &[f32], limit: usize) -> Vec<LearnedPattern> {
         let rb = self.reasoning_bank.read();
-        rb.find_similar(query, limit)
-            .into_iter()
-            .cloned()
-            .collect()
+        rb.find_similar(query, limit).into_iter().cloned().collect()
     }
 
     /// Apply learned transformations to input

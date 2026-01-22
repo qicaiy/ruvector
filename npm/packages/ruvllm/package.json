@@ -1,7 +1,7 @@
 {
   "name": "@ruvector/ruvllm",
-  "version": "2.3.0",
-  "description": "Self-learning LLM orchestration with SONA adaptive learning, HNSW memory, FastGRNN routing, and SIMD inference",
+  "version": "2.4.1",
+  "description": "Self-learning LLM orchestration with SONA adaptive learning, HNSW memory, RLM recursive retrieval, FastGRNN routing, and SIMD inference",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/cjs/index.d.ts",
@@ -74,6 +74,8 @@
   "keywords": [
     "ruvllm",
     "llm",
+    "rlm",
+    "retrieval-language-model",
     "self-learning",
     "adaptive-learning",
     "sona",
@@ -92,7 +94,9 @@
     "deep-learning",
     "napi",
     "rust",
-    "ruvector"
+    "ruvector",
+    "rag",
+    "contrastive-learning"
   ],
   "author": "rUv Team <team@ruv.io>",
   "license": "MIT OR Apache-2.0",

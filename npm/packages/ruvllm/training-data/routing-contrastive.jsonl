@@ -1,0 +1,793 @@
+{"anchor":"Implement a binary search function in TypeScript","positive":"Build a React component for user registration","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement a binary search function in TypeScript","positive":"Create a REST API endpoint for user authentication","agent":"coder","type":"positive_pair"}
+{"anchor":"Build a React component for user registration","positive":"Create a REST API endpoint for user authentication","agent":"coder","type":"positive_pair"}
+{"anchor":"Build a React component for user registration","positive":"Write a function to validate email addresses","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a REST API endpoint for user authentication","positive":"Write a function to validate email addresses","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a REST API endpoint for user authentication","positive":"Implement pagination for the product listing","agent":"coder","type":"positive_pair"}
+{"anchor":"Write a function to validate email addresses","positive":"Implement pagination for the product listing","agent":"coder","type":"positive_pair"}
+{"anchor":"Write a function to validate email addresses","positive":"Build a dropdown menu component with accessibility","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement pagination for the product listing","positive":"Build a dropdown menu component with accessibility","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement pagination for the product listing","positive":"Create a utility function for date formatting","agent":"coder","type":"positive_pair"}
+{"anchor":"Build a dropdown menu component with accessibility","positive":"Create a utility function for date formatting","agent":"coder","type":"positive_pair"}
+{"anchor":"Build a dropdown menu component with accessibility","positive":"Implement WebSocket connection handling","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a utility function for date formatting","positive":"Implement WebSocket connection handling","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a utility function for date formatting","positive":"Write a custom hook for form validation","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement WebSocket connection handling","positive":"Write a custom hook for form validation","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement WebSocket connection handling","positive":"Build the shopping cart logic in Redux","agent":"coder","type":"positive_pair"}
+{"anchor":"Write a custom hook for form validation","positive":"Build the shopping cart logic in Redux","agent":"coder","type":"positive_pair"}
+{"anchor":"Write a custom hook for form validation","positive":"Create a file upload component with progress","agent":"coder","type":"positive_pair"}
+{"anchor":"Build the shopping cart logic in Redux","positive":"Create a file upload component with progress","agent":"coder","type":"positive_pair"}
+{"anchor":"Build the shopping cart logic in Redux","positive":"Implement infinite scroll for the feed","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a file upload component with progress","positive":"Implement infinite scroll for the feed","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a file upload component with progress","positive":"Write the authentication middleware","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement infinite scroll for the feed","positive":"Write the authentication middleware","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement infinite scroll for the feed","positive":"Build a toast notification system","agent":"coder","type":"positive_pair"}
+{"anchor":"Write the authentication middleware","positive":"Build a toast notification system","agent":"coder","type":"positive_pair"}
+{"anchor":"Write the authentication middleware","positive":"Create a data table with sorting and filtering","agent":"coder","type":"positive_pair"}
+{"anchor":"Build a toast notification system","positive":"Create a data table with sorting and filtering","agent":"coder","type":"positive_pair"}
+{"anchor":"Build a toast notification system","positive":"Implement OAuth2 login flow","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a data table with sorting and filtering","positive":"Implement OAuth2 login flow","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a data table with sorting and filtering","positive":"Build a modal dialog component","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement OAuth2 login flow","positive":"Build a modal dialog component","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement OAuth2 login flow","positive":"Write the database migration scripts","agent":"coder","type":"positive_pair"}
+{"anchor":"Build a modal dialog component","positive":"Write the database migration scripts","agent":"coder","type":"positive_pair"}
+{"anchor":"Build a modal dialog component","positive":"Create a caching layer for API responses","agent":"coder","type":"positive_pair"}
+{"anchor":"Write the database migration scripts","positive":"Create a caching layer for API responses","agent":"coder","type":"positive_pair"}
+{"anchor":"Write the database migration scripts","positive":"Implement rate limiting middleware","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a caching layer for API responses","positive":"Implement rate limiting middleware","agent":"coder","type":"positive_pair"}
+{"anchor":"Create a caching layer for API responses","positive":"Add dark mode support to the application","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement rate limiting middleware","positive":"Add dark mode support to the application","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement rate limiting middleware","positive":"Add export to PDF functionality","agent":"coder","type":"positive_pair"}
+{"anchor":"Add dark mode support to the application","positive":"Add export to PDF functionality","agent":"coder","type":"positive_pair"}
+{"anchor":"Add dark mode support to the application","positive":"Add real-time collaboration features","agent":"coder","type":"positive_pair"}
+{"anchor":"Add export to PDF functionality","positive":"Add real-time collaboration features","agent":"coder","type":"positive_pair"}
+{"anchor":"Add export to PDF functionality","positive":"Add multi-language support i18n","agent":"coder","type":"positive_pair"}
+{"anchor":"Add real-time collaboration features","positive":"Add multi-language support i18n","agent":"coder","type":"positive_pair"}
+{"anchor":"Add real-time collaboration features","positive":"Add keyboard shortcuts to the editor","agent":"coder","type":"positive_pair"}
+{"anchor":"Add multi-language support i18n","positive":"Add keyboard shortcuts to the editor","agent":"coder","type":"positive_pair"}
+{"anchor":"Add multi-language support i18n","positive":"Build the checkout flow","agent":"coder","type":"positive_pair"}
+{"anchor":"Add keyboard shortcuts to the editor","positive":"Build the checkout flow","agent":"coder","type":"positive_pair"}
+{"anchor":"Add keyboard shortcuts to the editor","positive":"Create the user profile page","agent":"coder","type":"positive_pair"}
+{"anchor":"Build the checkout flow","positive":"Create the user profile page","agent":"coder","type":"positive_pair"}
+{"anchor":"Build the checkout flow","positive":"Develop the admin dashboard","agent":"coder","type":"positive_pair"}
+{"anchor":"Create the user profile page","positive":"Develop the admin dashboard","agent":"coder","type":"positive_pair"}
+{"anchor":"Create the user profile page","positive":"Code the payment integration","agent":"coder","type":"positive_pair"}
+{"anchor":"Develop the admin dashboard","positive":"Code the payment integration","agent":"coder","type":"positive_pair"}
+{"anchor":"Develop the admin dashboard","positive":"Program the notification service","agent":"coder","type":"positive_pair"}
+{"anchor":"Code the payment integration","positive":"Program the notification service","agent":"coder","type":"positive_pair"}
+{"anchor":"Code the payment integration","positive":"Write Python script for data processing","agent":"coder","type":"positive_pair"}
+{"anchor":"Program the notification service","positive":"Write Python script for data processing","agent":"coder","type":"positive_pair"}
+{"anchor":"Program the notification service","positive":"Implement Go microservice for metrics","agent":"coder","type":"positive_pair"}
+{"anchor":"Write Python script for data processing","positive":"Implement Go microservice for metrics","agent":"coder","type":"positive_pair"}
+{"anchor":"Write Python script for data processing","positive":"Create Rust library for parsing","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement Go microservice for metrics","positive":"Create Rust library for parsing","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement Go microservice for metrics","positive":"Build Node.js CLI tool","agent":"coder","type":"positive_pair"}
+{"anchor":"Create Rust library for parsing","positive":"Build Node.js CLI tool","agent":"coder","type":"positive_pair"}
+{"anchor":"Create Rust library for parsing","positive":"Write SQL stored procedure","agent":"coder","type":"positive_pair"}
+{"anchor":"Build Node.js CLI tool","positive":"Write SQL stored procedure","agent":"coder","type":"positive_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Research best practices for React state management","anchor_agent":"coder","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Review the pull request for code quality","anchor_agent":"coder","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Write unit tests for the authentication module","anchor_agent":"coder","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Design the database schema for user profiles","anchor_agent":"coder","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"coder","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Fix the null pointer exception in login","anchor_agent":"coder","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Write JSDoc comments for utility functions","anchor_agent":"coder","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Refactor the payment module to async/await","anchor_agent":"coder","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Optimize the database queries for dashboard","anchor_agent":"coder","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Set up the CI/CD pipeline","anchor_agent":"coder","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"coder","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Implement a binary search function in TypeScript","negative":"Create a sprint plan for next two weeks","anchor_agent":"coder","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","positive":"Investigate why the API is returning slow responses","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research best practices for React state management","positive":"Explore different authentication strategies","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate why the API is returning slow responses","positive":"Explore different authentication strategies","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate why the API is returning slow responses","positive":"Analyze the current database schema for improvements","agent":"researcher","type":"positive_pair"}
+{"anchor":"Explore different authentication strategies","positive":"Analyze the current database schema for improvements","agent":"researcher","type":"positive_pair"}
+{"anchor":"Explore different authentication strategies","positive":"Find the root cause of the memory leak","agent":"researcher","type":"positive_pair"}
+{"anchor":"Analyze the current database schema for improvements","positive":"Find the root cause of the memory leak","agent":"researcher","type":"positive_pair"}
+{"anchor":"Analyze the current database schema for improvements","positive":"Research GraphQL vs REST for our use case","agent":"researcher","type":"positive_pair"}
+{"anchor":"Find the root cause of the memory leak","positive":"Research GraphQL vs REST for our use case","agent":"researcher","type":"positive_pair"}
+{"anchor":"Find the root cause of the memory leak","positive":"Investigate alternatives to our current ORM","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research GraphQL vs REST for our use case","positive":"Investigate alternatives to our current ORM","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research GraphQL vs REST for our use case","positive":"Explore microservices vs monolith tradeoffs","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate alternatives to our current ORM","positive":"Explore microservices vs monolith tradeoffs","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate alternatives to our current ORM","positive":"Analyze competitor implementations","agent":"researcher","type":"positive_pair"}
+{"anchor":"Explore microservices vs monolith tradeoffs","positive":"Analyze competitor implementations","agent":"researcher","type":"positive_pair"}
+{"anchor":"Explore microservices vs monolith tradeoffs","positive":"Research GDPR compliance requirements","agent":"researcher","type":"positive_pair"}
+{"anchor":"Analyze competitor implementations","positive":"Research GDPR compliance requirements","agent":"researcher","type":"positive_pair"}
+{"anchor":"Analyze competitor implementations","positive":"Investigate the performance bottleneck in production","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research GDPR compliance requirements","positive":"Investigate the performance bottleneck in production","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research GDPR compliance requirements","positive":"Explore serverless options for our workload","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate the performance bottleneck in production","positive":"Explore serverless options for our workload","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate the performance bottleneck in production","positive":"Research caching strategies for high traffic","agent":"researcher","type":"positive_pair"}
+{"anchor":"Explore serverless options for our workload","positive":"Research caching strategies for high traffic","agent":"researcher","type":"positive_pair"}
+{"anchor":"Explore serverless options for our workload","positive":"Analyze user behavior patterns in analytics","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research caching strategies for high traffic","positive":"Analyze user behavior patterns in analytics","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research caching strategies for high traffic","positive":"Investigate third-party SDK options","agent":"researcher","type":"positive_pair"}
+{"anchor":"Analyze user behavior patterns in analytics","positive":"Investigate third-party SDK options","agent":"researcher","type":"positive_pair"}
+{"anchor":"Analyze user behavior patterns in analytics","positive":"Research machine learning models for recommendations","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate third-party SDK options","positive":"Research machine learning models for recommendations","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate third-party SDK options","positive":"Explore event sourcing patterns","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research machine learning models for recommendations","positive":"Explore event sourcing patterns","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research machine learning models for recommendations","positive":"Investigate CQRS implementation approaches","agent":"researcher","type":"positive_pair"}
+{"anchor":"Explore event sourcing patterns","positive":"Investigate CQRS implementation approaches","agent":"researcher","type":"positive_pair"}
+{"anchor":"Explore event sourcing patterns","positive":"Research WebRTC for real-time features","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate CQRS implementation approaches","positive":"Research WebRTC for real-time features","agent":"researcher","type":"positive_pair"}
+{"anchor":"Investigate CQRS implementation approaches","positive":"Analyze the feasibility of blockchain integration","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research WebRTC for real-time features","positive":"Analyze the feasibility of blockchain integration","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research WebRTC for real-time features","positive":"Discover why users are dropping off at checkout","agent":"researcher","type":"positive_pair"}
+{"anchor":"Analyze the feasibility of blockchain integration","positive":"Discover why users are dropping off at checkout","agent":"researcher","type":"positive_pair"}
+{"anchor":"Analyze the feasibility of blockchain integration","positive":"Find patterns in the error logs","agent":"researcher","type":"positive_pair"}
+{"anchor":"Discover why users are dropping off at checkout","positive":"Find patterns in the error logs","agent":"researcher","type":"positive_pair"}
+{"anchor":"Discover why users are dropping off at checkout","positive":"Look into the recent performance degradation","agent":"researcher","type":"positive_pair"}
+{"anchor":"Find patterns in the error logs","positive":"Look into the recent performance degradation","agent":"researcher","type":"positive_pair"}
+{"anchor":"Find patterns in the error logs","positive":"Examine the authentication flow for issues","agent":"researcher","type":"positive_pair"}
+{"anchor":"Look into the recent performance degradation","positive":"Examine the authentication flow for issues","agent":"researcher","type":"positive_pair"}
+{"anchor":"Look into the recent performance degradation","positive":"Study the codebase architecture","agent":"researcher","type":"positive_pair"}
+{"anchor":"Examine the authentication flow for issues","positive":"Study the codebase architecture","agent":"researcher","type":"positive_pair"}
+{"anchor":"Examine the authentication flow for issues","positive":"Compare React vs Vue for the frontend rewrite","agent":"researcher","type":"positive_pair"}
+{"anchor":"Study the codebase architecture","positive":"Compare React vs Vue for the frontend rewrite","agent":"researcher","type":"positive_pair"}
+{"anchor":"Study the codebase architecture","positive":"Evaluate PostgreSQL vs MongoDB for our needs","agent":"researcher","type":"positive_pair"}
+{"anchor":"Compare React vs Vue for the frontend rewrite","positive":"Evaluate PostgreSQL vs MongoDB for our needs","agent":"researcher","type":"positive_pair"}
+{"anchor":"Compare React vs Vue for the frontend rewrite","positive":"Assess the migration effort to TypeScript","agent":"researcher","type":"positive_pair"}
+{"anchor":"Evaluate PostgreSQL vs MongoDB for our needs","positive":"Assess the migration effort to TypeScript","agent":"researcher","type":"positive_pair"}
+{"anchor":"Evaluate PostgreSQL vs MongoDB for our needs","positive":"Review industry standards for API design","agent":"researcher","type":"positive_pair"}
+{"anchor":"Assess the migration effort to TypeScript","positive":"Review industry standards for API design","agent":"researcher","type":"positive_pair"}
+{"anchor":"Assess the migration effort to TypeScript","positive":"Survey available monitoring solutions","agent":"researcher","type":"positive_pair"}
+{"anchor":"Review industry standards for API design","positive":"Survey available monitoring solutions","agent":"researcher","type":"positive_pair"}
+{"anchor":"Research best practices for React state management","negative":"Implement a binary search function in TypeScript","anchor_agent":"researcher","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Review the pull request for code quality","anchor_agent":"researcher","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Write unit tests for the authentication module","anchor_agent":"researcher","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Design the database schema for user profiles","anchor_agent":"researcher","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"researcher","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Fix the null pointer exception in login","anchor_agent":"researcher","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Write JSDoc comments for utility functions","anchor_agent":"researcher","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Refactor the payment module to async/await","anchor_agent":"researcher","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Optimize the database queries for dashboard","anchor_agent":"researcher","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Set up the CI/CD pipeline","anchor_agent":"researcher","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"researcher","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Research best practices for React state management","negative":"Create a sprint plan for next two weeks","anchor_agent":"researcher","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","positive":"Check the code for potential issues","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the pull request for code quality","positive":"Evaluate the implementation approach","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check the code for potential issues","positive":"Evaluate the implementation approach","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check the code for potential issues","positive":"Assess the code for maintainability","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Evaluate the implementation approach","positive":"Assess the code for maintainability","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Evaluate the implementation approach","positive":"Review the PR before merging","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Assess the code for maintainability","positive":"Review the PR before merging","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Assess the code for maintainability","positive":"Check code for potential race conditions","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the PR before merging","positive":"Check code for potential race conditions","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the PR before merging","positive":"Evaluate the API design decisions","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check code for potential race conditions","positive":"Evaluate the API design decisions","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check code for potential race conditions","positive":"Review the database query patterns","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Evaluate the API design decisions","positive":"Review the database query patterns","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Evaluate the API design decisions","positive":"Assess code coverage of the changes","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the database query patterns","positive":"Assess code coverage of the changes","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the database query patterns","positive":"Check for code style violations","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Assess code coverage of the changes","positive":"Check for code style violations","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Assess code coverage of the changes","positive":"Review the error handling approach","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check for code style violations","positive":"Review the error handling approach","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check for code style violations","positive":"Evaluate the logging strategy","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the error handling approach","positive":"Evaluate the logging strategy","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the error handling approach","positive":"Check the implementation against requirements","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Evaluate the logging strategy","positive":"Check the implementation against requirements","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Evaluate the logging strategy","positive":"Review the commit messages for clarity","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check the implementation against requirements","positive":"Review the commit messages for clarity","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check the implementation against requirements","positive":"Assess the backwards compatibility","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the commit messages for clarity","positive":"Assess the backwards compatibility","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the commit messages for clarity","positive":"Review the configuration changes","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Assess the backwards compatibility","positive":"Review the configuration changes","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Assess the backwards compatibility","positive":"Check the dependency updates","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the configuration changes","positive":"Check the dependency updates","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the configuration changes","positive":"Evaluate the migration script safety","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check the dependency updates","positive":"Evaluate the migration script safety","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Check the dependency updates","positive":"Review the feature flag implementation","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Evaluate the migration script safety","positive":"Review the feature flag implementation","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Evaluate the migration script safety","positive":"Assess the rollback strategy","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the feature flag implementation","positive":"Assess the rollback strategy","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the feature flag implementation","positive":"Examine the submitted code changes","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Assess the rollback strategy","positive":"Examine the submitted code changes","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Assess the rollback strategy","positive":"Inspect the new feature implementation","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Examine the submitted code changes","positive":"Inspect the new feature implementation","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Examine the submitted code changes","positive":"Critique the refactoring approach","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Inspect the new feature implementation","positive":"Critique the refactoring approach","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Inspect the new feature implementation","positive":"Validate the coding standards","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Critique the refactoring approach","positive":"Validate the coding standards","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Critique the refactoring approach","positive":"Approve or request changes on the PR","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Validate the coding standards","positive":"Approve or request changes on the PR","agent":"reviewer","type":"positive_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Implement a binary search function in TypeScript","anchor_agent":"reviewer","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Research best practices for React state management","anchor_agent":"reviewer","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Write unit tests for the authentication module","anchor_agent":"reviewer","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Design the database schema for user profiles","anchor_agent":"reviewer","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"reviewer","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Fix the null pointer exception in login","anchor_agent":"reviewer","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Write JSDoc comments for utility functions","anchor_agent":"reviewer","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Refactor the payment module to async/await","anchor_agent":"reviewer","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Optimize the database queries for dashboard","anchor_agent":"reviewer","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Set up the CI/CD pipeline","anchor_agent":"reviewer","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"reviewer","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Review the pull request for code quality","negative":"Create a sprint plan for next two weeks","anchor_agent":"reviewer","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","positive":"Add integration tests for the API endpoints","agent":"tester","type":"positive_pair"}
+{"anchor":"Write unit tests for the authentication module","positive":"Create e2e tests for the checkout flow","agent":"tester","type":"positive_pair"}
+{"anchor":"Add integration tests for the API endpoints","positive":"Create e2e tests for the checkout flow","agent":"tester","type":"positive_pair"}
+{"anchor":"Add integration tests for the API endpoints","positive":"Write tests for the new feature","agent":"tester","type":"positive_pair"}
+{"anchor":"Create e2e tests for the checkout flow","positive":"Write tests for the new feature","agent":"tester","type":"positive_pair"}
+{"anchor":"Create e2e tests for the checkout flow","positive":"Add test coverage for edge cases","agent":"tester","type":"positive_pair"}
+{"anchor":"Write tests for the new feature","positive":"Add test coverage for edge cases","agent":"tester","type":"positive_pair"}
+{"anchor":"Write tests for the new feature","positive":"Create test fixtures for the database","agent":"tester","type":"positive_pair"}
+{"anchor":"Add test coverage for edge cases","positive":"Create test fixtures for the database","agent":"tester","type":"positive_pair"}
+{"anchor":"Add test coverage for edge cases","positive":"Write snapshot tests for the components","agent":"tester","type":"positive_pair"}
+{"anchor":"Create test fixtures for the database","positive":"Write snapshot tests for the components","agent":"tester","type":"positive_pair"}
+{"anchor":"Create test fixtures for the database","positive":"Add regression tests for the bug fix","agent":"tester","type":"positive_pair"}
+{"anchor":"Write snapshot tests for the components","positive":"Add regression tests for the bug fix","agent":"tester","type":"positive_pair"}
+{"anchor":"Write snapshot tests for the components","positive":"Create mock services for testing","agent":"tester","type":"positive_pair"}
+{"anchor":"Add regression tests for the bug fix","positive":"Create mock services for testing","agent":"tester","type":"positive_pair"}
+{"anchor":"Add regression tests for the bug fix","positive":"Write performance tests for the API","agent":"tester","type":"positive_pair"}
+{"anchor":"Create mock services for testing","positive":"Write performance tests for the API","agent":"tester","type":"positive_pair"}
+{"anchor":"Create mock services for testing","positive":"Add load tests for the service","agent":"tester","type":"positive_pair"}
+{"anchor":"Write performance tests for the API","positive":"Add load tests for the service","agent":"tester","type":"positive_pair"}
+{"anchor":"Write performance tests for the API","positive":"Create test data generators","agent":"tester","type":"positive_pair"}
+{"anchor":"Add load tests for the service","positive":"Create test data generators","agent":"tester","type":"positive_pair"}
+{"anchor":"Add load tests for the service","positive":"Write accessibility tests","agent":"tester","type":"positive_pair"}
+{"anchor":"Create test data generators","positive":"Write accessibility tests","agent":"tester","type":"positive_pair"}
+{"anchor":"Create test data generators","positive":"Add visual regression tests","agent":"tester","type":"positive_pair"}
+{"anchor":"Write accessibility tests","positive":"Add visual regression tests","agent":"tester","type":"positive_pair"}
+{"anchor":"Write accessibility tests","positive":"Create contract tests for the API","agent":"tester","type":"positive_pair"}
+{"anchor":"Add visual regression tests","positive":"Create contract tests for the API","agent":"tester","type":"positive_pair"}
+{"anchor":"Add visual regression tests","positive":"Write mutation tests to verify test quality","agent":"tester","type":"positive_pair"}
+{"anchor":"Create contract tests for the API","positive":"Write mutation tests to verify test quality","agent":"tester","type":"positive_pair"}
+{"anchor":"Create contract tests for the API","positive":"Add smoke tests for deployment validation","agent":"tester","type":"positive_pair"}
+{"anchor":"Write mutation tests to verify test quality","positive":"Add smoke tests for deployment validation","agent":"tester","type":"positive_pair"}
+{"anchor":"Write mutation tests to verify test quality","positive":"Create test suite for the payment gateway","agent":"tester","type":"positive_pair"}
+{"anchor":"Add smoke tests for deployment validation","positive":"Create test suite for the payment gateway","agent":"tester","type":"positive_pair"}
+{"anchor":"Add smoke tests for deployment validation","positive":"Write tests for the form validation logic","agent":"tester","type":"positive_pair"}
+{"anchor":"Create test suite for the payment gateway","positive":"Write tests for the form validation logic","agent":"tester","type":"positive_pair"}
+{"anchor":"Create test suite for the payment gateway","positive":"Add tests for error handling scenarios","agent":"tester","type":"positive_pair"}
+{"anchor":"Write tests for the form validation logic","positive":"Add tests for error handling scenarios","agent":"tester","type":"positive_pair"}
+{"anchor":"Write tests for the form validation logic","positive":"Run the test suite and fix failures","agent":"tester","type":"positive_pair"}
+{"anchor":"Add tests for error handling scenarios","positive":"Run the test suite and fix failures","agent":"tester","type":"positive_pair"}
+{"anchor":"Add tests for error handling scenarios","positive":"Execute the regression test suite","agent":"tester","type":"positive_pair"}
+{"anchor":"Run the test suite and fix failures","positive":"Execute the regression test suite","agent":"tester","type":"positive_pair"}
+{"anchor":"Run the test suite and fix failures","positive":"Verify the fix with automated tests","agent":"tester","type":"positive_pair"}
+{"anchor":"Execute the regression test suite","positive":"Verify the fix with automated tests","agent":"tester","type":"positive_pair"}
+{"anchor":"Execute the regression test suite","positive":"Test the application on multiple browsers","agent":"tester","type":"positive_pair"}
+{"anchor":"Verify the fix with automated tests","positive":"Test the application on multiple browsers","agent":"tester","type":"positive_pair"}
+{"anchor":"Verify the fix with automated tests","positive":"Validate the API responses match spec","agent":"tester","type":"positive_pair"}
+{"anchor":"Test the application on multiple browsers","positive":"Validate the API responses match spec","agent":"tester","type":"positive_pair"}
+{"anchor":"Test the application on multiple browsers","positive":"Improve test coverage to 80%","agent":"tester","type":"positive_pair"}
+{"anchor":"Validate the API responses match spec","positive":"Improve test coverage to 80%","agent":"tester","type":"positive_pair"}
+{"anchor":"Validate the API responses match spec","positive":"Reduce test flakiness","agent":"tester","type":"positive_pair"}
+{"anchor":"Improve test coverage to 80%","positive":"Reduce test flakiness","agent":"tester","type":"positive_pair"}
+{"anchor":"Improve test coverage to 80%","positive":"Speed up the test suite execution","agent":"tester","type":"positive_pair"}
+{"anchor":"Reduce test flakiness","positive":"Speed up the test suite execution","agent":"tester","type":"positive_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Implement a binary search function in TypeScript","anchor_agent":"tester","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Research best practices for React state management","anchor_agent":"tester","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Review the pull request for code quality","anchor_agent":"tester","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Design the database schema for user profiles","anchor_agent":"tester","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"tester","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Fix the null pointer exception in login","anchor_agent":"tester","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Write JSDoc comments for utility functions","anchor_agent":"tester","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Refactor the payment module to async/await","anchor_agent":"tester","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Optimize the database queries for dashboard","anchor_agent":"tester","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Set up the CI/CD pipeline","anchor_agent":"tester","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"tester","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Write unit tests for the authentication module","negative":"Create a sprint plan for next two weeks","anchor_agent":"tester","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","positive":"Plan the microservices architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the database schema for user profiles","positive":"Design the API contract for the service","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the microservices architecture","positive":"Design the API contract for the service","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the microservices architecture","positive":"Create the system architecture diagram","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the API contract for the service","positive":"Create the system architecture diagram","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the API contract for the service","positive":"Plan the data model for the application","agent":"architect","type":"positive_pair"}
+{"anchor":"Create the system architecture diagram","positive":"Plan the data model for the application","agent":"architect","type":"positive_pair"}
+{"anchor":"Create the system architecture diagram","positive":"Design the event-driven architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the data model for the application","positive":"Design the event-driven architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the data model for the application","positive":"Plan the caching strategy for the system","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the event-driven architecture","positive":"Plan the caching strategy for the system","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the event-driven architecture","positive":"Design the authentication flow architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the caching strategy for the system","positive":"Design the authentication flow architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the caching strategy for the system","positive":"Create the infrastructure topology","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the authentication flow architecture","positive":"Create the infrastructure topology","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the authentication flow architecture","positive":"Plan the database sharding strategy","agent":"architect","type":"positive_pair"}
+{"anchor":"Create the infrastructure topology","positive":"Plan the database sharding strategy","agent":"architect","type":"positive_pair"}
+{"anchor":"Create the infrastructure topology","positive":"Design the message queue architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the database sharding strategy","positive":"Design the message queue architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the database sharding strategy","positive":"Plan the API versioning strategy","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the message queue architecture","positive":"Plan the API versioning strategy","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the message queue architecture","positive":"Design the multi-tenant architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the API versioning strategy","positive":"Design the multi-tenant architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the API versioning strategy","positive":"Plan the disaster recovery architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the multi-tenant architecture","positive":"Plan the disaster recovery architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the multi-tenant architecture","positive":"Design the real-time notification system","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the disaster recovery architecture","positive":"Design the real-time notification system","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the disaster recovery architecture","positive":"Plan the search infrastructure","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the real-time notification system","positive":"Plan the search infrastructure","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the real-time notification system","positive":"Design the file storage architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the search infrastructure","positive":"Design the file storage architecture","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the search infrastructure","positive":"Plan the analytics data pipeline","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the file storage architecture","positive":"Plan the analytics data pipeline","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the file storage architecture","positive":"Design the CDN and edge caching strategy","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the analytics data pipeline","positive":"Design the CDN and edge caching strategy","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the analytics data pipeline","positive":"Plan the GraphQL schema design","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the CDN and edge caching strategy","positive":"Plan the GraphQL schema design","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the CDN and edge caching strategy","positive":"Decide on the frontend framework","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the GraphQL schema design","positive":"Decide on the frontend framework","agent":"architect","type":"positive_pair"}
+{"anchor":"Plan the GraphQL schema design","positive":"Choose the database technology","agent":"architect","type":"positive_pair"}
+{"anchor":"Decide on the frontend framework","positive":"Choose the database technology","agent":"architect","type":"positive_pair"}
+{"anchor":"Decide on the frontend framework","positive":"Define the service boundaries","agent":"architect","type":"positive_pair"}
+{"anchor":"Choose the database technology","positive":"Define the service boundaries","agent":"architect","type":"positive_pair"}
+{"anchor":"Choose the database technology","positive":"Structure the monorepo organization","agent":"architect","type":"positive_pair"}
+{"anchor":"Define the service boundaries","positive":"Structure the monorepo organization","agent":"architect","type":"positive_pair"}
+{"anchor":"Define the service boundaries","positive":"Establish coding standards and patterns","agent":"architect","type":"positive_pair"}
+{"anchor":"Structure the monorepo organization","positive":"Establish coding standards and patterns","agent":"architect","type":"positive_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Implement a binary search function in TypeScript","anchor_agent":"architect","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Research best practices for React state management","anchor_agent":"architect","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Review the pull request for code quality","anchor_agent":"architect","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Write unit tests for the authentication module","anchor_agent":"architect","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"architect","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Fix the null pointer exception in login","anchor_agent":"architect","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Write JSDoc comments for utility functions","anchor_agent":"architect","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Refactor the payment module to async/await","anchor_agent":"architect","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Optimize the database queries for dashboard","anchor_agent":"architect","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Set up the CI/CD pipeline","anchor_agent":"architect","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"architect","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Design the database schema for user profiles","negative":"Create a sprint plan for next two weeks","anchor_agent":"architect","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","positive":"Check for SQL injection vulnerabilities","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","positive":"Review authentication for security issues","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for SQL injection vulnerabilities","positive":"Review authentication for security issues","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for SQL injection vulnerabilities","positive":"Scan the codebase for CVE vulnerabilities","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review authentication for security issues","positive":"Scan the codebase for CVE vulnerabilities","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review authentication for security issues","positive":"Audit the file upload for security risks","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Scan the codebase for CVE vulnerabilities","positive":"Audit the file upload for security risks","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Scan the codebase for CVE vulnerabilities","positive":"Check for CSRF vulnerabilities","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the file upload for security risks","positive":"Check for CSRF vulnerabilities","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the file upload for security risks","positive":"Review the session management security","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for CSRF vulnerabilities","positive":"Review the session management security","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for CSRF vulnerabilities","positive":"Audit the password hashing implementation","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the session management security","positive":"Audit the password hashing implementation","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the session management security","positive":"Check for insecure direct object references","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the password hashing implementation","positive":"Check for insecure direct object references","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the password hashing implementation","positive":"Review the API rate limiting for abuse prevention","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for insecure direct object references","positive":"Review the API rate limiting for abuse prevention","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for insecure direct object references","positive":"Audit the encryption implementation","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the API rate limiting for abuse prevention","positive":"Audit the encryption implementation","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the API rate limiting for abuse prevention","positive":"Check for sensitive data exposure","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the encryption implementation","positive":"Check for sensitive data exposure","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the encryption implementation","positive":"Review the authorization logic","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for sensitive data exposure","positive":"Review the authorization logic","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for sensitive data exposure","positive":"Audit the JWT implementation","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the authorization logic","positive":"Audit the JWT implementation","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the authorization logic","positive":"Check for path traversal vulnerabilities","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the JWT implementation","positive":"Check for path traversal vulnerabilities","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the JWT implementation","positive":"Review the CORS configuration","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for path traversal vulnerabilities","positive":"Review the CORS configuration","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for path traversal vulnerabilities","positive":"Audit the dependency security","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the CORS configuration","positive":"Audit the dependency security","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the CORS configuration","positive":"Check for command injection risks","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the dependency security","positive":"Check for command injection risks","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the dependency security","positive":"Review the secrets management","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for command injection risks","positive":"Review the secrets management","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Check for command injection risks","positive":"Audit the logging for sensitive data","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the secrets management","positive":"Audit the logging for sensitive data","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Review the secrets management","positive":"Harden the application against attacks","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the logging for sensitive data","positive":"Harden the application against attacks","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the logging for sensitive data","positive":"Implement security headers","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Harden the application against attacks","positive":"Implement security headers","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Harden the application against attacks","positive":"Set up intrusion detection","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Implement security headers","positive":"Set up intrusion detection","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Implement security headers","positive":"Configure WAF rules","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Set up intrusion detection","positive":"Configure WAF rules","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Set up intrusion detection","positive":"Perform penetration testing","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Configure WAF rules","positive":"Perform penetration testing","agent":"security-architect","type":"positive_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Implement a binary search function in TypeScript","anchor_agent":"security-architect","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Research best practices for React state management","anchor_agent":"security-architect","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Review the pull request for code quality","anchor_agent":"security-architect","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Write unit tests for the authentication module","anchor_agent":"security-architect","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Design the database schema for user profiles","anchor_agent":"security-architect","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Fix the null pointer exception in login","anchor_agent":"security-architect","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Write JSDoc comments for utility functions","anchor_agent":"security-architect","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Refactor the payment module to async/await","anchor_agent":"security-architect","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Optimize the database queries for dashboard","anchor_agent":"security-architect","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Set up the CI/CD pipeline","anchor_agent":"security-architect","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"security-architect","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Audit the API endpoints for XSS vulnerabilities","negative":"Create a sprint plan for next two weeks","anchor_agent":"security-architect","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","positive":"Debug the memory leak in WebSocket handler","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the null pointer exception in login","positive":"Trace the source of the intermittent error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the memory leak in WebSocket handler","positive":"Trace the source of the intermittent error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the memory leak in WebSocket handler","positive":"Fix the race condition in the cache","agent":"debugger","type":"positive_pair"}
+{"anchor":"Trace the source of the intermittent error","positive":"Fix the race condition in the cache","agent":"debugger","type":"positive_pair"}
+{"anchor":"Trace the source of the intermittent error","positive":"Debug why the API returns 500 errors","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the race condition in the cache","positive":"Debug why the API returns 500 errors","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the race condition in the cache","positive":"Fix the undefined variable error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug why the API returns 500 errors","positive":"Fix the undefined variable error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug why the API returns 500 errors","positive":"Debug the infinite loop in the parser","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the undefined variable error","positive":"Debug the infinite loop in the parser","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the undefined variable error","positive":"Trace the stack overflow error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the infinite loop in the parser","positive":"Trace the stack overflow error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the infinite loop in the parser","positive":"Fix the database connection leak","agent":"debugger","type":"positive_pair"}
+{"anchor":"Trace the stack overflow error","positive":"Fix the database connection leak","agent":"debugger","type":"positive_pair"}
+{"anchor":"Trace the stack overflow error","positive":"Debug the serialization error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the database connection leak","positive":"Debug the serialization error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the database connection leak","positive":"Fix the type mismatch error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the serialization error","positive":"Fix the type mismatch error","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the serialization error","positive":"Debug the async timing issue","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the type mismatch error","positive":"Debug the async timing issue","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the type mismatch error","positive":"Fix the broken redirect loop","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the async timing issue","positive":"Fix the broken redirect loop","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the async timing issue","positive":"Trace why data is not saving","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the broken redirect loop","positive":"Trace why data is not saving","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the broken redirect loop","positive":"Fix the crash on mobile devices","agent":"debugger","type":"positive_pair"}
+{"anchor":"Trace why data is not saving","positive":"Fix the crash on mobile devices","agent":"debugger","type":"positive_pair"}
+{"anchor":"Trace why data is not saving","positive":"Debug the encoding issue with UTF-8","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the crash on mobile devices","positive":"Debug the encoding issue with UTF-8","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the crash on mobile devices","positive":"Fix the timezone conversion bug","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the encoding issue with UTF-8","positive":"Fix the timezone conversion bug","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug the encoding issue with UTF-8","positive":"Debug why tests fail intermittently","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the timezone conversion bug","positive":"Debug why tests fail intermittently","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the timezone conversion bug","positive":"Fix the deadlock in the transaction","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug why tests fail intermittently","positive":"Fix the deadlock in the transaction","agent":"debugger","type":"positive_pair"}
+{"anchor":"Debug why tests fail intermittently","positive":"Trace the source of data corruption","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the deadlock in the transaction","positive":"Trace the source of data corruption","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the deadlock in the transaction","positive":"Resolve the issue with user login","agent":"debugger","type":"positive_pair"}
+{"anchor":"Trace the source of data corruption","positive":"Resolve the issue with user login","agent":"debugger","type":"positive_pair"}
+{"anchor":"Trace the source of data corruption","positive":"Troubleshoot the payment failure","agent":"debugger","type":"positive_pair"}
+{"anchor":"Resolve the issue with user login","positive":"Troubleshoot the payment failure","agent":"debugger","type":"positive_pair"}
+{"anchor":"Resolve the issue with user login","positive":"Diagnose the slow query","agent":"debugger","type":"positive_pair"}
+{"anchor":"Troubleshoot the payment failure","positive":"Diagnose the slow query","agent":"debugger","type":"positive_pair"}
+{"anchor":"Troubleshoot the payment failure","positive":"Repair the broken feature","agent":"debugger","type":"positive_pair"}
+{"anchor":"Diagnose the slow query","positive":"Repair the broken feature","agent":"debugger","type":"positive_pair"}
+{"anchor":"Diagnose the slow query","positive":"Address the customer reported bug","agent":"debugger","type":"positive_pair"}
+{"anchor":"Repair the broken feature","positive":"Address the customer reported bug","agent":"debugger","type":"positive_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Implement a binary search function in TypeScript","anchor_agent":"debugger","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Research best practices for React state management","anchor_agent":"debugger","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Review the pull request for code quality","anchor_agent":"debugger","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Write unit tests for the authentication module","anchor_agent":"debugger","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Design the database schema for user profiles","anchor_agent":"debugger","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"debugger","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Write JSDoc comments for utility functions","anchor_agent":"debugger","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Refactor the payment module to async/await","anchor_agent":"debugger","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Optimize the database queries for dashboard","anchor_agent":"debugger","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Set up the CI/CD pipeline","anchor_agent":"debugger","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"debugger","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Fix the null pointer exception in login","negative":"Create a sprint plan for next two weeks","anchor_agent":"debugger","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","positive":"Create README for the new package","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write JSDoc comments for utility functions","positive":"Document the API endpoints","agent":"documenter","type":"positive_pair"}
+{"anchor":"Create README for the new package","positive":"Document the API endpoints","agent":"documenter","type":"positive_pair"}
+{"anchor":"Create README for the new package","positive":"Write the getting started guide","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the API endpoints","positive":"Write the getting started guide","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the API endpoints","positive":"Add inline comments explaining the algorithm","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the getting started guide","positive":"Add inline comments explaining the algorithm","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the getting started guide","positive":"Document the configuration options","agent":"documenter","type":"positive_pair"}
+{"anchor":"Add inline comments explaining the algorithm","positive":"Document the configuration options","agent":"documenter","type":"positive_pair"}
+{"anchor":"Add inline comments explaining the algorithm","positive":"Write the migration guide","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the configuration options","positive":"Write the migration guide","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the configuration options","positive":"Create the architecture documentation","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the migration guide","positive":"Create the architecture documentation","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the migration guide","positive":"Document the coding standards","agent":"documenter","type":"positive_pair"}
+{"anchor":"Create the architecture documentation","positive":"Document the coding standards","agent":"documenter","type":"positive_pair"}
+{"anchor":"Create the architecture documentation","positive":"Write the troubleshooting guide","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the coding standards","positive":"Write the troubleshooting guide","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the coding standards","positive":"Add examples to the documentation","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the troubleshooting guide","positive":"Add examples to the documentation","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the troubleshooting guide","positive":"Document the environment setup","agent":"documenter","type":"positive_pair"}
+{"anchor":"Add examples to the documentation","positive":"Document the environment setup","agent":"documenter","type":"positive_pair"}
+{"anchor":"Add examples to the documentation","positive":"Write the changelog entries","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the environment setup","positive":"Write the changelog entries","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the environment setup","positive":"Create the API reference documentation","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the changelog entries","positive":"Create the API reference documentation","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the changelog entries","positive":"Document the release process","agent":"documenter","type":"positive_pair"}
+{"anchor":"Create the API reference documentation","positive":"Document the release process","agent":"documenter","type":"positive_pair"}
+{"anchor":"Create the API reference documentation","positive":"Write the security policy","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the release process","positive":"Write the security policy","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the release process","positive":"Add TypeDoc comments","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the security policy","positive":"Add TypeDoc comments","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the security policy","positive":"Document the database schema","agent":"documenter","type":"positive_pair"}
+{"anchor":"Add TypeDoc comments","positive":"Document the database schema","agent":"documenter","type":"positive_pair"}
+{"anchor":"Add TypeDoc comments","positive":"Write the deployment guide","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the database schema","positive":"Write the deployment guide","agent":"documenter","type":"positive_pair"}
+{"anchor":"Document the database schema","positive":"Create the FAQ section","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the deployment guide","positive":"Create the FAQ section","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write the deployment guide","positive":"Explain how the authentication works","agent":"documenter","type":"positive_pair"}
+{"anchor":"Create the FAQ section","positive":"Explain how the authentication works","agent":"documenter","type":"positive_pair"}
+{"anchor":"Create the FAQ section","positive":"Describe the data flow","agent":"documenter","type":"positive_pair"}
+{"anchor":"Explain how the authentication works","positive":"Describe the data flow","agent":"documenter","type":"positive_pair"}
+{"anchor":"Explain how the authentication works","positive":"Annotate the complex code sections","agent":"documenter","type":"positive_pair"}
+{"anchor":"Describe the data flow","positive":"Annotate the complex code sections","agent":"documenter","type":"positive_pair"}
+{"anchor":"Describe the data flow","positive":"Update the outdated documentation","agent":"documenter","type":"positive_pair"}
+{"anchor":"Annotate the complex code sections","positive":"Update the outdated documentation","agent":"documenter","type":"positive_pair"}
+{"anchor":"Annotate the complex code sections","positive":"Improve the code comments","agent":"documenter","type":"positive_pair"}
+{"anchor":"Update the outdated documentation","positive":"Improve the code comments","agent":"documenter","type":"positive_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Implement a binary search function in TypeScript","anchor_agent":"documenter","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Research best practices for React state management","anchor_agent":"documenter","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Review the pull request for code quality","anchor_agent":"documenter","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Write unit tests for the authentication module","anchor_agent":"documenter","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Design the database schema for user profiles","anchor_agent":"documenter","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"documenter","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Fix the null pointer exception in login","anchor_agent":"documenter","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Refactor the payment module to async/await","anchor_agent":"documenter","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Optimize the database queries for dashboard","anchor_agent":"documenter","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Set up the CI/CD pipeline","anchor_agent":"documenter","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"documenter","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Write JSDoc comments for utility functions","negative":"Create a sprint plan for next two weeks","anchor_agent":"documenter","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","positive":"Restructure the utils folder","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Refactor the payment module to async/await","positive":"Extract common logic into shared module","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Restructure the utils folder","positive":"Extract common logic into shared module","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Restructure the utils folder","positive":"Modernize the callback-based code","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Extract common logic into shared module","positive":"Modernize the callback-based code","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Extract common logic into shared module","positive":"Consolidate duplicate code into utilities","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Modernize the callback-based code","positive":"Consolidate duplicate code into utilities","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Modernize the callback-based code","positive":"Simplify the complex conditional logic","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Consolidate duplicate code into utilities","positive":"Simplify the complex conditional logic","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Consolidate duplicate code into utilities","positive":"Rename variables for better clarity","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Simplify the complex conditional logic","positive":"Rename variables for better clarity","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Simplify the complex conditional logic","positive":"Split the large file into modules","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Rename variables for better clarity","positive":"Split the large file into modules","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Rename variables for better clarity","positive":"Convert class components to hooks","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Split the large file into modules","positive":"Convert class components to hooks","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Split the large file into modules","positive":"Migrate from CommonJS to ES modules","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Convert class components to hooks","positive":"Migrate from CommonJS to ES modules","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Convert class components to hooks","positive":"Clean up the legacy error handling","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Migrate from CommonJS to ES modules","positive":"Clean up the legacy error handling","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Migrate from CommonJS to ES modules","positive":"Restructure the folder organization","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Clean up the legacy error handling","positive":"Restructure the folder organization","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Clean up the legacy error handling","positive":"Extract the business logic from controllers","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Restructure the folder organization","positive":"Extract the business logic from controllers","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Restructure the folder organization","positive":"Simplify the nested callbacks","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Extract the business logic from controllers","positive":"Simplify the nested callbacks","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Extract the business logic from controllers","positive":"Consolidate the configuration files","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Simplify the nested callbacks","positive":"Consolidate the configuration files","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Simplify the nested callbacks","positive":"Modernize the build system","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Consolidate the configuration files","positive":"Modernize the build system","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Consolidate the configuration files","positive":"Clean up unused imports","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Modernize the build system","positive":"Clean up unused imports","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Modernize the build system","positive":"Restructure the test organization","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Clean up unused imports","positive":"Restructure the test organization","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Clean up unused imports","positive":"Extract the API client into a service","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Restructure the test organization","positive":"Extract the API client into a service","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Restructure the test organization","positive":"Simplify the state management","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Extract the API client into a service","positive":"Simplify the state management","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Extract the API client into a service","positive":"Decompose the monolithic function","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Simplify the state management","positive":"Decompose the monolithic function","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Simplify the state management","positive":"Remove the deprecated code paths","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Decompose the monolithic function","positive":"Remove the deprecated code paths","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Decompose the monolithic function","positive":"Upgrade to the new API patterns","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Remove the deprecated code paths","positive":"Upgrade to the new API patterns","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Remove the deprecated code paths","positive":"Decouple the tightly coupled modules","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Upgrade to the new API patterns","positive":"Decouple the tightly coupled modules","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Upgrade to the new API patterns","positive":"Standardize the code style","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Decouple the tightly coupled modules","positive":"Standardize the code style","agent":"refactorer","type":"positive_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Implement a binary search function in TypeScript","anchor_agent":"refactorer","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Research best practices for React state management","anchor_agent":"refactorer","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Review the pull request for code quality","anchor_agent":"refactorer","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Write unit tests for the authentication module","anchor_agent":"refactorer","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Design the database schema for user profiles","anchor_agent":"refactorer","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"refactorer","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Fix the null pointer exception in login","anchor_agent":"refactorer","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Write JSDoc comments for utility functions","anchor_agent":"refactorer","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Optimize the database queries for dashboard","anchor_agent":"refactorer","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Set up the CI/CD pipeline","anchor_agent":"refactorer","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"refactorer","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Refactor the payment module to async/await","negative":"Create a sprint plan for next two weeks","anchor_agent":"refactorer","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","positive":"Cache the frequently accessed user data","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the database queries for dashboard","positive":"Improve the API response time","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Cache the frequently accessed user data","positive":"Improve the API response time","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Cache the frequently accessed user data","positive":"Reduce the memory footprint","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve the API response time","positive":"Reduce the memory footprint","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve the API response time","positive":"Speed up the build process","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the memory footprint","positive":"Speed up the build process","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the memory footprint","positive":"Optimize the image loading","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Speed up the build process","positive":"Optimize the image loading","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Speed up the build process","positive":"Reduce the bundle size","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the image loading","positive":"Reduce the bundle size","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the image loading","positive":"Improve the cold start time","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the bundle size","positive":"Improve the cold start time","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the bundle size","positive":"Optimize the search query performance","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve the cold start time","positive":"Optimize the search query performance","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve the cold start time","positive":"Cache the computed results","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the search query performance","positive":"Cache the computed results","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the search query performance","positive":"Reduce the network requests","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Cache the computed results","positive":"Reduce the network requests","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Cache the computed results","positive":"Optimize the render performance","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the network requests","positive":"Optimize the render performance","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the network requests","positive":"Improve the database index strategy","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the render performance","positive":"Improve the database index strategy","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the render performance","positive":"Speed up the test execution","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve the database index strategy","positive":"Speed up the test execution","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve the database index strategy","positive":"Reduce the Docker image size","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Speed up the test execution","positive":"Reduce the Docker image size","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Speed up the test execution","positive":"Optimize the lazy loading","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the Docker image size","positive":"Optimize the lazy loading","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the Docker image size","positive":"Improve the caching headers","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the lazy loading","positive":"Improve the caching headers","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the lazy loading","positive":"Reduce the time to first byte","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve the caching headers","positive":"Reduce the time to first byte","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve the caching headers","positive":"Optimize the garbage collection","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the time to first byte","positive":"Optimize the garbage collection","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce the time to first byte","positive":"Speed up the CI pipeline","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the garbage collection","positive":"Speed up the CI pipeline","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the garbage collection","positive":"Make the page load faster","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Speed up the CI pipeline","positive":"Make the page load faster","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Speed up the CI pipeline","positive":"Reduce latency in the API","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Make the page load faster","positive":"Reduce latency in the API","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Make the page load faster","positive":"Improve throughput of the service","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce latency in the API","positive":"Improve throughput of the service","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Reduce latency in the API","positive":"Tune the database for performance","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve throughput of the service","positive":"Tune the database for performance","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Improve throughput of the service","positive":"Accelerate the data processing","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Tune the database for performance","positive":"Accelerate the data processing","agent":"optimizer","type":"positive_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Implement a binary search function in TypeScript","anchor_agent":"optimizer","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Research best practices for React state management","anchor_agent":"optimizer","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Review the pull request for code quality","anchor_agent":"optimizer","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Write unit tests for the authentication module","anchor_agent":"optimizer","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Design the database schema for user profiles","anchor_agent":"optimizer","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"optimizer","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Fix the null pointer exception in login","anchor_agent":"optimizer","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Write JSDoc comments for utility functions","anchor_agent":"optimizer","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Refactor the payment module to async/await","anchor_agent":"optimizer","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Set up the CI/CD pipeline","anchor_agent":"optimizer","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"optimizer","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Optimize the database queries for dashboard","negative":"Create a sprint plan for next two weeks","anchor_agent":"optimizer","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","positive":"Configure Kubernetes deployment","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up the CI/CD pipeline","positive":"Deploy to production","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure Kubernetes deployment","positive":"Deploy to production","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure Kubernetes deployment","positive":"Set up Docker containers","agent":"devops","type":"positive_pair"}
+{"anchor":"Deploy to production","positive":"Set up Docker containers","agent":"devops","type":"positive_pair"}
+{"anchor":"Deploy to production","positive":"Configure the load balancer","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up Docker containers","positive":"Configure the load balancer","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up Docker containers","positive":"Set up monitoring and alerting","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure the load balancer","positive":"Set up monitoring and alerting","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure the load balancer","positive":"Configure auto-scaling","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up monitoring and alerting","positive":"Configure auto-scaling","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up monitoring and alerting","positive":"Set up the staging environment","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure auto-scaling","positive":"Set up the staging environment","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure auto-scaling","positive":"Configure secrets management","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up the staging environment","positive":"Configure secrets management","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up the staging environment","positive":"Set up log aggregation","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure secrets management","positive":"Set up log aggregation","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure secrets management","positive":"Configure the CDN","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up log aggregation","positive":"Configure the CDN","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up log aggregation","positive":"Set up database backups","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure the CDN","positive":"Set up database backups","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure the CDN","positive":"Configure SSL certificates","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up database backups","positive":"Configure SSL certificates","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up database backups","positive":"Set up blue-green deployment","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure SSL certificates","positive":"Set up blue-green deployment","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure SSL certificates","positive":"Configure the reverse proxy","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up blue-green deployment","positive":"Configure the reverse proxy","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up blue-green deployment","positive":"Set up infrastructure as code","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure the reverse proxy","positive":"Set up infrastructure as code","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure the reverse proxy","positive":"Configure the message queue","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up infrastructure as code","positive":"Configure the message queue","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up infrastructure as code","positive":"Set up the VPN","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure the message queue","positive":"Set up the VPN","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure the message queue","positive":"Configure network policies","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up the VPN","positive":"Configure network policies","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up the VPN","positive":"Set up disaster recovery","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure network policies","positive":"Set up disaster recovery","agent":"devops","type":"positive_pair"}
+{"anchor":"Configure network policies","positive":"Provision the cloud resources","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up disaster recovery","positive":"Provision the cloud resources","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up disaster recovery","positive":"Manage the container registry","agent":"devops","type":"positive_pair"}
+{"anchor":"Provision the cloud resources","positive":"Manage the container registry","agent":"devops","type":"positive_pair"}
+{"anchor":"Provision the cloud resources","positive":"Automate the release process","agent":"devops","type":"positive_pair"}
+{"anchor":"Manage the container registry","positive":"Automate the release process","agent":"devops","type":"positive_pair"}
+{"anchor":"Manage the container registry","positive":"Roll back the failed deployment","agent":"devops","type":"positive_pair"}
+{"anchor":"Automate the release process","positive":"Roll back the failed deployment","agent":"devops","type":"positive_pair"}
+{"anchor":"Automate the release process","positive":"Scale the services for traffic","agent":"devops","type":"positive_pair"}
+{"anchor":"Roll back the failed deployment","positive":"Scale the services for traffic","agent":"devops","type":"positive_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Implement a binary search function in TypeScript","anchor_agent":"devops","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Research best practices for React state management","anchor_agent":"devops","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Review the pull request for code quality","anchor_agent":"devops","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Write unit tests for the authentication module","anchor_agent":"devops","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Design the database schema for user profiles","anchor_agent":"devops","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"devops","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Fix the null pointer exception in login","anchor_agent":"devops","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Write JSDoc comments for utility functions","anchor_agent":"devops","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Refactor the payment module to async/await","anchor_agent":"devops","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Optimize the database queries for dashboard","anchor_agent":"devops","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"devops","negative_agent":"api-docs","type":"negative_pair"}
+{"anchor":"Set up the CI/CD pipeline","negative":"Create a sprint plan for next two weeks","anchor_agent":"devops","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","positive":"Create Swagger spec for the endpoints","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","positive":"Document the API request/response formats","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create Swagger spec for the endpoints","positive":"Document the API request/response formats","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create Swagger spec for the endpoints","positive":"Write the API reference guide","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the API request/response formats","positive":"Write the API reference guide","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the API request/response formats","positive":"Create GraphQL schema documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Write the API reference guide","positive":"Create GraphQL schema documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Write the API reference guide","positive":"Generate API client examples","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create GraphQL schema documentation","positive":"Generate API client examples","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create GraphQL schema documentation","positive":"Document the authentication endpoints","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Generate API client examples","positive":"Document the authentication endpoints","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Generate API client examples","positive":"Create the API changelog","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the authentication endpoints","positive":"Create the API changelog","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the authentication endpoints","positive":"Write API versioning documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create the API changelog","positive":"Write API versioning documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create the API changelog","positive":"Document the webhook payloads","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Write API versioning documentation","positive":"Document the webhook payloads","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Write API versioning documentation","positive":"Create the SDK documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the webhook payloads","positive":"Create the SDK documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the webhook payloads","positive":"Generate the Postman collection","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create the SDK documentation","positive":"Generate the Postman collection","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create the SDK documentation","positive":"Document the error codes and responses","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Generate the Postman collection","positive":"Document the error codes and responses","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Generate the Postman collection","positive":"Create the API rate limit documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the error codes and responses","positive":"Create the API rate limit documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the error codes and responses","positive":"Write the API authentication guide","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create the API rate limit documentation","positive":"Write the API authentication guide","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create the API rate limit documentation","positive":"Generate the gRPC proto documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Write the API authentication guide","positive":"Generate the gRPC proto documentation","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Write the API authentication guide","positive":"Document the WebSocket events","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Generate the gRPC proto documentation","positive":"Document the WebSocket events","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Generate the gRPC proto documentation","positive":"Create the API quickstart guide","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the WebSocket events","positive":"Create the API quickstart guide","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Document the WebSocket events","positive":"Write the API best practices guide","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create the API quickstart guide","positive":"Write the API best practices guide","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Create the API quickstart guide","positive":"Document the API pagination","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Write the API best practices guide","positive":"Document the API pagination","agent":"api-docs","type":"positive_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Implement a binary search function in TypeScript","anchor_agent":"api-docs","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Research best practices for React state management","anchor_agent":"api-docs","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Review the pull request for code quality","anchor_agent":"api-docs","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Write unit tests for the authentication module","anchor_agent":"api-docs","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Design the database schema for user profiles","anchor_agent":"api-docs","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"api-docs","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Fix the null pointer exception in login","anchor_agent":"api-docs","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Write JSDoc comments for utility functions","anchor_agent":"api-docs","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Refactor the payment module to async/await","anchor_agent":"api-docs","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Optimize the database queries for dashboard","anchor_agent":"api-docs","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Set up the CI/CD pipeline","anchor_agent":"api-docs","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Generate OpenAPI documentation for REST API","negative":"Create a sprint plan for next two weeks","anchor_agent":"api-docs","negative_agent":"planner","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","positive":"Estimate the feature implementation effort","agent":"planner","type":"positive_pair"}
+{"anchor":"Create a sprint plan for next two weeks","positive":"Plan the roadmap for Q3","agent":"planner","type":"positive_pair"}
+{"anchor":"Estimate the feature implementation effort","positive":"Plan the roadmap for Q3","agent":"planner","type":"positive_pair"}
+{"anchor":"Estimate the feature implementation effort","positive":"Prioritize the backlog items","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the roadmap for Q3","positive":"Prioritize the backlog items","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the roadmap for Q3","positive":"Schedule the release timeline","agent":"planner","type":"positive_pair"}
+{"anchor":"Prioritize the backlog items","positive":"Schedule the release timeline","agent":"planner","type":"positive_pair"}
+{"anchor":"Prioritize the backlog items","positive":"Create milestones for the project","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the release timeline","positive":"Create milestones for the project","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the release timeline","positive":"Plan the migration timeline","agent":"planner","type":"positive_pair"}
+{"anchor":"Create milestones for the project","positive":"Plan the migration timeline","agent":"planner","type":"positive_pair"}
+{"anchor":"Create milestones for the project","positive":"Estimate the story points","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the migration timeline","positive":"Estimate the story points","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the migration timeline","positive":"Plan the team capacity","agent":"planner","type":"positive_pair"}
+{"anchor":"Estimate the story points","positive":"Plan the team capacity","agent":"planner","type":"positive_pair"}
+{"anchor":"Estimate the story points","positive":"Create the project timeline","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the team capacity","positive":"Create the project timeline","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the team capacity","positive":"Schedule the technical debt work","agent":"planner","type":"positive_pair"}
+{"anchor":"Create the project timeline","positive":"Schedule the technical debt work","agent":"planner","type":"positive_pair"}
+{"anchor":"Create the project timeline","positive":"Plan the feature rollout phases","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the technical debt work","positive":"Plan the feature rollout phases","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the technical debt work","positive":"Estimate the dependency impact","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the feature rollout phases","positive":"Estimate the dependency impact","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the feature rollout phases","positive":"Schedule the code freeze","agent":"planner","type":"positive_pair"}
+{"anchor":"Estimate the dependency impact","positive":"Schedule the code freeze","agent":"planner","type":"positive_pair"}
+{"anchor":"Estimate the dependency impact","positive":"Plan the cross-team dependencies","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the code freeze","positive":"Plan the cross-team dependencies","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the code freeze","positive":"Create the quarterly OKRs","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the cross-team dependencies","positive":"Create the quarterly OKRs","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the cross-team dependencies","positive":"Schedule the retrospective","agent":"planner","type":"positive_pair"}
+{"anchor":"Create the quarterly OKRs","positive":"Schedule the retrospective","agent":"planner","type":"positive_pair"}
+{"anchor":"Create the quarterly OKRs","positive":"Plan the onboarding timeline","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the retrospective","positive":"Plan the onboarding timeline","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the retrospective","positive":"Estimate the infrastructure costs","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the onboarding timeline","positive":"Estimate the infrastructure costs","agent":"planner","type":"positive_pair"}
+{"anchor":"Plan the onboarding timeline","positive":"Schedule the security audit","agent":"planner","type":"positive_pair"}
+{"anchor":"Estimate the infrastructure costs","positive":"Schedule the security audit","agent":"planner","type":"positive_pair"}
+{"anchor":"Estimate the infrastructure costs","positive":"Organize the work breakdown structure","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the security audit","positive":"Organize the work breakdown structure","agent":"planner","type":"positive_pair"}
+{"anchor":"Schedule the security audit","positive":"Coordinate the release activities","agent":"planner","type":"positive_pair"}
+{"anchor":"Organize the work breakdown structure","positive":"Coordinate the release activities","agent":"planner","type":"positive_pair"}
+{"anchor":"Organize the work breakdown structure","positive":"Allocate resources for the project","agent":"planner","type":"positive_pair"}
+{"anchor":"Coordinate the release activities","positive":"Allocate resources for the project","agent":"planner","type":"positive_pair"}
+{"anchor":"Coordinate the release activities","positive":"Define the project scope","agent":"planner","type":"positive_pair"}
+{"anchor":"Allocate resources for the project","positive":"Define the project scope","agent":"planner","type":"positive_pair"}
+{"anchor":"Allocate resources for the project","positive":"Set deadlines for deliverables","agent":"planner","type":"positive_pair"}
+{"anchor":"Define the project scope","positive":"Set deadlines for deliverables","agent":"planner","type":"positive_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Implement a binary search function in TypeScript","anchor_agent":"planner","negative_agent":"coder","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Research best practices for React state management","anchor_agent":"planner","negative_agent":"researcher","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Review the pull request for code quality","anchor_agent":"planner","negative_agent":"reviewer","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Write unit tests for the authentication module","anchor_agent":"planner","negative_agent":"tester","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Design the database schema for user profiles","anchor_agent":"planner","negative_agent":"architect","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Audit the API endpoints for XSS vulnerabilities","anchor_agent":"planner","negative_agent":"security-architect","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Fix the null pointer exception in login","anchor_agent":"planner","negative_agent":"debugger","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Write JSDoc comments for utility functions","anchor_agent":"planner","negative_agent":"documenter","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Refactor the payment module to async/await","anchor_agent":"planner","negative_agent":"refactorer","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Optimize the database queries for dashboard","anchor_agent":"planner","negative_agent":"optimizer","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Set up the CI/CD pipeline","anchor_agent":"planner","negative_agent":"devops","type":"negative_pair"}
+{"anchor":"Create a sprint plan for next two weeks","negative":"Generate OpenAPI documentation for REST API","anchor_agent":"planner","negative_agent":"api-docs","type":"negative_pair"}

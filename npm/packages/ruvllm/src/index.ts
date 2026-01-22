@@ -89,6 +89,9 @@ export * from './models';
 // Benchmarks for Claude Code use cases
 export * from './benchmarks';
 
+// RLM - Retrieval Language Model
+export * from './rlm';
+
 // Native bindings utilities
 export { version, hasSimdSupport } from './native';
 

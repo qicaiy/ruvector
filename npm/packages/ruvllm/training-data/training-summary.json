@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-01-21T14:49:21.089Z",
+  "datasets": {
+    "rlm_examples": 500,
+    "contrastive_pairs": 793,
+    "finetuning_triplets": 578,
+    "hard_negatives": 22
+  },
+  "quality": {
+    "avg_quality": 0.7802618320692704,
+    "successful_rate": 0.752,
+    "hard_negative_ratio": 0.4135115070527097
+  },
+  "routing": {
+    "embedding_only_accuracy": 0.2,
+    "hybrid_accuracy": 1,
+    "previous_sota": 0.882
+  },
+  "lora_config": {
+    "base_model": "Qwen/Qwen2.5-0.5B",
+    "lora_r": 8,
+    "lora_alpha": 16,
+    "epochs": 10,
+    "batch_size": 16,
+    "learning_rate": 0.0001
+  }
+}
