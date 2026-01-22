@@ -223,6 +223,16 @@ pub mod distributed;
 #[cfg_attr(docsrs, doc(cfg(feature = "ruvllm")))]
 pub mod ruvllm_integration;
 
+/// GPU acceleration - wgpu-based parallel coherence computation
+#[cfg(feature = "gpu")]
+#[cfg_attr(docsrs, doc(cfg(feature = "gpu")))]
+pub mod gpu;
+
+/// SIMD optimizations - explicit SIMD intrinsics for high-performance computation
+#[cfg(feature = "simd")]
+#[cfg_attr(docsrs, doc(cfg(feature = "simd")))]
+pub mod simd;
+
 // -----------------------------------------------------------------------------
 // Shared Types and Errors
 // -----------------------------------------------------------------------------
@@ -343,6 +353,32 @@ pub use distributed::{
 #[cfg(feature = "ruvllm")]
 pub use ruvllm_integration::{
     CoherenceConfidence, ConfidenceLevel, ConfidenceScore, EnergyContributor,
+};
+
+#[cfg(feature = "gpu")]
+pub use gpu::{
+    // Device management
+    GpuDevice, GpuDeviceInfo, GpuDeviceOptions,
+    // Buffer management
+    GpuBuffer, GpuBufferManager, GpuBufferPool, BufferUsage, BufferUsageFlags, BufferKey,
+    // Pipeline management
+    ComputePipeline, PipelineCache, BindingDesc, BindingType,
+    // Dispatch and synchronization
+    GpuDispatcher, DispatchConfig, DispatchBuilder,
+    // GPU coherence engine
+    GpuCoherenceEngine, GpuConfig, GpuCapabilities, GpuCoherenceEnergy,
+    // Kernel types
+    ComputeResidualsKernel, ComputeEnergyKernel, SheafAttentionKernel, TokenRoutingKernel,
+    // Errors
+    GpuError, GpuResult,
+};
+
+#[cfg(feature = "simd")]
+pub use simd::{
+    SimdWidth, SimdContext, best_simd_width,
+    dot_product_simd, norm_squared_simd, subtract_simd, scale_simd,
+    matmul_simd, matvec_simd,
+    batch_residuals_simd, weighted_energy_sum_simd, batch_lane_assignment_simd,
 };
 
 // ============================================================================

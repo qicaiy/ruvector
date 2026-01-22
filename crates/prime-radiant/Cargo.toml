@@ -110,6 +110,13 @@ once_cell = { workspace = true }
 wide = { version = "0.7", optional = true }
 
 # -----------------------------------------------------------------------------
+# GPU Acceleration
+# -----------------------------------------------------------------------------
+wgpu = { version = "23", optional = true }
+pollster = { version = "0.4", optional = true }
+bytemuck = { version = "1.19", features = ["derive"], optional = true }
+
+# -----------------------------------------------------------------------------
 # Async Runtime (for distributed)
 # -----------------------------------------------------------------------------
 tokio = { workspace = true, features = ["rt-multi-thread", "sync", "macros", "time"], optional = true }
@@ -181,6 +188,7 @@ full = [
     "graph-integration",
     "archive",
     "ruvllm",
+    "gpu",
 ]
 
 # -----------------------------------------------------------------------------
@@ -205,7 +213,12 @@ postgres = ["sqlx", "tokio", "futures"]
 # Performance Features
 # -----------------------------------------------------------------------------
 simd = ["ruvector-core/simd", "wide"]
+# Sub-features for specific SIMD instruction sets (compile-time targeting)
+simd-avx2 = ["simd"]
+simd-avx512 = ["simd"]
+simd-neon = ["simd"]
 parallel = ["rayon", "crossbeam"]
+gpu = ["wgpu", "pollster", "bytemuck", "tokio", "futures"]
 
 # -----------------------------------------------------------------------------
 # Analysis Features
@@ -290,6 +303,30 @@ harness = false
 
 [[bench]]
 name = "hyperbolic_bench"
+harness = false
+
+[[bench]]
+name = "coherence_bench"
+harness = false
+
+[[bench]]
+name = "attention_bench"
+harness = false
+
+# -----------------------------------------------------------------------------
+# Comprehensive Coherence Engine Benchmarks (ADR-014)
+# -----------------------------------------------------------------------------
+
+[[bench]]
+name = "coherence_benchmarks"
+harness = false
+
+[[bench]]
+name = "simd_benchmarks"
+harness = false
+
+[[bench]]
+name = "gpu_benchmarks"
 harness = false
 
 # ============================================================================
