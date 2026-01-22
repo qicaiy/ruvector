@@ -1,0 +1,524 @@
+//! SheafEdge: Constraint between nodes with restriction maps
+//!
+//! An edge in the sheaf graph encodes a constraint between two nodes.
+//! The constraint is expressed via two restriction maps:
+//!
+//! - `rho_source`: Projects the source state to the shared comparison space
+//! - `rho_target`: Projects the target state to the shared comparison space
+//!
+//! The **residual** at an edge is the difference between these projections:
+//! ```text
+//! r_e = rho_source(x_source) - rho_target(x_target)
+//! ```
+//!
+//! The **weighted residual energy** contributes to global coherence:
+//! ```text
+//! E_e = weight * ||r_e||^2
+//! ```
+
+use super::node::NodeId;
+use super::restriction::RestrictionMap;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use uuid::Uuid;
+
+/// Unique identifier for an edge
+pub type EdgeId = Uuid;
+
+/// An edge encoding a constraint between two nodes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SheafEdge {
+    /// Unique edge identifier
+    pub id: EdgeId,
+    /// Source node identifier
+    pub source: NodeId,
+    /// Target node identifier
+    pub target: NodeId,
+    /// Weight for energy calculation (importance of this constraint)
+    pub weight: f32,
+    /// Restriction map from source to shared comparison space
+    pub rho_source: RestrictionMap,
+    /// Restriction map from target to shared comparison space
+    pub rho_target: RestrictionMap,
+    /// Edge type/label for filtering
+    pub edge_type: Option<String>,
+    /// Namespace for multi-tenant isolation
+    pub namespace: Option<String>,
+    /// Arbitrary metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+    /// Creation timestamp
+    pub created_at: DateTime<Utc>,
+    /// Last update timestamp
+    pub updated_at: DateTime<Utc>,
+}
+
+impl SheafEdge {
+    /// Create a new edge with identity restriction maps
+    ///
+    /// This means both source and target states must match exactly in the
+    /// given dimension for the edge to be coherent.
+    pub fn identity(source: NodeId, target: NodeId, dim: usize) -> Self {
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            source,
+            target,
+            weight: 1.0,
+            rho_source: RestrictionMap::identity(dim),
+            rho_target: RestrictionMap::identity(dim),
+            edge_type: None,
+            namespace: None,
+            metadata: HashMap::new(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Create a new edge with custom restriction maps
+    pub fn with_restrictions(
+        source: NodeId,
+        target: NodeId,
+        rho_source: RestrictionMap,
+        rho_target: RestrictionMap,
+    ) -> Self {
+        debug_assert_eq!(
+            rho_source.output_dim(),
+            rho_target.output_dim(),
+            "Restriction maps must have same output dimension"
+        );
+
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            source,
+            target,
+            weight: 1.0,
+            rho_source,
+            rho_target,
+            edge_type: None,
+            namespace: None,
+            metadata: HashMap::new(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Calculate the edge residual (local mismatch)
+    ///
+    /// The residual is the difference between the projected source and target states:
+    /// ```text
+    /// r_e = rho_source(x_source) - rho_target(x_target)
+    /// ```
+    ///
+    /// # SIMD Optimization
+    ///
+    /// The subtraction is performed using SIMD-friendly patterns.
+    #[inline]
+    pub fn residual(&self, source_state: &[f32], target_state: &[f32]) -> Vec<f32> {
+        let projected_source = self.rho_source.apply(source_state);
+        let projected_target = self.rho_target.apply(target_state);
+
+        // SIMD-friendly subtraction
+        projected_source
+            .iter()
+            .zip(projected_target.iter())
+            .map(|(&a, &b)| a - b)
+            .collect()
+    }
+
+    /// Calculate the residual norm squared
+    ///
+    /// This is ||r_e||^2 without the weight factor.
+    ///
+    /// # SIMD Optimization
+    ///
+    /// Uses 4-lane accumulation for better vectorization.
+    #[inline]
+    pub fn residual_norm_squared(&self, source_state: &[f32], target_state: &[f32]) -> f32 {
+        let residual = self.residual(source_state, target_state);
+
+        // SIMD-friendly 4-lane accumulation
+        let mut lanes = [0.0f32; 4];
+        for (i, &r) in residual.iter().enumerate() {
+            lanes[i % 4] += r * r;
+        }
+        lanes[0] + lanes[1] + lanes[2] + lanes[3]
+    }
+
+    /// Calculate weighted residual energy
+    ///
+    /// This is the contribution of this edge to the global coherence energy:
+    /// ```text
+    /// E_e = weight * ||r_e||^2
+    /// ```
+    #[inline]
+    pub fn weighted_residual_energy(&self, source_state: &[f32], target_state: &[f32]) -> f32 {
+        self.weight * self.residual_norm_squared(source_state, target_state)
+    }
+
+    /// Calculate residual energy and return both the energy and residual vector
+    ///
+    /// This is more efficient when you need both values.
+    #[inline]
+    pub fn residual_with_energy(
+        &self,
+        source_state: &[f32],
+        target_state: &[f32],
+    ) -> (Vec<f32>, f32) {
+        let residual = self.residual(source_state, target_state);
+
+        // SIMD-friendly norm squared calculation
+        let mut lanes = [0.0f32; 4];
+        for (i, &r) in residual.iter().enumerate() {
+            lanes[i % 4] += r * r;
+        }
+        let norm_sq = lanes[0] + lanes[1] + lanes[2] + lanes[3];
+        let energy = self.weight * norm_sq;
+
+        (residual, energy)
+    }
+
+    /// Get the output dimension of the restriction maps (comparison space dimension)
+    #[inline]
+    pub fn comparison_dim(&self) -> usize {
+        self.rho_source.output_dim()
+    }
+
+    /// Check if this edge is coherent (residual below threshold)
+    #[inline]
+    pub fn is_coherent(&self, source_state: &[f32], target_state: &[f32], threshold: f32) -> bool {
+        self.residual_norm_squared(source_state, target_state) <= threshold * threshold
+    }
+
+    /// Update the weight
+    pub fn set_weight(&mut self, weight: f32) {
+        self.weight = weight;
+        self.updated_at = Utc::now();
+    }
+
+    /// Update the restriction maps
+    pub fn set_restrictions(&mut self, rho_source: RestrictionMap, rho_target: RestrictionMap) {
+        debug_assert_eq!(
+            rho_source.output_dim(),
+            rho_target.output_dim(),
+            "Restriction maps must have same output dimension"
+        );
+        self.rho_source = rho_source;
+        self.rho_target = rho_target;
+        self.updated_at = Utc::now();
+    }
+
+    /// Compute content hash for fingerprinting
+    pub fn content_hash(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.id.hash(&mut hasher);
+        self.source.hash(&mut hasher);
+        self.target.hash(&mut hasher);
+        self.weight.to_bits().hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
+/// Builder for constructing SheafEdge instances
+#[derive(Debug)]
+pub struct SheafEdgeBuilder {
+    id: Option<EdgeId>,
+    source: NodeId,
+    target: NodeId,
+    weight: f32,
+    rho_source: Option<RestrictionMap>,
+    rho_target: Option<RestrictionMap>,
+    edge_type: Option<String>,
+    namespace: Option<String>,
+    metadata: HashMap<String, serde_json::Value>,
+}
+
+impl SheafEdgeBuilder {
+    /// Create a new builder with required source and target nodes
+    pub fn new(source: NodeId, target: NodeId) -> Self {
+        Self {
+            id: None,
+            source,
+            target,
+            weight: 1.0,
+            rho_source: None,
+            rho_target: None,
+            edge_type: None,
+            namespace: None,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Set a custom edge ID
+    pub fn id(mut self, id: EdgeId) -> Self {
+        self.id = Some(id);
+        self
+    }
+
+    /// Set the weight
+    pub fn weight(mut self, weight: f32) -> Self {
+        self.weight = weight;
+        self
+    }
+
+    /// Set both restriction maps to identity (states must match exactly)
+    pub fn identity_restrictions(mut self, dim: usize) -> Self {
+        self.rho_source = Some(RestrictionMap::identity(dim));
+        self.rho_target = Some(RestrictionMap::identity(dim));
+        self
+    }
+
+    /// Set the source restriction map
+    pub fn rho_source(mut self, rho: RestrictionMap) -> Self {
+        self.rho_source = Some(rho);
+        self
+    }
+
+    /// Set the target restriction map
+    pub fn rho_target(mut self, rho: RestrictionMap) -> Self {
+        self.rho_target = Some(rho);
+        self
+    }
+
+    /// Set both restriction maps at once
+    pub fn restrictions(mut self, source: RestrictionMap, target: RestrictionMap) -> Self {
+        debug_assert_eq!(
+            source.output_dim(),
+            target.output_dim(),
+            "Restriction maps must have same output dimension"
+        );
+        self.rho_source = Some(source);
+        self.rho_target = Some(target);
+        self
+    }
+
+    /// Set the edge type
+    pub fn edge_type(mut self, edge_type: impl Into<String>) -> Self {
+        self.edge_type = Some(edge_type.into());
+        self
+    }
+
+    /// Set the namespace
+    pub fn namespace(mut self, namespace: impl Into<String>) -> Self {
+        self.namespace = Some(namespace.into());
+        self
+    }
+
+    /// Add metadata
+    pub fn metadata(mut self, key: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
+        self.metadata.insert(key.into(), value.into());
+        self
+    }
+
+    /// Build the edge
+    ///
+    /// # Panics
+    ///
+    /// Panics if restriction maps were not provided.
+    pub fn build(self) -> SheafEdge {
+        let rho_source = self.rho_source.expect("Source restriction map is required");
+        let rho_target = self.rho_target.expect("Target restriction map is required");
+
+        debug_assert_eq!(
+            rho_source.output_dim(),
+            rho_target.output_dim(),
+            "Restriction maps must have same output dimension"
+        );
+
+        let now = Utc::now();
+        SheafEdge {
+            id: self.id.unwrap_or_else(Uuid::new_v4),
+            source: self.source,
+            target: self.target,
+            weight: self.weight,
+            rho_source,
+            rho_target,
+            edge_type: self.edge_type,
+            namespace: self.namespace,
+            metadata: self.metadata,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Try to build the edge, returning an error if restrictions are missing
+    pub fn try_build(self) -> Result<SheafEdge, &'static str> {
+        let rho_source = self
+            .rho_source
+            .ok_or("Source restriction map is required")?;
+        let rho_target = self
+            .rho_target
+            .ok_or("Target restriction map is required")?;
+
+        if rho_source.output_dim() != rho_target.output_dim() {
+            return Err("Restriction maps must have same output dimension");
+        }
+
+        let now = Utc::now();
+        Ok(SheafEdge {
+            id: self.id.unwrap_or_else(Uuid::new_v4),
+            source: self.source,
+            target: self.target,
+            weight: self.weight,
+            rho_source,
+            rho_target,
+            edge_type: self.edge_type,
+            namespace: self.namespace,
+            metadata: self.metadata,
+            created_at: now,
+            updated_at: now,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_test_nodes() -> (NodeId, NodeId) {
+        (Uuid::new_v4(), Uuid::new_v4())
+    }
+
+    #[test]
+    fn test_identity_edge() {
+        let (source, target) = make_test_nodes();
+        let edge = SheafEdge::identity(source, target, 3);
+
+        assert_eq!(edge.source, source);
+        assert_eq!(edge.target, target);
+        assert_eq!(edge.weight, 1.0);
+        assert_eq!(edge.comparison_dim(), 3);
+    }
+
+    #[test]
+    fn test_identity_residual_matching() {
+        let (source, target) = make_test_nodes();
+        let edge = SheafEdge::identity(source, target, 3);
+
+        let source_state = vec![1.0, 2.0, 3.0];
+        let target_state = vec![1.0, 2.0, 3.0];
+
+        let residual = edge.residual(&source_state, &target_state);
+        assert!(residual.iter().all(|&x| x.abs() < 1e-10));
+        assert!(edge.residual_norm_squared(&source_state, &target_state) < 1e-10);
+    }
+
+    #[test]
+    fn test_identity_residual_mismatch() {
+        let (source, target) = make_test_nodes();
+        let edge = SheafEdge::identity(source, target, 3);
+
+        let source_state = vec![1.0, 2.0, 3.0];
+        let target_state = vec![2.0, 2.0, 3.0]; // Differs by 1 in first component
+
+        let residual = edge.residual(&source_state, &target_state);
+        assert_eq!(residual, vec![-1.0, 0.0, 0.0]);
+        assert!((edge.residual_norm_squared(&source_state, &target_state) - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_weighted_energy() {
+        let (source, target) = make_test_nodes();
+        let mut edge = SheafEdge::identity(source, target, 2);
+        edge.set_weight(2.0);
+
+        let source_state = vec![1.0, 0.0];
+        let target_state = vec![0.0, 0.0]; // Residual is [1, 0], norm^2 = 1
+
+        let energy = edge.weighted_residual_energy(&source_state, &target_state);
+        assert!((energy - 2.0).abs() < 1e-10); // weight * 1 = 2
+    }
+
+    #[test]
+    fn test_projection_restriction() {
+        let (source, target) = make_test_nodes();
+
+        // Source: 4D, project to first 2 dims
+        // Target: 2D, identity
+        let rho_source = RestrictionMap::projection(vec![0, 1], 4);
+        let rho_target = RestrictionMap::identity(2);
+
+        let edge = SheafEdge::with_restrictions(source, target, rho_source, rho_target);
+
+        let source_state = vec![1.0, 2.0, 100.0, 200.0]; // Extra dims ignored
+        let target_state = vec![1.0, 2.0];
+
+        let residual = edge.residual(&source_state, &target_state);
+        assert!(residual.iter().all(|&x| x.abs() < 1e-10));
+    }
+
+    #[test]
+    fn test_diagonal_restriction() {
+        let (source, target) = make_test_nodes();
+
+        // Source scaled by [2, 2], target by [1, 1]
+        // For coherence: 2*source = 1*target, so source = target/2
+        let rho_source = RestrictionMap::diagonal(vec![2.0, 2.0]);
+        let rho_target = RestrictionMap::identity(2);
+
+        let edge = SheafEdge::with_restrictions(source, target, rho_source, rho_target);
+
+        let source_state = vec![1.0, 1.0];
+        let target_state = vec![2.0, 2.0]; // 2*[1,1] = [2,2]
+
+        assert!(edge.residual_norm_squared(&source_state, &target_state) < 1e-10);
+    }
+
+    #[test]
+    fn test_is_coherent() {
+        let (source, target) = make_test_nodes();
+        let edge = SheafEdge::identity(source, target, 2);
+
+        let source_state = vec![1.0, 0.0];
+        let target_state = vec![1.1, 0.0]; // Small difference
+
+        // Residual is [-0.1, 0], norm = 0.1
+        assert!(edge.is_coherent(&source_state, &target_state, 0.2)); // Below threshold
+        assert!(!edge.is_coherent(&source_state, &target_state, 0.05)); // Above threshold
+    }
+
+    #[test]
+    fn test_builder() {
+        let (source, target) = make_test_nodes();
+
+        let edge = SheafEdgeBuilder::new(source, target)
+            .weight(2.5)
+            .identity_restrictions(4)
+            .edge_type("citation")
+            .namespace("test")
+            .metadata("importance", serde_json::json!(0.9))
+            .build();
+
+        assert_eq!(edge.weight, 2.5);
+        assert_eq!(edge.edge_type, Some("citation".to_string()));
+        assert_eq!(edge.namespace, Some("test".to_string()));
+        assert!(edge.metadata.contains_key("importance"));
+    }
+
+    #[test]
+    fn test_residual_with_energy() {
+        let (source, target) = make_test_nodes();
+        let edge = SheafEdge::identity(source, target, 3);
+
+        let source_state = vec![1.0, 2.0, 3.0];
+        let target_state = vec![0.0, 0.0, 0.0];
+
+        let (residual, energy) = edge.residual_with_energy(&source_state, &target_state);
+
+        assert_eq!(residual, vec![1.0, 2.0, 3.0]);
+        assert!((energy - 14.0).abs() < 1e-10); // 1 + 4 + 9 = 14
+    }
+
+    #[test]
+    fn test_content_hash_stability() {
+        let (source, target) = make_test_nodes();
+        let edge = SheafEdge::identity(source, target, 3);
+
+        let hash1 = edge.content_hash();
+        let hash2 = edge.content_hash();
+
+        assert_eq!(hash1, hash2);
+    }
+}

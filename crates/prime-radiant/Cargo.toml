@@ -1,0 +1,277 @@
+[package]
+name = "prime-radiant"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+license = "MIT OR Apache-2.0"
+authors = ["RuVector Team <team@ruvector.dev>"]
+description = "Universal coherence engine using sheaf Laplacian mathematics for structural consistency"
+repository = "https://github.com/ruvnet/ruvector"
+homepage = "https://github.com/ruvnet/ruvector/tree/main/crates/prime-radiant"
+documentation = "https://docs.rs/prime-radiant"
+keywords = ["coherence", "sheaf", "consistency", "ai-safety", "distributed"]
+categories = ["algorithms", "science", "mathematics"]
+readme = "README.md"
+
+[lib]
+crate-type = ["rlib"]
+
+# ============================================================================
+# DEPENDENCIES (ADR-014 Full Ecosystem Integration)
+# ============================================================================
+
+[dependencies]
+# -----------------------------------------------------------------------------
+# Core RuVector Ecosystem
+# -----------------------------------------------------------------------------
+
+# 256-tile WASM coherence fabric (cognitum-gate-kernel)
+# Provides: TileState, Delta, WitnessFragment, EvidenceAccumulator
+cognitum-gate-kernel = { path = "../cognitum-gate-kernel", features = ["std"], optional = true }
+
+# Self-optimizing thresholds with EWC++ (sona)
+# Provides: SonaEngine, MicroLoRA, EwcPlusPlus, ReasoningBank
+ruvector-sona = { path = "../sona", features = ["serde-support"], optional = true }
+
+# Learned restriction maps with GNN (ruvector-gnn)
+# Provides: RuvectorLayer, ElasticWeightConsolidation, ReplayBuffer
+ruvector-gnn = { path = "../ruvector-gnn", default-features = false, optional = true }
+
+# Subpolynomial n^o(1) graph partitioning (ruvector-mincut)
+# Provides: SubpolynomialMinCut, CognitiveMinCutEngine, WitnessTree
+ruvector-mincut = { path = "../ruvector-mincut", default-features = false, optional = true }
+
+# Hierarchy-aware Poincare energy (ruvector-hyperbolic-hnsw)
+# Provides: HyperbolicHnsw, poincare_distance, ShardedHyperbolicHnsw
+ruvector-hyperbolic-hnsw = { path = "../ruvector-hyperbolic-hnsw", default-features = false, optional = true }
+
+# CoherenceGatedSystem, HDC witnesses, neural gating (ruvector-nervous-system)
+# Provides: CoherenceGatedSystem, GlobalWorkspace, HdcMemory, Dendrite
+ruvector-nervous-system = { path = "../ruvector-nervous-system", default-features = false, optional = true }
+
+# Topology-gated attention, MoE, PDE diffusion (ruvector-attention)
+# Provides: TopologyGatedAttention, MoEAttention, DiffusionAttention
+ruvector-attention = { path = "../ruvector-attention", default-features = false, optional = true }
+
+# Distributed Raft consensus (ruvector-raft)
+# Provides: RaftNode, RaftConfig, LogEntry, ConsensusState
+ruvector-raft = { path = "../ruvector-raft", optional = true }
+
+# Vector storage and HNSW search (ruvector-core)
+# Provides: VectorDB, HnswConfig, DistanceMetric
+ruvector-core = { path = "../ruvector-core", default-features = false }
+
+# Graph data structures (ruvector-graph)
+# Provides: GraphStore, AdjacencyList
+ruvector-graph = { path = "../ruvector-graph", default-features = false, optional = true }
+
+# -----------------------------------------------------------------------------
+# Math and Numerics
+# -----------------------------------------------------------------------------
+ndarray = { workspace = true, features = ["serde"] }
+nalgebra = { version = "0.33", optional = true }
+
+# -----------------------------------------------------------------------------
+# Serialization
+# -----------------------------------------------------------------------------
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+rkyv = { workspace = true, optional = true }
+
+# -----------------------------------------------------------------------------
+# Hashing and Cryptography
+# -----------------------------------------------------------------------------
+blake3 = "1.5"
+
+# -----------------------------------------------------------------------------
+# Error Handling and Logging
+# -----------------------------------------------------------------------------
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+# -----------------------------------------------------------------------------
+# Concurrency and Performance
+# -----------------------------------------------------------------------------
+rayon = { workspace = true, optional = true }
+crossbeam = { workspace = true, optional = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+once_cell = { workspace = true }
+
+# -----------------------------------------------------------------------------
+# Async Runtime (for distributed)
+# -----------------------------------------------------------------------------
+tokio = { workspace = true, features = ["rt-multi-thread", "sync", "macros", "time"], optional = true }
+futures = { workspace = true, optional = true }
+
+# -----------------------------------------------------------------------------
+# Data Structures
+# -----------------------------------------------------------------------------
+ordered-float = "4.2"
+roaring = { version = "0.10", optional = true }
+petgraph = { version = "0.6", optional = true }
+
+# -----------------------------------------------------------------------------
+# Time and UUID
+# -----------------------------------------------------------------------------
+chrono = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["v4", "serde"] }
+
+# -----------------------------------------------------------------------------
+# Random Number Generation
+# -----------------------------------------------------------------------------
+rand = { workspace = true }
+rand_distr = { workspace = true }
+
+# -----------------------------------------------------------------------------
+# Database (optional for postgres governance storage)
+# -----------------------------------------------------------------------------
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"], optional = true }
+
+# ============================================================================
+# DEV DEPENDENCIES
+# ============================================================================
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = { workspace = true }
+mockall = { workspace = true }
+tempfile = "3.13"
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "test-util"] }
+approx = "0.5"
+quickcheck = "1.0"
+quickcheck_macros = "1.0"
+rand_chacha = "0.3"
+assert_matches = "1.5"
+
+# ============================================================================
+# FEATURES (ADR-014 Feature Flags)
+# ============================================================================
+
+[features]
+# Default: Minimal governance-only features (no external crate deps)
+default = []
+
+# Full: All integrations enabled
+full = [
+    "tiles",
+    "sona",
+    "learned-rho",
+    "hyperbolic",
+    "mincut",
+    "neural-gate",
+    "attention",
+    "distributed",
+    "postgres",
+    "simd",
+    "parallel",
+    "spectral",
+    "graph-integration",
+    "archive",
+]
+
+# -----------------------------------------------------------------------------
+# Core Computation Features
+# -----------------------------------------------------------------------------
+tiles = ["cognitum-gate-kernel"]
+sona = ["ruvector-sona"]
+learned-rho = ["ruvector-gnn"]
+hyperbolic = ["ruvector-hyperbolic-hnsw", "nalgebra"]
+mincut = ["ruvector-mincut", "roaring", "petgraph"]
+neural-gate = ["ruvector-nervous-system"]
+attention = ["ruvector-attention"]
+distributed = ["ruvector-raft", "tokio", "futures"]
+graph-integration = ["ruvector-graph"]
+
+# -----------------------------------------------------------------------------
+# Storage Features
+# -----------------------------------------------------------------------------
+postgres = ["sqlx", "tokio", "futures"]
+
+# -----------------------------------------------------------------------------
+# Performance Features
+# -----------------------------------------------------------------------------
+simd = ["ruvector-core/simd"]
+parallel = ["rayon", "crossbeam"]
+
+# -----------------------------------------------------------------------------
+# Analysis Features
+# -----------------------------------------------------------------------------
+spectral = ["nalgebra"]
+
+# -----------------------------------------------------------------------------
+# Serialization Features
+# -----------------------------------------------------------------------------
+archive = ["rkyv"]
+
+# -----------------------------------------------------------------------------
+# WASM Compatibility
+# -----------------------------------------------------------------------------
+wasm = []
+
+# ============================================================================
+# TESTS
+# ============================================================================
+
+[[test]]
+name = "integration_tests"
+path = "tests/integration/mod.rs"
+
+[[test]]
+name = "property_tests"
+path = "tests/property/mod.rs"
+
+[[test]]
+name = "replay_determinism"
+path = "tests/replay_determinism.rs"
+
+[[test]]
+name = "chaos_tests"
+path = "tests/chaos_tests.rs"
+
+# ============================================================================
+# BENCHMARKS (only existing ones)
+# ============================================================================
+
+[[bench]]
+name = "residual_bench"
+harness = false
+
+[[bench]]
+name = "energy_bench"
+harness = false
+
+[[bench]]
+name = "gate_bench"
+harness = false
+
+[[bench]]
+name = "incremental_bench"
+harness = false
+
+[[bench]]
+name = "tile_bench"
+harness = false
+
+[[bench]]
+name = "sona_bench"
+harness = false
+
+[[bench]]
+name = "mincut_bench"
+harness = false
+
+[[bench]]
+name = "hyperbolic_bench"
+harness = false
+
+# ============================================================================
+# DOCUMENTATION
+# ============================================================================
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
