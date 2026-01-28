@@ -298,7 +298,7 @@ mod tests {
     fn test_dag_attention_visualize_formats() {
         let formats = ["dot", "json", "ascii", "mermaid"];
         for format in &formats {
-            let result = dag_attention_visualize("SELECT 1", Some("auto"), Some(format));
+            let result = dag_attention_visualize("SELECT 1", "auto", format);
             assert!(!result.is_empty());
         }
     }
@@ -306,6 +306,6 @@ mod tests {
     #[pg_test]
     #[should_panic(expected = "Invalid format")]
     fn test_dag_attention_visualize_invalid_format() {
-        dag_attention_visualize("SELECT 1", Some("auto"), Some("invalid"));
+        dag_attention_visualize("SELECT 1", "auto", "invalid");
     }
 }

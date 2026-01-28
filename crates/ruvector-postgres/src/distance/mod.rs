@@ -83,6 +83,7 @@ fn detect_simd_capability() -> SimdCapability {
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
             return SimdCapability::Avx2;
         }
+        return SimdCapability::Scalar;
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -91,6 +92,7 @@ fn detect_simd_capability() -> SimdCapability {
         return SimdCapability::Neon;
     }
 
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     SimdCapability::Scalar
 }
 
