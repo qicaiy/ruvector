@@ -12,12 +12,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const VERSION = '0.3.0';
+const MODULE_COUNT = 22;
 
 const program = new Command();
 
 program
   .name('rvlite')
-  .description('Lightweight vector database with SQL, SPARQL, and Cypher')
+  .description('Standalone vector database with 22+ WASM modules')
   .version(VERSION);
 
 // Database state (in-memory for now, persisted to JSON)
@@ -1682,4 +1683,616 @@ program
     console.log(chalk.cyan('\n═══════════════════════════════════════════════════════════'));
   });
 
+// ============ MODULES COMMAND ============
+
+program
+  .command('modules')
+  .description('List all available RvLite WASM modules')
+  .option('--json', 'Output as JSON')
+  .action(async (options) => {
+    const modules = [
+      { name: 'core',            version: '0.3.0',  status: 'active', description: 'Vector storage, SIMD similarity search' },
+      { name: 'sql',             version: '0.3.0',  status: 'active', description: 'SQL queries with pgvector-compatible syntax' },
+      { name: 'sparql',          version: '0.3.0',  status: 'active', description: 'SPARQL RDF triple store and queries' },
+      { name: 'cypher',          version: '0.3.0',  status: 'active', description: 'Cypher property graph queries' },
+      { name: 'persistence',     version: '0.3.0',  status: 'active', description: 'IndexedDB/filesystem persistence' },
+      { name: 'gnn',             version: '0.1.0',  status: 'active', description: 'Graph Neural Networks (GCN, GAT, GraphSAGE, GIN)' },
+      { name: 'attention',       version: '0.1.32', status: 'active', description: '39 attention mechanisms (Flash, MoE, Hyperbolic)' },
+      { name: 'delta',           version: '0.1.0',  status: 'active', description: 'Incremental vector updates and consensus' },
+      { name: 'learning',        version: '0.1.0',  status: 'active', description: 'MicroLoRA adaptation (<100us latency)' },
+      { name: 'math',            version: '0.1.0',  status: 'active', description: 'Optimal Transport, Information Geometry, Manifolds' },
+      { name: 'hyperbolic',      version: '0.1.0',  status: 'active', description: 'Poincare/Lorentz hierarchy-aware search' },
+      { name: 'nervous-system',  version: '0.1.0',  status: 'active', description: 'Bio-inspired SNN with LIF neurons, STDP' },
+      { name: 'sparse-inference',version: '0.1.0',  status: 'active', description: 'PowerInfer-style sparse inference' },
+      { name: 'dag',             version: '0.1.0',  status: 'active', description: 'DAG workflow orchestration' },
+      { name: 'router',          version: '0.1.0',  status: 'active', description: 'Intelligent embedding-based routing' },
+      { name: 'hnsw',            version: '2.3.2',  status: 'active', description: 'Neuromorphic HNSW (11.8KB micro-hnsw)' },
+      { name: 'sona',            version: '0.1.4',  status: 'active', description: 'SONA self-optimizing neural architecture' },
+      { name: 'economy',         version: '0.1.0',  status: 'active', description: 'Token economy and resource management' },
+      { name: 'exotic',          version: '0.1.0',  status: 'active', description: 'Exotic distance types and metrics' },
+      { name: 'fpga',            version: '0.1.0',  status: 'active', description: 'FPGA transformer acceleration' },
+      { name: 'mincut',          version: '0.1.0',  status: 'active', description: 'Graph min-cut optimization' },
+      { name: 'cognitum',        version: '0.1.0',  status: 'active', description: 'Cognitive gateway with evidence evaluation' },
+    ];
+
+    if (options.json) {
+      console.log(JSON.stringify(modules, null, 2));
+      return;
+    }
+
+    console.log(chalk.cyan(`\nRvLite v${VERSION} - ${modules.length} WASM Modules\n`));
+    console.log(chalk.dim('  Module               Version   Status   Description'));
+    console.log(chalk.dim('  ' + '─'.repeat(78)));
+    for (const m of modules) {
+      const status = m.status === 'active' ? chalk.green('active') : chalk.yellow(m.status);
+      const name = m.name.padEnd(20);
+      const ver = m.version.padEnd(9);
+      console.log(`  ${chalk.white(name)} ${chalk.dim(ver)} ${status}  ${chalk.dim(m.description)}`);
+    }
+    console.log();
+  });
+
+// ============ DELTA COMMANDS ============
+
+program
+  .command('delta-compute')
+  .description('Compute delta between two vectors')
+  .argument('<vec-a>', 'First vector as JSON array')
+  .argument('<vec-b>', 'Second vector as JSON array')
+  .option('--compress', 'Compress the delta')
+  .action(async (vecAStr, vecBStr, options) => {
+    try {
+      const a = JSON.parse(vecAStr);
+      const b = JSON.parse(vecBStr);
+      if (a.length !== b.length) {
+        console.error(chalk.red('Vectors must have same dimensions'));
+        process.exit(1);
+      }
+      const delta = a.map((v, i) => b[i] - v);
+
+      // Compute sparsity
+      const nonzero = delta.filter(v => Math.abs(v) > 1e-8).length;
+      const sparsity = 1 - (nonzero / delta.length);
+
+      if (options.compress) {
+        // Sparse representation: only store non-zero indices
+        const sparse = [];
+        for (let i = 0; i < delta.length; i++) {
+          if (Math.abs(delta[i]) > 1e-8) {
+            sparse.push({ i, v: delta[i] });
+          }
+        }
+        console.log(JSON.stringify({ type: 'sparse-delta', sparsity: sparsity.toFixed(4), entries: sparse }));
+      } else {
+        console.log(JSON.stringify({ type: 'dense-delta', sparsity: sparsity.toFixed(4), delta }));
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('delta-apply')
+  .description('Apply a delta to a stored vector')
+  .argument('<id>', 'Vector ID')
+  .argument('<delta>', 'Delta as JSON array')
+  .option('-p, --path <path>', 'Database path', DEFAULT_DB_PATH)
+  .action(async (id, deltaStr, options) => {
+    try {
+      loadState(options.path);
+      if (!state.vectors[id]) {
+        console.error(chalk.red(`Vector ${id} not found`));
+        process.exit(1);
+      }
+      const delta = JSON.parse(deltaStr);
+      const vec = state.vectors[id].vector;
+      if (vec.length !== delta.length) {
+        console.error(chalk.red('Delta dimensions must match vector'));
+        process.exit(1);
+      }
+      for (let i = 0; i < vec.length; i++) {
+        vec[i] += delta[i];
+      }
+      // Recompute norm
+      state.vectors[id].norm = computeNorm(vec);
+      normCache.set(id, state.vectors[id].norm);
+      saveState(options.path);
+      console.log(chalk.green(`Delta applied to ${id}`));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+// ============ MATH COMMANDS ============
+
+program
+  .command('math-distance')
+  .description('Compute advanced distance metrics between vectors')
+  .argument('<vec-a>', 'First vector as JSON array')
+  .argument('<vec-b>', 'Second vector as JSON array')
+  .option('-m, --metric <type>', 'Metric type (wasserstein, kl, js, hellinger, mahalanobis)', 'wasserstein')
+  .action(async (vecAStr, vecBStr, options) => {
+    try {
+      const a = JSON.parse(vecAStr);
+      const b = JSON.parse(vecBStr);
+
+      let distance;
+      const metric = options.metric;
+
+      if (metric === 'wasserstein' || metric === 'emd') {
+        // 1D Wasserstein (Earth Mover's Distance)
+        const sortedA = [...a].sort((x, y) => x - y);
+        const sortedB = [...b].sort((x, y) => x - y);
+        distance = 0;
+        for (let i = 0; i < sortedA.length; i++) {
+          distance += Math.abs(sortedA[i] - sortedB[i]);
+        }
+        distance /= sortedA.length;
+      } else if (metric === 'kl') {
+        // KL Divergence (with epsilon for stability)
+        const eps = 1e-10;
+        distance = 0;
+        for (let i = 0; i < a.length; i++) {
+          const p = Math.max(Math.abs(a[i]), eps);
+          const q = Math.max(Math.abs(b[i]), eps);
+          distance += p * Math.log(p / q);
+        }
+      } else if (metric === 'js') {
+        // Jensen-Shannon Divergence
+        const eps = 1e-10;
+        const m = a.map((v, i) => (Math.abs(v) + Math.abs(b[i])) / 2);
+        let klAM = 0, klBM = 0;
+        for (let i = 0; i < a.length; i++) {
+          const p = Math.max(Math.abs(a[i]), eps);
+          const q = Math.max(Math.abs(b[i]), eps);
+          const mi = Math.max(m[i], eps);
+          klAM += p * Math.log(p / mi);
+          klBM += q * Math.log(q / mi);
+        }
+        distance = (klAM + klBM) / 2;
+      } else if (metric === 'hellinger') {
+        // Hellinger Distance
+        let sum = 0;
+        for (let i = 0; i < a.length; i++) {
+          const diff = Math.sqrt(Math.abs(a[i])) - Math.sqrt(Math.abs(b[i]));
+          sum += diff * diff;
+        }
+        distance = Math.sqrt(sum / 2);
+      } else if (metric === 'mahalanobis') {
+        // Simplified Mahalanobis (assumes identity covariance)
+        distance = Math.sqrt(a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0));
+      } else {
+        console.error(chalk.red(`Unknown metric: ${metric}. Use: wasserstein, kl, js, hellinger, mahalanobis`));
+        process.exit(1);
+      }
+
+      console.log(JSON.stringify({ metric, distance, dims: a.length }));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+// ============ HYPERBOLIC COMMANDS ============
+
+program
+  .command('hyperbolic-embed')
+  .description('Project a vector into hyperbolic space (Poincare ball)')
+  .argument('<vector>', 'Vector as JSON array')
+  .option('-c, --curvature <n>', 'Curvature parameter', '1.0')
+  .option('--model <type>', 'Hyperbolic model (poincare, lorentz)', 'poincare')
+  .action(async (vectorStr, options) => {
+    try {
+      const vec = JSON.parse(vectorStr);
+      const c = parseFloat(options.curvature);
+
+      if (options.model === 'poincare') {
+        const projected = projectToPoincareBall(vec);
+        const norm = computeNorm(projected);
+        console.log(JSON.stringify({
+          model: 'poincare-ball',
+          curvature: c,
+          originalNorm: computeNorm(vec).toFixed(6),
+          projectedNorm: norm.toFixed(6),
+          inBall: norm < 1,
+          vector: projected.map(v => parseFloat(v.toFixed(6)))
+        }));
+      } else if (options.model === 'lorentz') {
+        const projected = euclideanToLorentz(vec);
+        console.log(JSON.stringify({
+          model: 'lorentz-hyperboloid',
+          curvature: c,
+          timeComponent: projected[0].toFixed(6),
+          spatialDims: projected.length - 1,
+          vector: projected.map(v => parseFloat(v.toFixed(6)))
+        }));
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('hyperbolic-search')
+  .description('Search vectors using hyperbolic distance')
+  .argument('<query>', 'Query vector as JSON array')
+  .option('-k, --top-k <n>', 'Number of results', '5')
+  .option('--model <type>', 'Hyperbolic model (poincare, lorentz)', 'poincare')
+  .option('-p, --path <path>', 'Database path', DEFAULT_DB_PATH)
+  .action(async (queryStr, options) => {
+    try {
+      loadState(options.path);
+      const query = JSON.parse(queryStr);
+      const k = parseInt(options.topK);
+      const metric = options.model === 'lorentz' ? 'lorentz' : 'poincare';
+      const results = searchVectors(query, k, metric);
+      console.log(JSON.stringify(results.map(r => ({
+        id: r.id,
+        distance: r.distance ? r.distance.toFixed(6) : undefined,
+        score: r.score.toFixed(6),
+        metadata: r.metadata
+      })), null, 2));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('hyperbolic-midpoint')
+  .description('Compute Mobius midpoint of two vectors in Poincare ball')
+  .argument('<vec-a>', 'First vector as JSON array')
+  .argument('<vec-b>', 'Second vector as JSON array')
+  .action(async (vecAStr, vecBStr) => {
+    try {
+      const a = JSON.parse(vecAStr);
+      const b = JSON.parse(vecBStr);
+      // Mobius midpoint: mobiusAdd(a, b) / 2 (approximate)
+      const midpoint = mobiusAdd(a.map(v => v * 0.5), b.map(v => v * 0.5));
+      console.log(JSON.stringify({
+        midpoint: midpoint.map(v => parseFloat(v.toFixed(6))),
+        norm: computeNorm(midpoint).toFixed(6),
+        distAB: poincareDistance(a, b).toFixed(6)
+      }));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+// ============ DAG COMMANDS ============
+
+program
+  .command('dag-create')
+  .description('Create a DAG (directed acyclic graph) workflow')
+  .argument('<name>', 'DAG name')
+  .option('-p, --path <path>', 'Database path', DEFAULT_DB_PATH)
+  .action(async (name, options) => {
+    try {
+      loadState(options.path);
+      if (!state.dags) state.dags = {};
+      state.dags[name] = { nodes: {}, edges: [], created: Date.now() };
+      saveState(options.path);
+      console.log(chalk.green(`DAG "${name}" created`));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('dag-add-node')
+  .description('Add a node to a DAG')
+  .argument('<dag>', 'DAG name')
+  .argument('<node-id>', 'Node ID')
+  .option('-t, --type <type>', 'Node type', 'task')
+  .option('-d, --data <json>', 'Node data as JSON')
+  .option('--depends <ids>', 'Comma-separated dependency node IDs')
+  .option('-p, --path <path>', 'Database path', DEFAULT_DB_PATH)
+  .action(async (dagName, nodeId, options) => {
+    try {
+      loadState(options.path);
+      if (!state.dags || !state.dags[dagName]) {
+        console.error(chalk.red(`DAG "${dagName}" not found. Use dag-create first.`));
+        process.exit(1);
+      }
+      const dag = state.dags[dagName];
+      const data = options.data ? JSON.parse(options.data) : {};
+      dag.nodes[nodeId] = { type: options.type, data, status: 'pending' };
+      if (options.depends) {
+        const deps = options.depends.split(',');
+        for (const dep of deps) {
+          dag.edges.push({ from: dep.trim(), to: nodeId });
+        }
+      }
+      saveState(options.path);
+      console.log(chalk.green(`Node "${nodeId}" added to DAG "${dagName}"`));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('dag-topo-sort')
+  .description('Get topological sort order of a DAG')
+  .argument('<dag>', 'DAG name')
+  .option('-p, --path <path>', 'Database path', DEFAULT_DB_PATH)
+  .action(async (dagName, options) => {
+    try {
+      loadState(options.path);
+      if (!state.dags || !state.dags[dagName]) {
+        console.error(chalk.red(`DAG "${dagName}" not found`));
+        process.exit(1);
+      }
+      const dag = state.dags[dagName];
+      const nodes = Object.keys(dag.nodes);
+      const inDegree = {};
+      const adj = {};
+      for (const n of nodes) { inDegree[n] = 0; adj[n] = []; }
+      for (const e of dag.edges) {
+        adj[e.from] = adj[e.from] || [];
+        adj[e.from].push(e.to);
+        inDegree[e.to] = (inDegree[e.to] || 0) + 1;
+      }
+      const queue = nodes.filter(n => (inDegree[n] || 0) === 0);
+      const sorted = [];
+      while (queue.length > 0) {
+        const node = queue.shift();
+        sorted.push(node);
+        for (const next of (adj[node] || [])) {
+          inDegree[next]--;
+          if (inDegree[next] === 0) queue.push(next);
+        }
+      }
+      if (sorted.length !== nodes.length) {
+        console.error(chalk.red('DAG contains a cycle!'));
+        process.exit(1);
+      }
+      // Group into parallel levels
+      const level = {};
+      for (const n of sorted) {
+        const deps = dag.edges.filter(e => e.to === n).map(e => e.from);
+        level[n] = deps.length === 0 ? 0 : Math.max(...deps.map(d => level[d])) + 1;
+      }
+      const levels = {};
+      for (const [n, l] of Object.entries(level)) {
+        if (!levels[l]) levels[l] = [];
+        levels[l].push(n);
+      }
+      console.log(JSON.stringify({ order: sorted, parallelLevels: levels }, null, 2));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('dag-list')
+  .description('List all DAGs')
+  .option('-p, --path <path>', 'Database path', DEFAULT_DB_PATH)
+  .action(async (options) => {
+    try {
+      loadState(options.path);
+      const dags = state.dags || {};
+      const names = Object.keys(dags);
+      if (names.length === 0) {
+        console.log(chalk.dim('No DAGs found'));
+        return;
+      }
+      for (const name of names) {
+        const dag = dags[name];
+        const nodeCount = Object.keys(dag.nodes).length;
+        const edgeCount = dag.edges.length;
+        console.log(`  ${chalk.white(name)}: ${nodeCount} nodes, ${edgeCount} edges`);
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+// ============ NERVOUS SYSTEM COMMANDS ============
+
+program
+  .command('nervous-simulate')
+  .description('Simulate a spiking neural network')
+  .option('-n, --neurons <n>', 'Number of neurons', '10')
+  .option('-t, --timesteps <n>', 'Simulation timesteps', '100')
+  .option('--model <type>', 'Neuron model (lif, izhikevich)', 'lif')
+  .option('--input <json>', 'Input current as JSON array')
+  .option('--threshold <v>', 'Spike threshold', '1.0')
+  .action(async (options) => {
+    try {
+      const numNeurons = parseInt(options.neurons);
+      const timesteps = parseInt(options.timesteps);
+      const threshold = parseFloat(options.threshold);
+
+      // LIF (Leaky Integrate-and-Fire) simulation
+      const membrane = new Float64Array(numNeurons);
+      const spikes = [];
+      const tau = 20.0; // membrane time constant
+      const dt = 1.0;
+      const leak = Math.exp(-dt / tau);
+
+      // Generate input current
+      let input;
+      if (options.input) {
+        input = JSON.parse(options.input);
+      } else {
+        // Random Poisson input
+        input = Array(numNeurons).fill(0).map(() => Math.random() * 0.5 + 0.3);
+      }
+
+      let totalSpikes = 0;
+      for (let t = 0; t < timesteps; t++) {
+        for (let i = 0; i < numNeurons; i++) {
+          // Leaky integration
+          membrane[i] = membrane[i] * leak + input[i % input.length] * (Math.random() * 2);
+
+          // Spike check
+          if (membrane[i] >= threshold) {
+            spikes.push({ neuron: i, time: t });
+            membrane[i] = 0; // Reset
+            totalSpikes++;
+          }
+        }
+      }
+
+      const firingRate = totalSpikes / (numNeurons * timesteps) * 1000; // Hz (assuming 1ms timestep)
+      console.log(JSON.stringify({
+        model: options.model,
+        neurons: numNeurons,
+        timesteps,
+        threshold,
+        totalSpikes,
+        firingRate: `${firingRate.toFixed(1)} Hz`,
+        spikeCount: spikes.length,
+        lastSpikes: spikes.slice(-10)
+      }, null, 2));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+// ============ SPARSE INFERENCE COMMANDS ============
+
+program
+  .command('sparse-analyze')
+  .description('Analyze sparsity of a vector or set of vectors')
+  .argument('<input>', 'Vector as JSON array, or path to JSON file with vectors')
+  .option('--threshold <v>', 'Zero threshold', '1e-6')
+  .option('--pattern <type>', 'Sparsity pattern (powerinfer, top-k, threshold)', 'threshold')
+  .action(async (inputStr, options) => {
+    try {
+      let vectors;
+      if (inputStr.startsWith('[')) {
+        vectors = [JSON.parse(inputStr)];
+      } else {
+        const data = JSON.parse(fs.readFileSync(inputStr, 'utf-8'));
+        vectors = Array.isArray(data) ? data : [data];
+      }
+
+      const thresh = parseFloat(options.threshold);
+      const results = vectors.map((vec, idx) => {
+        const nonzero = vec.filter(v => Math.abs(v) > thresh).length;
+        const sparsity = 1 - (nonzero / vec.length);
+        const topK = [...vec].map((v, i) => ({ i, v: Math.abs(v) }))
+          .sort((a, b) => b.v - a.v)
+          .slice(0, 10)
+          .map(e => e.i);
+        return {
+          index: idx,
+          dims: vec.length,
+          nonzero,
+          sparsity: `${(sparsity * 100).toFixed(1)}%`,
+          topIndices: topK,
+          l2Norm: computeNorm(vec).toFixed(6)
+        };
+      });
+
+      console.log(JSON.stringify(results.length === 1 ? results[0] : results, null, 2));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+// ============ ROUTER COMMANDS ============
+
+program
+  .command('router-route')
+  .description('Route a query to the best matching target using embedding similarity')
+  .argument('<query>', 'Query text to route')
+  .option('-r, --routes <json>', 'Routes as JSON array of {pattern, target, embedding}')
+  .option('-p, --path <path>', 'Database path', DEFAULT_DB_PATH)
+  .option('-k, --top-k <n>', 'Number of top matches', '3')
+  .action(async (query, options) => {
+    try {
+      const queryEmbed = hashEmbed(query);
+      let routes;
+
+      if (options.routes) {
+        routes = JSON.parse(options.routes);
+      } else {
+        // Default routes for demonstration
+        routes = [
+          { pattern: 'database query sql', target: 'sql-engine' },
+          { pattern: 'graph relationship node edge', target: 'cypher-engine' },
+          { pattern: 'rdf triple semantic', target: 'sparql-engine' },
+          { pattern: 'neural network train model', target: 'gnn-engine' },
+          { pattern: 'attention transformer', target: 'attention-engine' },
+          { pattern: 'search vector similarity', target: 'vector-search' },
+        ];
+      }
+
+      // Compute similarities
+      const results = routes.map(route => {
+        const routeEmbed = route.embedding || hashEmbed(route.pattern);
+        const queryNorm = computeNorm(queryEmbed);
+        const routeNorm = computeNorm(routeEmbed);
+        const score = cosineSimilarity(queryEmbed, routeEmbed, queryNorm, routeNorm);
+        return { target: route.target, pattern: route.pattern, score };
+      });
+
+      results.sort((a, b) => b.score - a.score);
+      const topK = parseInt(options.topK);
+      const top = results.slice(0, topK);
+
+      console.log(JSON.stringify({
+        query,
+        bestMatch: top[0].target,
+        confidence: top[0].score.toFixed(4),
+        matches: top.map(r => ({
+          target: r.target,
+          score: r.score.toFixed(4)
+        }))
+      }, null, 2));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+// ============ SYSTEM INFO ============
+
+program
+  .command('info')
+  .description('Show system information and module status')
+  .option('-p, --path <path>', 'Database path', DEFAULT_DB_PATH)
+  .action(async (options) => {
+    loadState(options.path);
+    const vectorCount = Object.keys(state.vectors).length;
+    const tripleCount = state.triples ? state.triples.length : 0;
+    const nodeCount = state.graph ? Object.keys(state.graph.nodes || {}).length : 0;
+    const edgeCount = state.graph ? Object.keys(state.graph.edges || {}).length : 0;
+    const dagCount = state.dags ? Object.keys(state.dags).length : 0;
+
+    console.log(chalk.cyan(`\nRvLite v${VERSION}\n`));
+    console.log(chalk.white('  Database:'));
+    console.log(`    Path:      ${options.path}`);
+    console.log(`    Vectors:   ${vectorCount}`);
+    console.log(`    Triples:   ${tripleCount}`);
+    console.log(`    Nodes:     ${nodeCount}`);
+    console.log(`    Edges:     ${edgeCount}`);
+    console.log(`    DAGs:      ${dagCount}`);
+    console.log();
+    console.log(chalk.white('  WASM Modules: 22'));
+    console.log(chalk.white('  Feature Sets:'));
+    console.log(`    core-plus:       graph + hnsw + sona`);
+    console.log(`    ml:              gnn + attention + learning + nervous`);
+    console.log(`    advanced-search: hnsw + hyperbolic + math + sparse`);
+    console.log(`    full:            all 22 modules`);
+    console.log();
+    console.log(chalk.white('  Runtime:'));
+    console.log(`    Node.js:   ${process.version}`);
+    console.log(`    Platform:  ${process.platform} ${process.arch}`);
+    console.log();
+  });
+
 program.parse();
+

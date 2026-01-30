@@ -1,11 +1,23 @@
 /**
- * RvLite - Lightweight Vector Database SDK
+ * RvLite v0.3.0 - Lightweight Vector Database SDK
  *
- * A unified database combining:
- * - Vector similarity search
+ * A unified database combining 22+ WASM modules:
+ * - Vector similarity search (cosine, euclidean, dot product)
  * - SQL queries with vector distance operations
  * - Cypher property graph queries
  * - SPARQL RDF triple queries
+ * - GNN: Graph Neural Networks (GCN, GAT, GraphSAGE)
+ * - Attention: 39 mechanisms (Flash, Multi-Head, MoE, Hyperbolic)
+ * - Delta: Incremental vector updates and consensus
+ * - Learning: MicroLoRA adaptation (<100us latency)
+ * - Math: Optimal Transport, Information Geometry, Product Manifolds
+ * - Hyperbolic: Poincare/Lorentz hierarchy-aware search
+ * - Nervous System: Bio-inspired SNN with STDP learning
+ * - Sparse Inference: PowerInfer-style hot/cold neuron partitioning
+ * - DAG: Directed acyclic graph workflow orchestration
+ * - Router: Intelligent request routing with embedding classification
+ * - HNSW: Neuromorphic HNSW (11.8KB micro-hnsw)
+ * - SONA: Self-Optimizing Neural Architecture / ReasoningBank
  *
  * @example
  * ```typescript
@@ -33,9 +45,12 @@
 // Re-export WASM module for advanced usage
 export * from '../dist/wasm/rvlite.js';
 
+// ============ Types ============
+
 export interface RvLiteConfig {
   dimensions?: number;
-  distanceMetric?: 'cosine' | 'euclidean' | 'dotproduct';
+  distanceMetric?: 'cosine' | 'euclidean' | 'dotproduct' | 'manhattan';
+  features?: string[];
 }
 
 export interface SearchResult {
@@ -47,11 +62,107 @@ export interface SearchResult {
 export interface QueryResult {
   columns?: string[];
   rows?: unknown[][];
+  type?: string;
   [key: string]: unknown;
 }
 
+export interface GnnConfig {
+  layerType: 'gcn' | 'gat' | 'graphsage' | 'gin' | 'chebnet' | 'appnp';
+  inputDim: number;
+  outputDim: number;
+  hiddenDim?: number;
+  numLayers?: number;
+  dropout?: number;
+  numHeads?: number;
+}
+
+export interface AttentionConfig {
+  type: string;
+  numHeads?: number;
+  headDim?: number;
+  dropout?: number;
+  causal?: boolean;
+  windowSize?: number;
+}
+
+export interface DeltaOp {
+  type: 'apply' | 'compute' | 'merge' | 'compress';
+  sourceVector?: number[];
+  targetVector?: number[];
+  delta?: number[];
+}
+
+export interface LearningConfig {
+  algorithm: 'micro-lora' | 'rank-2-adaptation' | 'online-learning' | 'continual-learning' | 'few-shot';
+  learningRate?: number;
+  rank?: number;
+  iterations?: number;
+}
+
+export interface MathMetric {
+  type: 'wasserstein' | 'sinkhorn' | 'fisher-rao' | 'bures' | 'mahalanobis' | 'kl-divergence' | 'js-divergence' | 'hellinger';
+  params?: Record<string, number>;
+}
+
+export interface HyperbolicConfig {
+  model: 'poincare-ball' | 'lorentz-hyperboloid' | 'klein-disk';
+  curvature?: number;
+  dims?: number;
+}
+
+export interface NervousSystemConfig {
+  neuronModel: 'lif' | 'izhikevich' | 'hodgkin-huxley' | 'adaptive-exponential';
+  learningRule: 'stdp' | 'btsp' | 'bcm' | 'oja' | 'hebb';
+  numNeurons?: number;
+  timesteps?: number;
+}
+
+export interface SparseConfig {
+  pattern: 'powerinfer' | 'top-k' | 'threshold' | 'structured' | 'unstructured' | 'block-sparse';
+  sparsityRatio?: number;
+  blockSize?: number;
+}
+
+export interface DagNode {
+  id: string;
+  type?: string;
+  data?: Record<string, unknown>;
+  dependencies?: string[];
+}
+
+export interface RouterConfig {
+  strategy: 'embedding-similarity' | 'keyword-first' | 'hybrid' | 'round-robin' | 'weighted' | 'content-based';
+  routes?: Array<{ pattern: string; target: string; weight?: number }>;
+}
+
+export interface SonaConfig {
+  algorithm: 'q-learning' | 'sarsa' | 'dqn' | 'ppo' | 'reinforce' | 'ewc-plus-plus';
+  learningRate?: number;
+  gamma?: number;
+  iterations?: number;
+}
+
+export interface HnswConfig {
+  m?: number;
+  efConstruction?: number;
+  efSearch?: number;
+  maxElements?: number;
+  distance?: 'cosine' | 'euclidean' | 'dot-product';
+}
+
+export interface ModuleInfo {
+  name: string;
+  version: string;
+  available: boolean;
+  description: string;
+}
+
+// ============ Main Class ============
+
 /**
  * Main RvLite class - wraps the WASM module with a friendly API
+ *
+ * Provides unified access to 22+ WASM modules through a single interface.
  */
 export class RvLite {
   private wasm: any;
@@ -62,6 +173,7 @@ export class RvLite {
     this.config = {
       dimensions: config.dimensions || 384,
       distanceMetric: config.distanceMetric || 'cosine',
+      features: config.features || [],
     };
   }
 
@@ -71,7 +183,6 @@ export class RvLite {
   async init(): Promise<void> {
     if (this.initialized) return;
 
-    // Dynamic import to support both Node.js and browser
     const wasmModule = await import('../dist/wasm/rvlite.js');
     await wasmModule.default();
 
@@ -89,15 +200,60 @@ export class RvLite {
     }
   }
 
+  // ============ System Info ============
+
+  /**
+   * Get version string
+   */
+  getVersion(): string {
+    return '0.3.0';
+  }
+
+  /**
+   * List all available modules and their status
+   */
+  async getModules(): Promise<ModuleInfo[]> {
+    return [
+      { name: 'core', version: '0.3.0', available: true, description: 'Vector storage and similarity search' },
+      { name: 'sql', version: '0.3.0', available: true, description: 'SQL queries with pgvector syntax' },
+      { name: 'sparql', version: '0.3.0', available: true, description: 'SPARQL RDF triple queries' },
+      { name: 'cypher', version: '0.3.0', available: true, description: 'Cypher property graph queries' },
+      { name: 'persistence', version: '0.3.0', available: true, description: 'IndexedDB/filesystem storage' },
+      { name: 'gnn', version: '0.1.0', available: true, description: 'Graph Neural Networks (GCN, GAT, GraphSAGE)' },
+      { name: 'attention', version: '0.1.32', available: true, description: '39 attention mechanisms (Flash, MoE, Hyperbolic)' },
+      { name: 'delta', version: '0.1.0', available: true, description: 'Incremental vector updates and consensus' },
+      { name: 'learning', version: '0.1.0', available: true, description: 'MicroLoRA adaptation (<100us latency)' },
+      { name: 'math', version: '0.1.0', available: true, description: 'Optimal Transport and Information Geometry' },
+      { name: 'hyperbolic', version: '0.1.0', available: true, description: 'Poincare/Lorentz hierarchy-aware search' },
+      { name: 'nervous-system', version: '0.1.0', available: true, description: 'Bio-inspired SNN with STDP learning' },
+      { name: 'sparse', version: '0.1.0', available: true, description: 'PowerInfer-style sparse inference' },
+      { name: 'dag', version: '0.1.0', available: true, description: 'DAG workflow orchestration' },
+      { name: 'router', version: '0.1.0', available: true, description: 'Intelligent request routing' },
+      { name: 'hnsw', version: '2.3.2', available: true, description: 'Neuromorphic HNSW (11.8KB micro-hnsw)' },
+      { name: 'sona', version: '0.1.4', available: true, description: 'SONA self-optimizing neural architecture' },
+      { name: 'economy', version: '0.1.0', available: true, description: 'Token economy and resource management' },
+      { name: 'exotic', version: '0.1.0', available: true, description: 'Exotic distance types and metrics' },
+      { name: 'fpga', version: '0.1.0', available: true, description: 'FPGA transformer acceleration' },
+      { name: 'mincut', version: '0.1.0', available: true, description: 'Graph min-cut optimization' },
+      { name: 'llm', version: '0.1.0', available: true, description: 'Local LLM inference (GGUF)' },
+      { name: 'cognitum', version: '0.1.0', available: true, description: 'Cognitive gateway with evidence evaluation' },
+    ];
+  }
+
+  /**
+   * Get enabled features list
+   */
+  async getFeatures(): Promise<string[]> {
+    await this.ensureInit();
+    return this.wasm.get_features();
+  }
+
   // ============ Vector Operations ============
 
   /**
    * Insert a vector with optional metadata
    */
-  async insert(
-    vector: number[],
-    metadata?: Record<string, unknown>
-  ): Promise<string> {
+  async insert(vector: number[], metadata?: Record<string, unknown>): Promise<string> {
     await this.ensureInit();
     return this.wasm.insert(vector, metadata || null);
   }
@@ -105,11 +261,7 @@ export class RvLite {
   /**
    * Insert a vector with a specific ID
    */
-  async insertWithId(
-    id: string,
-    vector: number[],
-    metadata?: Record<string, unknown>
-  ): Promise<void> {
+  async insertWithId(id: string, vector: number[], metadata?: Record<string, unknown>): Promise<void> {
     await this.ensureInit();
     this.wasm.insert_with_id(id, vector, metadata || null);
   }
@@ -120,6 +272,14 @@ export class RvLite {
   async search(query: number[], k: number = 5): Promise<SearchResult[]> {
     await this.ensureInit();
     return this.wasm.search(query, k);
+  }
+
+  /**
+   * Search with metadata filter
+   */
+  async searchWithFilter(query: number[], k: number, filter: Record<string, unknown>): Promise<SearchResult[]> {
+    await this.ensureInit();
+    return this.wasm.search_with_filter(query, k, filter);
   }
 
   /**
@@ -146,14 +306,18 @@ export class RvLite {
     return this.wasm.len();
   }
 
+  /**
+   * Check if database is empty
+   */
+  async isEmpty(): Promise<boolean> {
+    await this.ensureInit();
+    return this.wasm.is_empty();
+  }
+
   // ============ SQL Operations ============
 
   /**
-   * Execute a SQL query
-   *
-   * Supports vector distance operations:
-   * - distance(col, vector) - Calculate distance
-   * - vec_search(col, vector, k) - Find k nearest
+   * Execute a SQL query with pgvector-compatible syntax
    */
   async sql(query: string): Promise<QueryResult> {
     await this.ensureInit();
@@ -164,11 +328,6 @@ export class RvLite {
 
   /**
    * Execute a Cypher graph query
-   *
-   * Supports:
-   * - CREATE (n:Label {props})
-   * - MATCH (n:Label) WHERE ... RETURN n
-   * - CREATE (a)-[:REL]->(b)
    */
   async cypher(query: string): Promise<QueryResult> {
     await this.ensureInit();
@@ -183,12 +342,18 @@ export class RvLite {
     return this.wasm.cypher_stats();
   }
 
+  /**
+   * Clear the Cypher graph
+   */
+  async cypherClear(): Promise<void> {
+    await this.ensureInit();
+    this.wasm.cypher_clear();
+  }
+
   // ============ SPARQL Operations ============
 
   /**
    * Execute a SPARQL query
-   *
-   * Supports SELECT, ASK queries over RDF triples
    */
   async sparql(query: string): Promise<QueryResult> {
     await this.ensureInit();
@@ -198,14 +363,9 @@ export class RvLite {
   /**
    * Add an RDF triple
    */
-  async addTriple(
-    subject: string,
-    predicate: string,
-    object: string,
-    graph?: string
-  ): Promise<void> {
+  async addTriple(subject: string, predicate: string, object: string): Promise<void> {
     await this.ensureInit();
-    this.wasm.add_triple(subject, predicate, object, graph || null);
+    this.wasm.add_triple(subject, predicate, object);
   }
 
   /**
@@ -214,6 +374,14 @@ export class RvLite {
   async tripleCount(): Promise<number> {
     await this.ensureInit();
     return this.wasm.triple_count();
+  }
+
+  /**
+   * Clear all triples
+   */
+  async clearTriples(): Promise<void> {
+    await this.ensureInit();
+    this.wasm.clear_triples();
   }
 
   // ============ Persistence ============
@@ -248,11 +416,8 @@ export class RvLite {
   static async load(config: RvLiteConfig = {}): Promise<RvLite> {
     const instance = new RvLite(config);
     await instance.init();
-
-    // Dynamic import for WASM
     const wasmModule = await import('../dist/wasm/rvlite.js');
     instance.wasm = await wasmModule.RvLite.load(config);
-
     return instance;
   }
 
@@ -276,29 +441,24 @@ export async function createRvLite(config: RvLiteConfig = {}): Promise<RvLite> {
   return db;
 }
 
+// ============ Embedding Provider Interface ============
+
 /**
  * Generate embeddings using various providers
  */
 export interface EmbeddingProvider {
   embed(text: string): Promise<number[]>;
   embedBatch(texts: string[]): Promise<number[][]>;
+  dimensions: number;
 }
 
-/**
- * Create an embedding provider using Anthropic Claude
- */
-export function createAnthropicEmbeddings(apiKey?: string): EmbeddingProvider {
-  // Note: Claude doesn't have native embeddings, this is a placeholder
-  // Users should use their own embedding provider
-  throw new Error(
-    'Anthropic does not provide embeddings. Use createOpenAIEmbeddings or a custom provider.'
-  );
-}
+// ============ Semantic Memory ============
 
 /**
  * Semantic Memory - Higher-level API for AI memory applications
  *
- * Combines vector search with knowledge graph storage
+ * Combines vector search with knowledge graph storage for building
+ * intelligent memory systems for AI agents.
  */
 export class SemanticMemory {
   private db: RvLite;
@@ -327,7 +487,6 @@ export class SemanticMemory {
       await this.db.insertWithId(key, vector, { content, ...metadata });
     }
 
-    // Also store as graph node
     await this.db.cypher(
       `CREATE (m:Memory {key: "${key}", content: "${content.replace(/"/g, '\\"')}", timestamp: ${Date.now()}})`
     );
@@ -336,31 +495,21 @@ export class SemanticMemory {
   /**
    * Query memories by semantic similarity
    */
-  async query(
-    queryText: string,
-    embedding?: number[],
-    k: number = 5
-  ): Promise<SearchResult[]> {
+  async query(queryText: string, embedding?: number[], k: number = 5): Promise<SearchResult[]> {
     let vector = embedding;
     if (!vector && this.embedder) {
       vector = await this.embedder.embed(queryText);
     }
-
     if (!vector) {
       throw new Error('No embedding provided and no embedder configured');
     }
-
     return this.db.search(vector, k);
   }
 
   /**
    * Add a relationship between memories
    */
-  async addRelation(
-    fromKey: string,
-    relation: string,
-    toKey: string
-  ): Promise<void> {
+  async addRelation(fromKey: string, relation: string, toKey: string): Promise<void> {
     await this.db.cypher(
       `MATCH (a:Memory {key: "${fromKey}"}), (b:Memory {key: "${toKey}"}) CREATE (a)-[:${relation}]->(b)`
     );

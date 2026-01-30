@@ -1,13 +1,28 @@
-//! RvLite - Standalone vector database with SQL, SPARQL, and Cypher
+//! RvLite v0.3.0 - Standalone vector database with 22+ WASM modules
 //!
-//! A WASM-compatible vector database powered by RuVector.
+//! A complete WASM-powered database combining vectors, graphs, neural networks,
+//! attention mechanisms, and self-learning capabilities.
 //!
-//! # Features
-//! - Vector storage and similarity search
+//! # Core Features
+//! - Vector storage and HNSW similarity search
 //! - SQL queries with pgvector-compatible syntax
 //! - SPARQL queries for RDF data
 //! - Cypher queries for property graphs
 //! - IndexedDB persistence for browsers
+//!
+//! # Extension Modules (feature-gated)
+//! - `gnn` - Graph Neural Networks (GCN, GAT, GraphSAGE)
+//! - `attention` - 39 attention mechanisms (Flash, Multi-Head, MoE)
+//! - `delta` - Incremental vector updates and consensus
+//! - `learning` - MicroLoRA adaptation (<100us latency)
+//! - `math` - Optimal Transport, Information Geometry
+//! - `hyperbolic` - Poincare/Lorentz hierarchy-aware search
+//! - `nervous` - Bio-inspired SNN with STDP learning
+//! - `sparse` - PowerInfer-style sparse inference
+//! - `dag` - DAG workflow orchestration
+//! - `router` - Intelligent request routing
+//! - `hnsw` - Neuromorphic HNSW (11.8KB)
+//! - `sona` - Self-Optimizing Neural Architecture / ReasoningBank
 //!
 //! # Example (JavaScript)
 //! ```javascript
@@ -50,13 +65,18 @@ pub mod sparql;
 pub mod sql;
 pub mod storage;
 
+// Feature-gated extension modules
+pub mod extensions;
+
 // Re-export storage types
 pub use storage::{GraphState, RvLiteState, TripleStoreState, VectorState};
 
 #[wasm_bindgen(start)]
 pub fn init() {
     console_error_panic_hook::set_once();
-    web_sys::console::log_1(&"RvLite v0.2.0 - SQL, SPARQL, Cypher + Persistence".into());
+    web_sys::console::log_1(
+        &"RvLite v0.3.0 - Vectors, SQL, SPARQL, Cypher + 22 WASM modules".into(),
+    );
 }
 
 /// Error type for RvLite
@@ -215,12 +235,12 @@ impl RvLite {
 
     /// Get version string
     pub fn get_version(&self) -> String {
-        "0.2.0".to_string()
+        "0.3.0".to_string()
     }
 
     /// Get enabled features
     pub fn get_features(&self) -> Result<JsValue, JsValue> {
-        let features = vec![
+        let mut features = vec![
             "core",
             "vectors",
             "search",
@@ -230,7 +250,75 @@ impl RvLite {
             "memory-storage",
             "indexeddb-persistence",
         ];
+
+        #[cfg(feature = "gnn")]
+        features.push("gnn");
+        #[cfg(feature = "attention")]
+        features.push("attention");
+        #[cfg(feature = "delta")]
+        features.push("delta");
+        #[cfg(feature = "learning")]
+        features.push("learning");
+        #[cfg(feature = "math")]
+        features.push("math");
+        #[cfg(feature = "hyperbolic")]
+        features.push("hyperbolic");
+        #[cfg(feature = "nervous")]
+        features.push("nervous-system");
+        #[cfg(feature = "sparse")]
+        features.push("sparse-inference");
+        #[cfg(feature = "dag")]
+        features.push("dag");
+        #[cfg(feature = "router")]
+        features.push("router");
+        #[cfg(feature = "hnsw")]
+        features.push("micro-hnsw");
+        #[cfg(feature = "sona")]
+        features.push("sona");
+        #[cfg(feature = "economy")]
+        features.push("economy");
+        #[cfg(feature = "exotic")]
+        features.push("exotic");
+        #[cfg(feature = "fpga")]
+        features.push("fpga-transformer");
+        #[cfg(feature = "mincut")]
+        features.push("mincut");
+        #[cfg(feature = "llm")]
+        features.push("llm");
+        #[cfg(feature = "cognitum")]
+        features.push("cognitum-gate");
+
         serde_wasm_bindgen::to_value(&features).map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Get total number of available extension modules
+    pub fn get_module_count(&self) -> usize {
+        let mut count = 8usize; // core features always available
+        #[cfg(feature = "gnn")]
+        { count += 1; }
+        #[cfg(feature = "attention")]
+        { count += 1; }
+        #[cfg(feature = "delta")]
+        { count += 1; }
+        #[cfg(feature = "learning")]
+        { count += 1; }
+        #[cfg(feature = "math")]
+        { count += 1; }
+        #[cfg(feature = "hyperbolic")]
+        { count += 1; }
+        #[cfg(feature = "nervous")]
+        { count += 1; }
+        #[cfg(feature = "sparse")]
+        { count += 1; }
+        #[cfg(feature = "dag")]
+        { count += 1; }
+        #[cfg(feature = "router")]
+        { count += 1; }
+        #[cfg(feature = "hnsw")]
+        { count += 1; }
+        #[cfg(feature = "sona")]
+        { count += 1; }
+        count
     }
 
     // ===== Persistence Methods =====

@@ -1,8 +1,8 @@
 {
   "name": "rvlite",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
-  "description": "Lightweight vector database with SQL, SPARQL, and Cypher - runs everywhere (Node.js, Browser, Edge)",
+  "description": "Standalone vector database with 22+ WASM modules: SQL, SPARQL, Cypher, GNN, attention, delta, learning, math, hyperbolic search, sparse inference, DAG workflows - runs everywhere",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -44,7 +44,15 @@
     "ai",
     "llm",
     "rag",
-    "knowledge-graph"
+    "knowledge-graph",
+    "gnn",
+    "attention",
+    "hnsw",
+    "neuromorphic",
+    "edge-computing",
+    "sona",
+    "hyperbolic",
+    "sparse-inference"
   ],
   "author": "RuVector Contributors",
   "license": "MIT OR Apache-2.0",

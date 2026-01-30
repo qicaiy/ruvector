@@ -1,26 +1,76 @@
 [package]
 name = "rvlite"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description = "Standalone vector database with SQL, SPARQL, and Cypher - powered by RuVector WASM"
+description = "Standalone vector database with SQL, SPARQL, Cypher, GNN, attention, delta ops, and 20+ WASM modules - powered by RuVector"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ruvnet/ruvector"
 authors = ["RuVector Contributors"]
+keywords = ["vector-database", "wasm", "graph-database", "neural-network", "edge-computing"]
+categories = ["database-implementations", "wasm", "algorithms"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# ===== 100% REUSE - Existing WASM Crates =====
-ruvector-core = {path = "../ruvector-core", default-features = false, features = ["memory-only"] }
-# Note: ruvector-wasm, ruvector-graph-wasm, ruvector-gnn-wasm will be added after validating they exist
+# ===== Core Vector Engine (always included) =====
+ruvector-core = { path = "../ruvector-core", default-features = false, features = ["memory-only"] }
 
-# Optional features (to be enabled after basic integration works)
-# sona = { path = "../sona", features = ["wasm"], optional = true }
-# micro-hnsw-wasm = { path = "../micro-hnsw-wasm", optional = true }
+# ===== Graph Database =====
+ruvector-graph-wasm = { path = "../ruvector-graph-wasm", optional = true }
 
-# ===== NEW - SQL Engine (to be added later) =====
-# sqlparser = { version = "0.49", optional = true }
+# ===== Graph Neural Networks =====
+ruvector-gnn-wasm = { path = "../ruvector-gnn-wasm", optional = true }
+
+# ===== Attention Mechanisms (39 types) =====
+ruvector-attention-wasm = { path = "../ruvector-attention-wasm", optional = true }
+ruvector-attention-unified-wasm = { path = "../ruvector-attention-unified-wasm", optional = true }
+
+# ===== HNSW Indexing =====
+micro-hnsw-wasm = { path = "../micro-hnsw-wasm", optional = true }
+ruvector-hyperbolic-hnsw-wasm = { path = "../ruvector-hyperbolic-hnsw-wasm", optional = true }
+
+# ===== Self-Learning & Adaptation =====
+ruvector-sona = { path = "../sona", optional = true }
+ruvector-learning-wasm = { path = "../ruvector-learning-wasm", optional = true }
+
+# ===== Math & Geometry =====
+ruvector-math-wasm = { path = "../ruvector-math-wasm", optional = true }
+
+# ===== Delta Operations =====
+ruvector-delta-wasm = { path = "../ruvector-delta-wasm", optional = true }
+
+# ===== Sparse Inference =====
+ruvector-sparse-inference-wasm = { path = "../ruvector-sparse-inference-wasm", optional = true }
+
+# ===== Bio-Inspired Neural =====
+ruvector-nervous-system-wasm = { path = "../ruvector-nervous-system-wasm", optional = true }
+
+# ===== DAG Workflows =====
+ruvector-dag-wasm = { path = "../ruvector-dag-wasm", optional = true }
+
+# ===== Router =====
+ruvector-router-wasm = { path = "../ruvector-router-wasm", optional = true }
+
+# ===== Economy & Exotic Types =====
+ruvector-economy-wasm = { path = "../ruvector-economy-wasm", optional = true }
+ruvector-exotic-wasm = { path = "../ruvector-exotic-wasm", optional = true }
+
+# ===== FPGA Transformer =====
+ruvector-fpga-transformer-wasm = { path = "../ruvector-fpga-transformer-wasm", optional = true }
+
+# ===== Graph Min-Cut =====
+ruvector-mincut-wasm = { path = "../ruvector-mincut-wasm", optional = true }
+ruvector-mincut-gated-transformer-wasm = { path = "../ruvector-mincut-gated-transformer-wasm", optional = true }
+
+# ===== Tiny Dancer =====
+ruvector-tiny-dancer-wasm = { path = "../ruvector-tiny-dancer-wasm", optional = true }
+
+# ===== LLM Inference =====
+ruvllm-wasm = { path = "../ruvllm-wasm", optional = true }
+
+# ===== Cognitive Gateway =====
+cognitum-gate-kernel = { path = "../cognitum-gate-kernel", optional = true }
 
 # ===== WASM Bindings =====
 wasm-bindgen = "0.2"
@@ -59,19 +109,48 @@ once_cell = "1.19"
 wasm-bindgen-test = "0.3"
 
 # Ensure getrandom uses js feature for WASM
-# Note: We use a direct dependency instead of workspace to specify version
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 
 [features]
 default = []
-# Feature flags to be added later
-# sql = ["dep:sqlparser"]
-# sparql = []
-# cypher = []
-# gnn = []
-# learning = ["dep:sona"]
-# full = ["sql", "sparql", "cypher", "gnn", "learning"]
+
+# Individual feature flags
+graph = ["dep:ruvector-graph-wasm"]
+gnn = ["dep:ruvector-gnn-wasm"]
+attention = ["dep:ruvector-attention-wasm"]
+attention-unified = ["dep:ruvector-attention-unified-wasm"]
+hnsw = ["dep:micro-hnsw-wasm"]
+hyperbolic = ["dep:ruvector-hyperbolic-hnsw-wasm"]
+sona = ["dep:ruvector-sona"]
+learning = ["dep:ruvector-learning-wasm"]
+math = ["dep:ruvector-math-wasm"]
+delta = ["dep:ruvector-delta-wasm"]
+sparse = ["dep:ruvector-sparse-inference-wasm"]
+nervous = ["dep:ruvector-nervous-system-wasm"]
+dag = ["dep:ruvector-dag-wasm"]
+router = ["dep:ruvector-router-wasm"]
+economy = ["dep:ruvector-economy-wasm"]
+exotic = ["dep:ruvector-exotic-wasm"]
+fpga = ["dep:ruvector-fpga-transformer-wasm"]
+mincut = ["dep:ruvector-mincut-wasm"]
+mincut-transformer = ["dep:ruvector-mincut-gated-transformer-wasm"]
+tiny-dancer = ["dep:ruvector-tiny-dancer-wasm"]
+llm = ["dep:ruvllm-wasm"]
+cognitum = ["dep:cognitum-gate-kernel"]
+
+# Composite feature sets
+core-plus = ["graph", "hnsw", "sona"]
+ml = ["gnn", "attention", "learning", "nervous"]
+advanced-search = ["hnsw", "hyperbolic", "math", "sparse"]
+full = [
+    "graph", "gnn", "attention", "attention-unified",
+    "hnsw", "hyperbolic", "sona", "learning",
+    "math", "delta", "sparse", "nervous",
+    "dag", "router", "economy", "exotic",
+    "fpga", "mincut", "mincut-transformer",
+    "tiny-dancer", "llm", "cognitum",
+]
 
 [profile.release]
 opt-level = "z"        # Optimize for size
