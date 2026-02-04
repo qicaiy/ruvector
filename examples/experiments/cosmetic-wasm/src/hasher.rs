@@ -47,11 +47,16 @@ pub fn hash_pair(left: &Hash, right: &Hash) -> Hash {
 /// Compute the hash of a leaf node
 /// H(0x00 || key || value)
 /// The 0x00 prefix domain-separates leaf hashes from internal node hashes.
+///
+/// Optimized: pre-builds header (1 + 32 bytes) contiguously, then appends
+/// the variable-length value in a second update call.
 #[inline(always)]
 pub fn hash_leaf(key: &Hash, value: &[u8]) -> Hash {
+    let mut header = [0u8; 1 + HASH_SIZE];
+    header[0] = 0x00; // leaf domain separator
+    header[1..33].copy_from_slice(key);
     let mut hasher = Sha256::new();
-    hasher.update([0x00]); // leaf domain separator
-    hasher.update(key);
+    hasher.update(&header);
     hasher.update(value);
     hasher.finalize().into()
 }
@@ -59,12 +64,20 @@ pub fn hash_leaf(key: &Hash, value: &[u8]) -> Hash {
 /// Compute the hash of an internal node
 /// H(0x01 || left || right)
 /// The 0x01 prefix domain-separates internal hashes from leaf hashes.
+///
+/// Optimized: pre-builds the 65-byte buffer (1 + 32 + 32) to minimize
+/// SHA-256 update calls. A single update of a contiguous buffer is faster
+/// than three separate calls because SHA-256 processes 64-byte blocks and
+/// the 65-byte input triggers exactly 2 compressions either way, but we
+/// avoid the function call overhead and internal bookkeeping of 3 updates.
 #[inline(always)]
 pub fn hash_internal(left: &Hash, right: &Hash) -> Hash {
+    let mut buf = [0u8; 1 + HASH_SIZE + HASH_SIZE];
+    buf[0] = 0x01; // internal domain separator
+    buf[1..33].copy_from_slice(left);
+    buf[33..65].copy_from_slice(right);
     let mut hasher = Sha256::new();
-    hasher.update([0x01]); // internal domain separator
-    hasher.update(left);
-    hasher.update(right);
+    hasher.update(&buf);
     hasher.finalize().into()
 }
 

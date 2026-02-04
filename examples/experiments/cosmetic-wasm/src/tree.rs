@@ -6,8 +6,17 @@
 //!
 //! Tree depth is fixed at 256 (matching SHA-256 key space). Each key is a
 //! 256-bit address; the i-th bit selects left (0) or right (1) at depth i.
+//!
+//! Performance notes:
+//! - Uses FxHashMap (rustc-hash) for all internal maps. Since keys are
+//!   already cryptographic hashes, SipHash protection is unnecessary and
+//!   FxHash's multiply-xor is ~3x faster for lookups.
+//! - Path updates short-circuit when both current and sibling are empty
+//!   at a level, avoiding redundant SHA-256 computations.
+//! - Batch operations sort keys by prefix for cache locality.
 
 use crate::hasher::{self, Hash, DEFAULT_EMPTY};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -66,12 +75,14 @@ pub struct BatchMutationResult {
 /// Stores only populated leaves and caches internal node hashes along
 /// paths that have been touched. Empty subtrees are represented implicitly
 /// using precomputed per-level empty hashes.
+///
+/// Uses FxHashMap for O(1) lookups without SipHash overhead on pre-hashed keys.
 pub struct SparseMerkleTree {
     /// Populated leaf entries: key -> data
-    leaves: HashMap<Hash, LeafData>,
+    leaves: FxHashMap<Hash, LeafData>,
     /// Cached internal node hashes keyed by (depth_from_root, prefix)
     /// where prefix has bits below that depth zeroed.
-    nodes: HashMap<(u16, Hash), Hash>,
+    nodes: FxHashMap<(u16, Hash), Hash>,
     /// Current root hash
     root: Hash,
 }
@@ -80,8 +91,8 @@ impl SparseMerkleTree {
     /// Create an empty tree.
     pub fn new() -> Self {
         Self {
-            leaves: HashMap::new(),
-            nodes: HashMap::new(),
+            leaves: FxHashMap::default(),
+            nodes: FxHashMap::default(),
             root: EMPTY_HASHES[TREE_DEPTH],
         }
     }
@@ -89,10 +100,8 @@ impl SparseMerkleTree {
     /// Create a tree with pre-allocated capacity for `n` expected leaves.
     pub fn with_capacity(n: usize) -> Self {
         Self {
-            leaves: HashMap::with_capacity(n),
-            // Each leaf touches ~256 internal nodes, but many share prefixes.
-            // Heuristic: n * 64 is a reasonable initial capacity.
-            nodes: HashMap::with_capacity(n * 64),
+            leaves: FxHashMap::with_capacity_and_hasher(n, Default::default()),
+            nodes: FxHashMap::with_capacity_and_hasher(n * 64, Default::default()),
             root: EMPTY_HASHES[TREE_DEPTH],
         }
     }
@@ -142,8 +151,10 @@ impl SparseMerkleTree {
     }
 
     /// Insert multiple key-value pairs in batch.
-    /// More efficient than individual inserts when adding many entries,
-    /// as the path updates can share intermediate computations.
+    ///
+    /// Sorts keys by first 8 bytes to maximize cache-line reuse when
+    /// updating overlapping Merkle paths. Keys sharing long prefixes will
+    /// be adjacent, so their path updates reuse recently-cached sibling hashes.
     pub fn insert_batch(
         &mut self,
         entries: Vec<(Hash, Vec<u8>, Option<String>)>,
@@ -153,7 +164,7 @@ impl SparseMerkleTree {
         let count = entries.len();
 
         // Insert all leaves first
-        let keys: Vec<Hash> = entries
+        let mut keys: Vec<Hash> = entries
             .into_iter()
             .map(|(key, value, tag)| {
                 self.leaves.insert(
@@ -167,6 +178,9 @@ impl SparseMerkleTree {
                 key
             })
             .collect();
+
+        // Sort by prefix for cache locality during path updates
+        keys.sort_unstable();
 
         // Update paths for all modified keys
         for key in &keys {
@@ -200,7 +214,11 @@ impl SparseMerkleTree {
         for key in keys {
             self.leaves.remove(key);
         }
-        for key in keys {
+
+        // Sort for cache locality
+        let mut sorted = keys.to_vec();
+        sorted.sort_unstable();
+        for key in &sorted {
             self.update_path(key);
         }
 
@@ -294,6 +312,11 @@ impl SparseMerkleTree {
     }
 
     /// Update all cached internal nodes along the path from a leaf to the root.
+    ///
+    /// Optimization: when both current and sibling are the level-appropriate
+    /// empty hash, the parent is known to be `EMPTY_HASHES[levels_up + 1]`
+    /// without computing a SHA-256. We still cache it (for consistency) but
+    /// skip the expensive hash_internal call.
     fn update_path(&mut self, key: &Hash) {
         let mut current = match self.leaves.get(key) {
             Some(leaf) => hasher::hash_leaf(key, &leaf.value),
@@ -306,14 +329,19 @@ impl SparseMerkleTree {
 
             let sibling = self.get_sibling_hash(key, depth_from_root, levels_up);
 
-            let parent = if bit == 0 {
+            // Early termination: if both children are their level's empty hash,
+            // the parent is the next level's empty hash. Skip SHA-256.
+            let parent = if current == EMPTY_HASHES[levels_up]
+                && sibling == EMPTY_HASHES[levels_up]
+            {
+                EMPTY_HASHES[levels_up + 1]
+            } else if bit == 0 {
                 hasher::hash_internal(&current, &sibling)
             } else {
                 hasher::hash_internal(&sibling, &current)
             };
 
-            // Cache the parent at depth_from_root. The parent is the root of
-            // the subtree spanning both current and sibling.
+            // Cache the parent at depth_from_root
             let cache_k = Self::make_cache_key(key, depth_from_root);
             self.nodes.insert(cache_k, parent);
 
@@ -341,9 +369,14 @@ impl SparseMerkleTree {
             prefix[boundary_byte] &= !((1u8 << (8 - bit_in_byte)) - 1);
         }
 
-        // Zero all complete bytes after the boundary
-        for b in prefix.iter_mut().skip(boundary_byte + 1) {
-            *b = 0;
+        // Zero all complete bytes after the boundary using ptr::write_bytes
+        // for bulk memset instead of a per-byte loop
+        let start = boundary_byte + 1;
+        if start < 32 {
+            // SAFETY: prefix is [u8; 32], start..32 is within bounds
+            unsafe {
+                std::ptr::write_bytes(prefix.as_mut_ptr().add(start), 0, 32 - start);
+            }
         }
 
         (depth_from_root as u16, prefix)
@@ -370,11 +403,12 @@ impl SparseMerkleTree {
         self.leaves.keys().copied().collect()
     }
 
-    /// Export the full tree state as a serializable snapshot
+    /// Export the full tree state as a serializable snapshot.
+    /// The snapshot uses std HashMap for serde compatibility.
     pub fn snapshot(&self) -> TreeSnapshot {
         TreeSnapshot {
             root: self.root,
-            leaves: self.leaves.clone(),
+            leaves: self.leaves.iter().map(|(k, v)| (*k, v.clone())).collect(),
             leaf_count: self.leaves.len(),
         }
     }
@@ -382,10 +416,13 @@ impl SparseMerkleTree {
     /// Restore a tree from a snapshot, rebuilding the internal node cache.
     pub fn from_snapshot(snapshot: TreeSnapshot) -> Self {
         let mut tree = Self::with_capacity(snapshot.leaves.len());
-        tree.leaves = snapshot.leaves;
+        for (k, v) in snapshot.leaves {
+            tree.leaves.insert(k, v);
+        }
 
-        // Rebuild all paths
-        let keys: Vec<Hash> = tree.leaves.keys().copied().collect();
+        // Rebuild all paths (sorted for cache locality)
+        let mut keys: Vec<Hash> = tree.leaves.keys().copied().collect();
+        keys.sort_unstable();
         for key in &keys {
             tree.update_path(key);
         }
@@ -482,7 +519,6 @@ mod tests {
         let tree = SparseMerkleTree::new();
         assert!(tree.is_empty());
         assert_eq!(tree.len(), 0);
-        // Root should be the precomputed empty root
         assert_eq!(tree.root(), EMPTY_HASHES[TREE_DEPTH]);
     }
 
@@ -691,5 +727,16 @@ mod tests {
         assert_eq!(stats.leaf_count, 1);
         assert!(stats.cached_node_count > 0);
         assert!(stats.estimated_total_bytes > 0);
+    }
+
+    #[test]
+    fn test_early_termination_on_remove() {
+        // After removing the only leaf, the tree should short-circuit
+        // most of the 256-level path update via empty hash detection
+        let mut tree = SparseMerkleTree::new();
+        let key = hasher::compute_key(b"only_leaf");
+        tree.insert(key, b"val".to_vec(), None);
+        tree.remove(&key);
+        assert_eq!(tree.root(), EMPTY_HASHES[TREE_DEPTH]);
     }
 }
