@@ -50,6 +50,17 @@ pub struct MutationResult {
     pub key: Hash,
 }
 
+/// Result of a batch mutation
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BatchMutationResult {
+    /// The new root hash after all mutations
+    pub new_root: Hash,
+    /// The old root hash before mutations
+    pub old_root: Hash,
+    /// Number of keys mutated
+    pub count: usize,
+}
+
 /// Sparse Merkle Tree with computation-aware leaf encoding.
 ///
 /// Stores only populated leaves and caches internal node hashes along
@@ -60,7 +71,6 @@ pub struct SparseMerkleTree {
     leaves: HashMap<Hash, LeafData>,
     /// Cached internal node hashes keyed by (depth_from_root, prefix)
     /// where prefix has bits below that depth zeroed.
-    /// "levels_from_leaf" in the cache: 1 = parent of leaves, 256 = root
     nodes: HashMap<(u16, Hash), Hash>,
     /// Current root hash
     root: Hash,
@@ -76,17 +86,31 @@ impl SparseMerkleTree {
         }
     }
 
+    /// Create a tree with pre-allocated capacity for `n` expected leaves.
+    pub fn with_capacity(n: usize) -> Self {
+        Self {
+            leaves: HashMap::with_capacity(n),
+            // Each leaf touches ~256 internal nodes, but many share prefixes.
+            // Heuristic: n * 64 is a reasonable initial capacity.
+            nodes: HashMap::with_capacity(n * 64),
+            root: EMPTY_HASHES[TREE_DEPTH],
+        }
+    }
+
     /// Get the current root hash
+    #[inline]
     pub fn root(&self) -> Hash {
         self.root
     }
 
     /// Get the number of non-empty leaves
+    #[inline]
     pub fn len(&self) -> usize {
         self.leaves.len()
     }
 
     /// Check if tree has no entries
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.leaves.is_empty()
     }
@@ -117,6 +141,45 @@ impl SparseMerkleTree {
         }
     }
 
+    /// Insert multiple key-value pairs in batch.
+    /// More efficient than individual inserts when adding many entries,
+    /// as the path updates can share intermediate computations.
+    pub fn insert_batch(
+        &mut self,
+        entries: Vec<(Hash, Vec<u8>, Option<String>)>,
+    ) -> BatchMutationResult {
+        let old_root = self.root;
+        let timestamp = Self::current_timestamp();
+        let count = entries.len();
+
+        // Insert all leaves first
+        let keys: Vec<Hash> = entries
+            .into_iter()
+            .map(|(key, value, tag)| {
+                self.leaves.insert(
+                    key,
+                    LeafData {
+                        value,
+                        computation_tag: tag,
+                        timestamp,
+                    },
+                );
+                key
+            })
+            .collect();
+
+        // Update paths for all modified keys
+        for key in &keys {
+            self.update_path(key);
+        }
+
+        BatchMutationResult {
+            new_root: self.root,
+            old_root,
+            count,
+        }
+    }
+
     /// Remove a leaf. Returns the mutation result.
     pub fn remove(&mut self, key: &Hash) -> MutationResult {
         let old_root = self.root;
@@ -130,12 +193,32 @@ impl SparseMerkleTree {
         }
     }
 
+    /// Remove multiple keys in batch.
+    pub fn remove_batch(&mut self, keys: &[Hash]) -> BatchMutationResult {
+        let old_root = self.root;
+
+        for key in keys {
+            self.leaves.remove(key);
+        }
+        for key in keys {
+            self.update_path(key);
+        }
+
+        BatchMutationResult {
+            new_root: self.root,
+            old_root,
+            count: keys.len(),
+        }
+    }
+
     /// Get a leaf value by key
+    #[inline]
     pub fn get(&self, key: &Hash) -> Option<&LeafData> {
         self.leaves.get(key)
     }
 
     /// Check whether a key exists in the tree
+    #[inline]
     pub fn contains(&self, key: &Hash) -> bool {
         self.leaves.contains_key(key)
     }
@@ -188,6 +271,7 @@ impl SparseMerkleTree {
     ///
     /// At levels_up=0: sibling is a leaf at depth TREE_DEPTH (conceptual).
     /// At levels_up=k>0: sibling subtree is rooted at depth (depth_from_root + 1).
+    #[inline]
     fn get_sibling_hash(&self, key: &Hash, depth_from_root: usize, levels_up: usize) -> Hash {
         let mut sibling_key = *key;
         flip_bit(&mut sibling_key, depth_from_root);
@@ -239,16 +323,29 @@ impl SparseMerkleTree {
         self.root = current;
     }
 
-    /// Create a cache key: zero bits below `depth_from_root` so that
+    /// Create a cache key: zero bits at `depth_from_root` and below so that
     /// all keys sharing the same prefix at that depth map to the same entry.
+    /// Uses byte-level zeroing for complete bytes beyond the boundary.
+    #[inline]
     fn make_cache_key(key: &Hash, depth_from_root: usize) -> (u16, Hash) {
         let mut prefix = *key;
-        // Zero out bit at depth_from_root and all bits below it
-        for d in depth_from_root..TREE_DEPTH {
-            let byte_idx = d / 8;
-            let bit_idx = 7 - (d % 8);
-            prefix[byte_idx] &= !(1 << bit_idx);
+        let boundary_byte = depth_from_root / 8;
+        let bit_in_byte = depth_from_root % 8;
+
+        // Mask the boundary byte: keep bits at depths < depth_from_root
+        if bit_in_byte == 0 {
+            // All bits in this byte are at depth >= depth_from_root
+            prefix[boundary_byte] = 0;
+        } else {
+            // Keep top `bit_in_byte` bits, zero the rest
+            prefix[boundary_byte] &= !((1u8 << (8 - bit_in_byte)) - 1);
         }
+
+        // Zero all complete bytes after the boundary
+        for b in prefix.iter_mut().skip(boundary_byte + 1) {
+            *b = 0;
+        }
+
         (depth_from_root as u16, prefix)
     }
 
@@ -281,12 +378,49 @@ impl SparseMerkleTree {
             leaf_count: self.leaves.len(),
         }
     }
+
+    /// Restore a tree from a snapshot, rebuilding the internal node cache.
+    pub fn from_snapshot(snapshot: TreeSnapshot) -> Self {
+        let mut tree = Self::with_capacity(snapshot.leaves.len());
+        tree.leaves = snapshot.leaves;
+
+        // Rebuild all paths
+        let keys: Vec<Hash> = tree.leaves.keys().copied().collect();
+        for key in &keys {
+            tree.update_path(key);
+        }
+
+        tree
+    }
+
+    /// Get memory statistics for this tree
+    pub fn memory_stats(&self) -> TreeMemoryStats {
+        let leaf_bytes = self.leaves.len() * (32 + std::mem::size_of::<LeafData>());
+        let node_bytes = self.nodes.len() * (std::mem::size_of::<(u16, Hash)>() + 32);
+        TreeMemoryStats {
+            leaf_count: self.leaves.len(),
+            cached_node_count: self.nodes.len(),
+            estimated_leaf_bytes: leaf_bytes,
+            estimated_node_bytes: node_bytes,
+            estimated_total_bytes: leaf_bytes + node_bytes,
+        }
+    }
 }
 
 impl Default for SparseMerkleTree {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Memory usage statistics for the tree
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TreeMemoryStats {
+    pub leaf_count: usize,
+    pub cached_node_count: usize,
+    pub estimated_leaf_bytes: usize,
+    pub estimated_node_bytes: usize,
+    pub estimated_total_bytes: usize,
 }
 
 /// Serializable tree state snapshot
@@ -323,7 +457,7 @@ pub struct ExclusionProof {
 
 /// Extract the bit at a given depth from a 256-bit key.
 /// Depth 0 = MSB of byte 0, depth 255 = LSB of byte 31.
-#[inline]
+#[inline(always)]
 pub(crate) fn get_bit(key: &Hash, depth: usize) -> u8 {
     let byte_idx = depth / 8;
     let bit_idx = 7 - (depth % 8);
@@ -331,7 +465,7 @@ pub(crate) fn get_bit(key: &Hash, depth: usize) -> u8 {
 }
 
 /// Flip the bit at a given depth in a 256-bit key
-#[inline]
+#[inline(always)]
 fn flip_bit(key: &mut Hash, depth: usize) {
     let byte_idx = depth / 8;
     let bit_idx = 7 - (depth % 8);
@@ -484,5 +618,78 @@ mod tests {
         let snap = tree.snapshot();
         assert_eq!(snap.leaf_count, 1);
         assert_eq!(snap.root, tree.root());
+    }
+
+    #[test]
+    fn test_batch_insert() {
+        let mut tree = SparseMerkleTree::new();
+        let entries: Vec<_> = (0..10)
+            .map(|i| {
+                let key = hasher::compute_key(format!("batch_{}", i).as_bytes());
+                (key, format!("value_{}", i).into_bytes(), None)
+            })
+            .collect();
+
+        let result = tree.insert_batch(entries);
+        assert_eq!(result.count, 10);
+        assert_eq!(tree.len(), 10);
+        assert_ne!(result.old_root, result.new_root);
+    }
+
+    #[test]
+    fn test_batch_remove() {
+        let mut tree = SparseMerkleTree::new();
+        let keys: Vec<_> = (0..5)
+            .map(|i| {
+                let key = hasher::compute_key(format!("rm_{}", i).as_bytes());
+                tree.insert(key, b"val".to_vec(), None);
+                key
+            })
+            .collect();
+        assert_eq!(tree.len(), 5);
+
+        let result = tree.remove_batch(&keys);
+        assert_eq!(result.count, 5);
+        assert_eq!(tree.len(), 0);
+    }
+
+    #[test]
+    fn test_snapshot_restore() {
+        let mut tree = SparseMerkleTree::new();
+        let keys: Vec<_> = (0..5)
+            .map(|i| {
+                let key = hasher::compute_key(format!("snap_{}", i).as_bytes());
+                tree.insert(key, format!("val_{}", i).into_bytes(), None);
+                key
+            })
+            .collect();
+
+        let snap = tree.snapshot();
+        let restored = SparseMerkleTree::from_snapshot(snap);
+
+        assert_eq!(tree.root(), restored.root());
+        assert_eq!(tree.len(), restored.len());
+        for key in &keys {
+            assert!(restored.contains(key));
+        }
+    }
+
+    #[test]
+    fn test_with_capacity() {
+        let tree = SparseMerkleTree::with_capacity(100);
+        assert!(tree.is_empty());
+        assert_eq!(tree.root(), EMPTY_HASHES[TREE_DEPTH]);
+    }
+
+    #[test]
+    fn test_memory_stats() {
+        let mut tree = SparseMerkleTree::new();
+        let key = hasher::compute_key(b"stats_test");
+        tree.insert(key, b"data".to_vec(), None);
+
+        let stats = tree.memory_stats();
+        assert_eq!(stats.leaf_count, 1);
+        assert!(stats.cached_node_count > 0);
+        assert!(stats.estimated_total_bytes > 0);
     }
 }

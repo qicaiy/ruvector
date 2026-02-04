@@ -1450,6 +1450,7 @@ name = "cosmetic-wasm"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "criterion 0.5.1",
  "js-sys",
  "serde",
  "serde_json",

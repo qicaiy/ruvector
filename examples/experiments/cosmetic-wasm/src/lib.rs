@@ -74,8 +74,13 @@ pub mod wasm_api;
 
 pub use attestation::{AttestationBuilder, AttestationLog, ComputationAttestation};
 pub use hasher::{Hash, HASH_SIZE};
-pub use proof::{verify_exclusion, verify_inclusion, CompactProof, VerifyResult};
-pub use tree::{ExclusionProof, InclusionProof, SparseMerkleTree};
+pub use proof::{
+    all_valid_exclusion, all_valid_inclusion, verify_exclusion, verify_inclusion, CompactProof,
+    VerifyResult,
+};
+pub use tree::{
+    BatchMutationResult, ExclusionProof, InclusionProof, SparseMerkleTree, TreeMemoryStats,
+};
 pub use wasm_api::CosmeticTree;
 
 /// Initialize panic hook for better error messages in browser console

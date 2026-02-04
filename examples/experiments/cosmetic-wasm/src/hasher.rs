@@ -16,7 +16,6 @@ pub type Hash = [u8; HASH_SIZE];
 /// H("cosmetic_empty_leaf")
 pub const DEFAULT_EMPTY: Hash = {
     // Pre-computed SHA-256 of b"cosmetic_empty_leaf"
-    // We use a const fn workaround: store the known digest bytes directly.
     [
         0x8b, 0x1a, 0x9d, 0x7f, 0x3e, 0x2c, 0x5b, 0x4a, 0x91, 0x0e, 0xd3, 0xf8, 0x76, 0xc5,
         0xa4, 0x23, 0x6d, 0x1f, 0x8e, 0xb7, 0x50, 0x9c, 0xe2, 0x34, 0xa8, 0x67, 0xdb, 0x19,
@@ -24,8 +23,11 @@ pub const DEFAULT_EMPTY: Hash = {
     ]
 };
 
+/// Hex lookup table for fast encoding (avoids per-byte format! allocation)
+const HEX_LUT: &[u8; 16] = b"0123456789abcdef";
+
 /// Compute SHA-256 hash of arbitrary data
-#[inline]
+#[inline(always)]
 pub fn sha256(data: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(data);
@@ -34,7 +36,7 @@ pub fn sha256(data: &[u8]) -> Hash {
 
 /// Compute the hash of two child nodes (internal node hash)
 /// H(left || right)
-#[inline]
+#[inline(always)]
 pub fn hash_pair(left: &Hash, right: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(left);
@@ -45,7 +47,7 @@ pub fn hash_pair(left: &Hash, right: &Hash) -> Hash {
 /// Compute the hash of a leaf node
 /// H(0x00 || key || value)
 /// The 0x00 prefix domain-separates leaf hashes from internal node hashes.
-#[inline]
+#[inline(always)]
 pub fn hash_leaf(key: &Hash, value: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update([0x00]); // leaf domain separator
@@ -57,7 +59,7 @@ pub fn hash_leaf(key: &Hash, value: &[u8]) -> Hash {
 /// Compute the hash of an internal node
 /// H(0x01 || left || right)
 /// The 0x01 prefix domain-separates internal hashes from leaf hashes.
-#[inline]
+#[inline(always)]
 pub fn hash_internal(left: &Hash, right: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update([0x01]); // internal domain separator
@@ -87,12 +89,16 @@ pub fn hash_attestation(
 /// Simple algebraic hash for ZK-friendly operations (Poseidon-style placeholder).
 ///
 /// In a real ZK deployment, this would be replaced with a proper Poseidon
-/// permutation over a prime field. This simplified version provides the
-/// same API shape for testing and WASM demonstration purposes.
+/// permutation over a prime field (e.g., BN254 scalar field). This simplified
+/// version uses domain-separated SHA-256 to provide the same API shape.
+///
+/// A real Poseidon implementation would:
+/// - Operate over Fp elements (field arithmetic, not byte operations)
+/// - Use ~8x fewer constraints in R1CS/Plonkish circuits
+/// - Provide algebraic collision resistance (not just generic)
+/// - Support variable-width inputs via a sponge construction
 #[cfg(feature = "poseidon")]
 pub fn poseidon_hash(inputs: &[u64]) -> Hash {
-    // Simplified: feed u64 inputs through SHA-256 as a stand-in
-    // A real Poseidon would operate over Fp elements with ~8x fewer constraints
     let mut hasher = Sha256::new();
     hasher.update([0x03]); // poseidon domain separator
     for val in inputs {
@@ -101,25 +107,47 @@ pub fn poseidon_hash(inputs: &[u64]) -> Hash {
     hasher.finalize().into()
 }
 
-/// Convert a hash to a hex string
+/// Convert a hash to a hex string (zero-allocation fast path)
+#[inline]
 pub fn to_hex(hash: &Hash) -> String {
-    hash.iter().map(|b| format!("{:02x}", b)).collect()
+    let mut hex = Vec::with_capacity(HASH_SIZE * 2);
+    for &b in hash {
+        hex.push(HEX_LUT[(b >> 4) as usize]);
+        hex.push(HEX_LUT[(b & 0x0f) as usize]);
+    }
+    // SAFETY: HEX_LUT only contains valid ASCII bytes
+    unsafe { String::from_utf8_unchecked(hex) }
 }
 
 /// Parse a hex string into a Hash
+#[inline]
 pub fn from_hex(hex: &str) -> Result<Hash, &'static str> {
     if hex.len() != HASH_SIZE * 2 {
         return Err("Invalid hex length");
     }
+    let bytes = hex.as_bytes();
     let mut hash = [0u8; HASH_SIZE];
     for i in 0..HASH_SIZE {
-        hash[i] =
-            u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).map_err(|_| "Invalid hex digit")?;
+        let hi = hex_nibble(bytes[i * 2])?;
+        let lo = hex_nibble(bytes[i * 2 + 1])?;
+        hash[i] = (hi << 4) | lo;
     }
     Ok(hash)
 }
 
+/// Decode a single hex character to its nibble value
+#[inline(always)]
+fn hex_nibble(c: u8) -> Result<u8, &'static str> {
+    match c {
+        b'0'..=b'9' => Ok(c - b'0'),
+        b'a'..=b'f' => Ok(c - b'a' + 10),
+        b'A'..=b'F' => Ok(c - b'A' + 10),
+        _ => Err("Invalid hex digit"),
+    }
+}
+
 /// Compute the key (address) for a given data blob by hashing it
+#[inline]
 pub fn compute_key(data: &[u8]) -> Hash {
     sha256(data)
 }
@@ -163,5 +191,14 @@ mod tests {
     fn test_from_hex_invalid() {
         assert!(from_hex("not_valid_hex").is_err());
         assert!(from_hex("abcd").is_err()); // too short
+    }
+
+    #[test]
+    fn test_hex_case_insensitive() {
+        let hash = sha256(b"test");
+        let hex_lower = to_hex(&hash);
+        let hex_upper = hex_lower.to_uppercase();
+        let recovered = from_hex(&hex_upper).unwrap();
+        assert_eq!(hash, recovered);
     }
 }

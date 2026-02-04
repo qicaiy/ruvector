@@ -19,9 +19,27 @@ pub enum VerifyResult {
 }
 
 impl VerifyResult {
+    #[inline]
     pub fn is_valid(&self) -> bool {
         matches!(self, VerifyResult::Valid)
     }
+}
+
+/// Walk a sibling path from a starting hash up to the root.
+/// This is the common core of both inclusion and exclusion verification.
+#[inline]
+fn walk_to_root(key: &Hash, start_hash: Hash, siblings: &[Hash]) -> Hash {
+    let mut current = start_hash;
+    for (i, sibling) in siblings.iter().enumerate() {
+        let depth = TREE_DEPTH - 1 - i;
+        let bit = get_bit(key, depth);
+        current = if bit == 0 {
+            hasher::hash_internal(&current, sibling)
+        } else {
+            hasher::hash_internal(sibling, &current)
+        };
+    }
+    current
 }
 
 /// Verify an inclusion proof: confirms that (key, value) is in the tree with the given root.
@@ -39,23 +57,10 @@ pub fn verify_inclusion(proof: &InclusionProof) -> VerifyResult {
         ));
     }
 
-    // Step 1: Compute leaf hash
-    let mut current = hasher::hash_leaf(&proof.key, &proof.leaf_data.value);
+    let leaf_hash = hasher::hash_leaf(&proof.key, &proof.leaf_data.value);
+    let computed_root = walk_to_root(&proof.key, leaf_hash, &proof.siblings);
 
-    // Step 2: Walk up from leaf to root
-    for (i, sibling) in proof.siblings.iter().enumerate() {
-        let depth = TREE_DEPTH - 1 - i;
-        let bit = get_bit(&proof.key, depth);
-
-        current = if bit == 0 {
-            hasher::hash_internal(&current, sibling)
-        } else {
-            hasher::hash_internal(sibling, &current)
-        };
-    }
-
-    // Step 3: Compare roots
-    if current == proof.root {
+    if computed_root == proof.root {
         VerifyResult::Valid
     } else {
         VerifyResult::Invalid("Computed root does not match claimed root".into())
@@ -68,9 +73,6 @@ pub fn verify_inclusion(proof: &InclusionProof) -> VerifyResult {
 /// 1. Start with DEFAULT_EMPTY (the hash of an absent leaf)
 /// 2. Walk up the tree using sibling hashes
 /// 3. Compare final computed root with the claimed root
-///
-/// This works because if the key were present, the leaf hash would be different
-/// from DEFAULT_EMPTY, producing a different root.
 pub fn verify_exclusion(proof: &ExclusionProof) -> VerifyResult {
     if proof.siblings.len() != TREE_DEPTH {
         return VerifyResult::Invalid(format!(
@@ -80,23 +82,9 @@ pub fn verify_exclusion(proof: &ExclusionProof) -> VerifyResult {
         ));
     }
 
-    // Step 1: Empty leaf hash
-    let mut current = DEFAULT_EMPTY;
+    let computed_root = walk_to_root(&proof.key, DEFAULT_EMPTY, &proof.siblings);
 
-    // Step 2: Walk up from leaf to root
-    for (i, sibling) in proof.siblings.iter().enumerate() {
-        let depth = TREE_DEPTH - 1 - i;
-        let bit = get_bit(&proof.key, depth);
-
-        current = if bit == 0 {
-            hasher::hash_internal(&current, sibling)
-        } else {
-            hasher::hash_internal(sibling, &current)
-        };
-    }
-
-    // Step 3: Compare roots
-    if current == proof.root {
+    if computed_root == proof.root {
         VerifyResult::Valid
     } else {
         VerifyResult::Invalid("Computed root does not match claimed root".into())
@@ -112,6 +100,16 @@ pub fn verify_batch_inclusion(proofs: &[InclusionProof]) -> Vec<VerifyResult> {
 /// Batch verification for exclusion proofs.
 pub fn verify_batch_exclusion(proofs: &[ExclusionProof]) -> Vec<VerifyResult> {
     proofs.iter().map(verify_exclusion).collect()
+}
+
+/// Check if all proofs in a batch are valid (short-circuits on first failure).
+pub fn all_valid_inclusion(proofs: &[InclusionProof]) -> bool {
+    proofs.iter().all(|p| verify_inclusion(p).is_valid())
+}
+
+/// Check if all exclusion proofs in a batch are valid (short-circuits on first failure).
+pub fn all_valid_exclusion(proofs: &[ExclusionProof]) -> bool {
+    proofs.iter().all(|p| verify_exclusion(p).is_valid())
 }
 
 /// Compact proof representation for serialization/transport.
@@ -164,6 +162,55 @@ impl CompactProof {
         }
     }
 
+    /// Decompress this compact proof back into a full sibling list.
+    /// Uses per-level EMPTY_HASHES for missing siblings.
+    pub fn decompress_siblings(&self) -> Vec<Hash> {
+        use crate::tree::EMPTY_HASHES;
+
+        let mut siblings = Vec::with_capacity(TREE_DEPTH);
+        let mut nd_idx = 0;
+
+        for i in 0..TREE_DEPTH {
+            let byte_idx = i / 8;
+            let bit_idx = 7 - (i % 8);
+            let is_set = byte_idx < self.sibling_bitmap.len()
+                && (self.sibling_bitmap[byte_idx] >> bit_idx) & 1 == 1;
+
+            if is_set && nd_idx < self.non_default_siblings.len() {
+                siblings.push(self.non_default_siblings[nd_idx]);
+                nd_idx += 1;
+            } else {
+                siblings.push(EMPTY_HASHES[i]);
+            }
+        }
+
+        siblings
+    }
+
+    /// Verify this compact proof directly without full decompression overhead.
+    pub fn verify(&self) -> VerifyResult {
+        let siblings = self.decompress_siblings();
+        if siblings.len() != TREE_DEPTH {
+            return VerifyResult::Invalid("Decompressed siblings length mismatch".into());
+        }
+
+        let start_hash = if self.is_inclusion {
+            match &self.leaf_value {
+                Some(val) => hasher::hash_leaf(&self.key, val),
+                None => return VerifyResult::Invalid("Inclusion proof missing leaf value".into()),
+            }
+        } else {
+            DEFAULT_EMPTY
+        };
+
+        let computed_root = walk_to_root(&self.key, start_hash, &siblings);
+        if computed_root == self.root {
+            VerifyResult::Valid
+        } else {
+            VerifyResult::Invalid("Computed root does not match claimed root".into())
+        }
+    }
+
     /// Compute the byte size of this compact proof
     pub fn byte_size(&self) -> usize {
         HASH_SIZE  // key
@@ -172,6 +219,15 @@ impl CompactProof {
         + self.sibling_bitmap.len()
         + self.non_default_siblings.len() * HASH_SIZE
         + HASH_SIZE  // root
+    }
+
+    /// Compression ratio: compact size / full proof size
+    pub fn compression_ratio(&self) -> f64 {
+        let full_size = HASH_SIZE // key
+            + TREE_DEPTH * HASH_SIZE // siblings
+            + self.leaf_value.as_ref().map_or(0, |v| v.len())
+            + HASH_SIZE; // root
+        self.byte_size() as f64 / full_size as f64
     }
 }
 
@@ -263,6 +319,39 @@ mod tests {
 
         // Compact should be smaller since most siblings are default-empty
         assert!(compact_size < full_size, "Compact {} should be < full {}", compact_size, full_size);
+        assert!(compact.compression_ratio() < 1.0);
+    }
+
+    #[test]
+    fn test_compact_proof_roundtrip() {
+        let mut tree = SparseMerkleTree::new();
+        let key = hasher::compute_key(b"roundtrip_test");
+        tree.insert(key, b"val".to_vec(), None);
+
+        let proof = tree.prove_inclusion(&key).unwrap();
+        let compact = CompactProof::from_inclusion(&proof);
+
+        // Decompress and verify siblings match
+        let decompressed = compact.decompress_siblings();
+        assert_eq!(decompressed.len(), proof.siblings.len());
+        assert_eq!(decompressed, proof.siblings);
+    }
+
+    #[test]
+    fn test_compact_proof_verify() {
+        let mut tree = SparseMerkleTree::new();
+        let key = hasher::compute_key(b"compact_verify");
+        tree.insert(key, b"val".to_vec(), None);
+
+        let proof = tree.prove_inclusion(&key).unwrap();
+        let compact = CompactProof::from_inclusion(&proof);
+        assert!(compact.verify().is_valid());
+
+        // Exclusion compact proof
+        let exc_key = hasher::compute_key(b"missing");
+        let exc_proof = tree.prove_exclusion(&exc_key).unwrap();
+        let exc_compact = CompactProof::from_exclusion(&exc_proof);
+        assert!(exc_compact.verify().is_valid());
     }
 
     #[test]
@@ -283,5 +372,18 @@ mod tests {
 
         let results = verify_batch_inclusion(&proofs);
         assert!(results.iter().all(|r| r.is_valid()));
+        assert!(all_valid_inclusion(&proofs));
+    }
+
+    #[test]
+    fn test_all_valid_short_circuits() {
+        let mut tree = SparseMerkleTree::new();
+        let key = hasher::compute_key(b"short");
+        tree.insert(key, b"val".to_vec(), None);
+
+        let mut proof = tree.prove_inclusion(&key).unwrap();
+        proof.leaf_data.value = b"tampered".to_vec();
+
+        assert!(!all_valid_inclusion(&[proof]));
     }
 }

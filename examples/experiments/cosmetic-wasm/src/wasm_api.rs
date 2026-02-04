@@ -28,6 +28,15 @@ impl CosmeticTree {
         }
     }
 
+    /// Create a new tree with pre-allocated capacity
+    #[wasm_bindgen(js_name = withCapacity)]
+    pub fn with_capacity(n: usize) -> CosmeticTree {
+        CosmeticTree {
+            tree: SparseMerkleTree::with_capacity(n),
+            log: AttestationLog::new(),
+        }
+    }
+
     /// Get the current root hash as a hex string
     #[wasm_bindgen(js_name = rootHex)]
     pub fn root_hex(&self) -> String {
@@ -78,6 +87,31 @@ impl CosmeticTree {
             hasher::from_hex(key_hex).map_err(|e| JsValue::from_str(&format!("Bad key: {}", e)))?;
         let result = self.tree.insert(key, value.to_vec(), computation_tag);
         Ok(hasher::to_hex(&result.new_root))
+    }
+
+    /// Insert multiple key-value pairs in batch.
+    /// `entries_json` format: [{"key_data": "...", "value": "...", "tag": "..."}]
+    /// Returns JSON with new root and count.
+    #[wasm_bindgen(js_name = insertBatch)]
+    pub fn insert_batch(&mut self, entries_json: &str) -> Result<String, JsValue> {
+        let entries: Vec<BatchEntry> = serde_json::from_str(entries_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid JSON: {}", e)))?;
+
+        let batch: Vec<_> = entries
+            .into_iter()
+            .map(|e| {
+                let key = hasher::compute_key(e.key_data.as_bytes());
+                (key, e.value.into_bytes(), e.tag)
+            })
+            .collect();
+
+        let result = self.tree.insert_batch(batch);
+        let json = serde_json::json!({
+            "new_root": hasher::to_hex(&result.new_root),
+            "old_root": hasher::to_hex(&result.old_root),
+            "count": result.count,
+        });
+        Ok(json.to_string())
     }
 
     /// Remove a key. Key is derived from `key_data` by hashing.
@@ -144,7 +178,7 @@ impl CosmeticTree {
         }
     }
 
-    /// Verify an inclusion proof (provided as JSON string)
+    /// Verify an inclusion proof (re-generates from tree state)
     #[wasm_bindgen(js_name = verifyInclusionProof)]
     pub fn verify_inclusion_proof(&self, key_data: &[u8]) -> bool {
         let key = hasher::compute_key(key_data);
@@ -253,6 +287,13 @@ impl CosmeticTree {
     pub fn compute_hash(data: &[u8]) -> String {
         hasher::to_hex(&hasher::sha256(data))
     }
+
+    /// Get memory usage statistics as JSON
+    #[wasm_bindgen(js_name = memoryStats)]
+    pub fn memory_stats(&self) -> String {
+        let stats = self.tree.memory_stats();
+        serde_json::to_string(&stats).unwrap_or_else(|_| "{}".into())
+    }
 }
 
 /// Input format for inclusion/exclusion decisions from JS
@@ -262,6 +303,14 @@ struct DecisionInput {
     included: bool,
     reason: String,
     criterion: String,
+}
+
+/// Input format for batch insert entries from JS
+#[derive(Deserialize)]
+struct BatchEntry {
+    key_data: String,
+    value: String,
+    tag: Option<String>,
 }
 
 #[cfg(test)]
@@ -307,5 +356,33 @@ mod tests {
         let h2 = CosmeticTree::compute_hash(b"hello");
         assert_eq!(h1, h2);
         assert_eq!(h1.len(), 64); // 32 bytes = 64 hex chars
+    }
+
+    #[test]
+    fn test_wasm_batch_insert() {
+        let mut tree = CosmeticTree::new();
+        let json = r#"[
+            {"key_data": "p1", "value": "enrolled", "tag": "trial"},
+            {"key_data": "p2", "value": "enrolled", "tag": null},
+            {"key_data": "p3", "value": "pending", "tag": null}
+        ]"#;
+        let result = tree.insert_batch(json).unwrap();
+        assert_eq!(tree.leaf_count(), 3);
+        assert!(result.contains("\"count\":3"));
+    }
+
+    #[test]
+    fn test_wasm_memory_stats() {
+        let mut tree = CosmeticTree::new();
+        tree.insert(b"key", b"val", None);
+        let stats = tree.memory_stats();
+        assert!(stats.contains("leaf_count"));
+        assert!(stats.contains("cached_node_count"));
+    }
+
+    #[test]
+    fn test_wasm_with_capacity() {
+        let tree = CosmeticTree::with_capacity(100);
+        assert!(tree.is_empty());
     }
 }
