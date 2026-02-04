@@ -1446,6 +1446,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmetic-wasm"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "serde",
+ "serde_json",
+ "sha2",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "cpp_demangle"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8606,7 +8619,7 @@ dependencies = [
 
 [[package]]
 name = "ruvector-postgres"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "approx",
  "bincode 1.3.3",
