@@ -1,0 +1,17 @@
+[package]
+name = "ruvector-vwm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Visual World Model: 4D Gaussian splatting with spacetime tiling, coherence gating, and packed draw lists"
+
+[features]
+default = []
+simd = []
+ffi = []
+
+[lib]
+crate-type = ["lib"]
