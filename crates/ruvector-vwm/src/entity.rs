@@ -125,9 +125,13 @@ impl EntityGraph {
     }
 
     /// Find all entities connected to the given entity by any edge (as source or target).
+    ///
+    /// Note: This is O(E) where E is the total number of edges, as it performs a
+    /// linear scan over all edges. Consider an adjacency-list index for large graphs.
     pub fn neighbors(&self, id: u64) -> Vec<&Entity> {
         let mut neighbor_ids = Vec::new();
 
+        // Linear scan of all edges -- O(E)
         for edge in &self.edges {
             if edge.source == id {
                 neighbor_ids.push(edge.target);
@@ -150,6 +154,9 @@ impl EntityGraph {
     ///
     /// The `entity_type` string is matched against the variant name (case-insensitive)
     /// or, for `Object` types, the class label.
+    ///
+    /// Note: This is O(N) where N is the total number of entities, as it iterates
+    /// over all entities. Consider a type index for frequent queries on large graphs.
     pub fn query_by_type(&self, entity_type: &str) -> Vec<&Entity> {
         let lower = entity_type.to_lowercase();
         self.entities
@@ -181,6 +188,63 @@ impl EntityGraph {
     /// Return the number of edges in the graph.
     pub fn edge_count(&self) -> usize {
         self.edges.len()
+    }
+
+    /// Search entities by cosine similarity against a query embedding.
+    ///
+    /// Returns entities whose embedding similarity exceeds `threshold`,
+    /// sorted by descending similarity. Each result is `(entity_ref, score)`.
+    ///
+    /// Entities with empty embeddings or dimension mismatches are skipped.
+    pub fn search_by_embedding(&self, query: &[f32], threshold: f32) -> Vec<(&Entity, f32)> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let query_norm = query.iter().map(|v| v * v).sum::<f32>().sqrt();
+        if query_norm == 0.0 {
+            return Vec::new();
+        }
+
+        let mut results: Vec<(&Entity, f32)> = self
+            .entities
+            .iter()
+            .filter_map(|e| {
+                if e.embedding.len() != query.len() || e.embedding.is_empty() {
+                    return None;
+                }
+                let sim = cosine_similarity(query, &e.embedding, query_norm);
+                if sim >= threshold {
+                    Some((e, sim))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Find the top-k most similar entities to the query embedding.
+    ///
+    /// Returns up to `k` results sorted by descending similarity.
+    pub fn top_k_by_embedding(&self, query: &[f32], k: usize) -> Vec<(&Entity, f32)> {
+        let results = self.search_by_embedding(query, f32::NEG_INFINITY);
+        results.into_iter().take(k).collect()
+    }
+}
+
+/// Compute cosine similarity between two vectors.
+///
+/// `a_norm` is the precomputed L2 norm of `a`.
+#[inline]
+fn cosine_similarity(a: &[f32], b: &[f32], a_norm: f32) -> f32 {
+    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+    let b_norm: f32 = b.iter().map(|v| v * v).sum::<f32>().sqrt();
+    if b_norm > 0.0 && a_norm > 0.0 {
+        dot / (a_norm * b_norm)
+    } else {
+        0.0
     }
 }
 
@@ -323,5 +387,89 @@ mod tests {
             time_range: None,
         });
         assert_eq!(graph.edge_count(), 1);
+    }
+
+    // -- Embedding search tests --
+
+    fn make_entity_with_embedding(id: u64, class: &str, embedding: Vec<f32>) -> Entity {
+        Entity {
+            id,
+            entity_type: EntityType::Object {
+                class: class.to_string(),
+            },
+            time_span: [0.0, 10.0],
+            embedding,
+            confidence: 0.9,
+            privacy_tags: vec![],
+            attributes: vec![],
+            gaussian_ids: vec![],
+        }
+    }
+
+    #[test]
+    fn test_search_by_embedding_finds_similar() {
+        let mut graph = EntityGraph::new();
+        graph.add_entity(make_entity_with_embedding(1, "car", vec![1.0, 0.0, 0.0]));
+        graph.add_entity(make_entity_with_embedding(2, "car", vec![0.9, 0.1, 0.0]));
+        graph.add_entity(make_entity_with_embedding(3, "tree", vec![0.0, 0.0, 1.0]));
+
+        let results = graph.search_by_embedding(&[1.0, 0.0, 0.0], 0.8);
+        assert_eq!(results.len(), 2); // entities 1 and 2
+        assert_eq!(results[0].0.id, 1); // exact match first
+        assert!(results[0].1 > results[1].1); // sorted by descending similarity
+    }
+
+    #[test]
+    fn test_search_by_embedding_threshold_filters() {
+        let mut graph = EntityGraph::new();
+        graph.add_entity(make_entity_with_embedding(1, "a", vec![1.0, 0.0, 0.0]));
+        graph.add_entity(make_entity_with_embedding(2, "b", vec![0.0, 1.0, 0.0]));
+
+        let results = graph.search_by_embedding(&[1.0, 0.0, 0.0], 0.99);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0.id, 1);
+    }
+
+    #[test]
+    fn test_search_by_embedding_empty_query() {
+        let mut graph = EntityGraph::new();
+        graph.add_entity(make_entity_with_embedding(1, "a", vec![1.0, 0.0]));
+        assert!(graph.search_by_embedding(&[], 0.0).is_empty());
+    }
+
+    #[test]
+    fn test_search_by_embedding_dimension_mismatch() {
+        let mut graph = EntityGraph::new();
+        graph.add_entity(make_entity_with_embedding(1, "a", vec![1.0, 0.0]));
+        // 3D query vs 2D embedding → skipped
+        assert!(graph.search_by_embedding(&[1.0, 0.0, 0.0], 0.0).is_empty());
+    }
+
+    #[test]
+    fn test_top_k_by_embedding() {
+        let mut graph = EntityGraph::new();
+        for i in 0..10 {
+            let angle = i as f32 * 0.3;
+            graph.add_entity(make_entity_with_embedding(
+                i,
+                "x",
+                vec![angle.cos(), angle.sin(), 0.0],
+            ));
+        }
+        let results = graph.top_k_by_embedding(&[1.0, 0.0, 0.0], 3);
+        assert_eq!(results.len(), 3);
+        // First result should be the most similar
+        assert!(results[0].1 >= results[1].1);
+        assert!(results[1].1 >= results[2].1);
+    }
+
+    #[test]
+    fn test_search_empty_embeddings_skipped() {
+        let mut graph = EntityGraph::new();
+        graph.add_entity(make_entity_with_embedding(1, "a", vec![])); // empty
+        graph.add_entity(make_entity_with_embedding(2, "b", vec![1.0, 0.0]));
+        let results = graph.search_by_embedding(&[1.0, 0.0], 0.0);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0.id, 2);
     }
 }

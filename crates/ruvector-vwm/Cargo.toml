@@ -13,5 +13,12 @@ default = []
 simd = []
 ffi = []
 
+[dev-dependencies]
+criterion = { workspace = true }
+
 [lib]
 crate-type = ["lib"]
+
+[[bench]]
+name = "vwm_bench"
+harness = false

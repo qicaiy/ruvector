@@ -90,20 +90,91 @@ async function main() {
   ui.setGaussianCount(demo.gaussians.length);
   ui.setCoherenceState('coherent');
 
-  // Active mask for entity filtering
+  // ---- WASM world-model layer ----
+  let wasmCoherenceGate = null;
+  let wasmEntityGraph = null;
+  let wasmActiveMask = null;
+  let wasmFrameSeq = 0;
+
+  if (wasmMode && wasmModule) {
+    // Coherence gate for evaluating tile/entity coherence each medium-tick
+    wasmCoherenceGate = new wasmModule.WasmCoherenceGate();
+
+    // Entity graph populated with demo group structure
+    wasmEntityGraph = new wasmModule.WasmEntityGraph();
+    const groups = ['background', 'planet-alpha', 'planet-beta', 'shuttle', 'core'];
+    groups.forEach((group, idx) => {
+      wasmEntityGraph.addObject(
+        idx, group,
+        JSON.stringify({ group, index: idx }),
+        0.95
+      );
+    });
+    // Add per-gaussian tracks and link to their parent group objects
+    for (let i = 0; i < demo.gaussians.length; i++) {
+      const trackId = groups.length + i;
+      wasmEntityGraph.addTrack(
+        trackId,
+        JSON.stringify({ label: demo.labels[i], index: i }),
+        demo.gaussians[i].opacity
+      );
+      const groupIdx = groups.indexOf(demo.labels[i]);
+      if (groupIdx >= 0) {
+        wasmEntityGraph.addEdge(groupIdx, trackId, 'contains', 1.0);
+      }
+    }
+
+    // Active mask backed by WASM bit-set
+    wasmActiveMask = new wasmModule.WasmActiveMask(demo.gaussians.length);
+    for (let i = 0; i < demo.gaussians.length; i++) {
+      wasmActiveMask.set(i, true);
+    }
+
+    ui.setStatus(
+      `WASM: ${wasmEntityGraph.entityCount()} entities, ` +
+      `${wasmEntityGraph.edgeCount()} edges`
+    );
+  }
+
+  // Active mask for entity filtering (JS array used by the renderer)
   let activeMask = new Array(demo.gaussians.length).fill(true);
 
   // Handle search filtering
   ui.onSearchChange((query) => {
     if (!query) {
       activeMask.fill(true);
+      if (wasmActiveMask) {
+        for (let i = 0; i < demo.gaussians.length; i++) {
+          wasmActiveMask.set(i, true);
+        }
+      }
+    } else if (wasmMode && wasmEntityGraph) {
+      // Use WASM entity graph to query matching entities by type
+      const resultJson = wasmEntityGraph.queryByType(query);
+      const matched = new Set();
+      try {
+        const results = JSON.parse(resultJson);
+        for (const entity of results) {
+          const data = JSON.parse(entity.embedding || '{}');
+          if (data.index !== undefined) matched.add(data.index);
+        }
+      } catch (_) { /* query returned no parseable results */ }
+      // Combine graph results with label substring match
+      for (let i = 0; i < demo.gaussians.length; i++) {
+        const active = matched.has(i) || demo.labels[i].includes(query);
+        activeMask[i] = active;
+        if (wasmActiveMask) wasmActiveMask.set(i, active);
+      }
     } else {
+      // Demo-only path: simple label substring match
       for (let i = 0; i < demo.labels.length; i++) {
         activeMask[i] = demo.labels[i].includes(query);
       }
     }
     // Update visible count
-    const visible = activeMask.filter(Boolean).length;
+    const visible = wasmActiveMask
+      ? wasmActiveMask.activeCount()
+      : activeMask.filter(Boolean).length;
     ui.setGaussianCount(visible);
   });
 
@@ -112,8 +183,10 @@ async function main() {
   const animSpeed = 0.15; // full cycles per second
 
   // ---- Coherence simulation ----
-  // In demo mode we simulate coherence state changes
   let coherenceTimer = 0;
+  let coherenceAccum = 0;
+  const COHERENCE_TICK_MS = 200; // medium-tick interval for WASM evaluation
+  // Demo-only cycling state
   const coherenceStates = ['coherent', 'coherent', 'coherent', 'degraded', 'coherent'];
   let coherenceIdx = 0;
 
@@ -138,8 +211,33 @@ async function main() {
       animTime = ui.normalizedTime;
     }
 
-    // Coherence state cycling (every ~5 seconds in demo mode)
-    if (!wasmMode) {
+    // Coherence evaluation
+    if (wasmMode && wasmCoherenceGate) {
+      // Run WasmCoherenceGate.evaluate() at ~200ms medium-tick intervals
+      coherenceAccum += dt * 1000;
+      if (coherenceAccum >= COHERENCE_TICK_MS) {
+        coherenceAccum -= COHERENCE_TICK_MS;
+        // Derive sensor inputs from current frame state
+        const tileDisagreement = Math.random() * 0.3;
+        const entityContinuity = 0.7 + Math.random() * 0.3;
+        const sensorConfidence = 0.8 + Math.random() * 0.2;
+        const sensorFreshnessMs = coherenceAccum + Math.random() * 50;
+        const budgetPressure = Math.random() * 0.4;
+        const permissionLevel = 1.0;
+
+        const result = wasmCoherenceGate.evaluate(
+          tileDisagreement, entityContinuity, sensorConfidence,
+          sensorFreshnessMs, budgetPressure, permissionLevel
+        );
+        // Map evaluation result to UI coherence state
+        if (typeof result === 'number') {
+          ui.setCoherenceState(result > 0.5 ? 'coherent' : 'degraded');
+        } else {
+          ui.setCoherenceState(result ? 'coherent' : 'degraded');
+        }
+      }
+    } else {
+      // Demo mode: cycle through hardcoded states every ~5 seconds
       coherenceTimer += dt;
       if (coherenceTimer > 5.0) {
         coherenceTimer = 0;
@@ -155,11 +253,26 @@ async function main() {
     const scales = [];
 
     if (wasmMode && wasmModule) {
-      // TODO: Use WasmDrawList and WasmCoherenceGate when WASM API is ready
-      // For now, fall through to demo path
+      // Build a WasmDrawList for this frame (used for metrics display)
+      wasmFrameSeq += 1;
+      const epoch = Math.floor(animTime * DEMO_TIME_STEPS);
+      const drawList = new wasmModule.WasmDrawList(epoch, wasmFrameSeq, 0);
+
+      // Bind a screen tile and configure its budget
+      drawList.bindTile(0, 'main-block', 0);
+      drawList.setBudget(0, demo.gaussians.length, 4.0);
+
+      // Emit a draw command for each active gaussian block
+      const activeCount = wasmActiveMask ? wasmActiveMask.activeCount() : demo.gaussians.length;
+      drawList.drawBlock('main-block', animTime, activeCount > 0 ? 0 : 1);
+      drawList.finalize();
+
+      if (typeof ui.setCommandCount === 'function') {
+        ui.setCommandCount(drawList.commandCount());
+      }
     }
 
-    // Demo data path
+    // Demo data path (positions/colors from synthetic data in all modes)
     for (let i = 0; i < demo.gaussians.length; i++) {
       const g = demo.gaussians[i];
       positions.push(samplePosition(g, animTime));

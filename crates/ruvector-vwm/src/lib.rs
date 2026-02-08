@@ -96,11 +96,15 @@
 //! assert_eq!(decision, ruvector_vwm::coherence::CoherenceDecision::Accept);
 //! ```
 
+pub mod attention;
 pub mod coherence;
 pub mod draw_list;
 pub mod entity;
 pub mod gaussian;
+pub mod layer;
 pub mod lineage;
+pub mod query;
+pub mod runtime;
 pub mod streaming;
 pub mod tile;
 
@@ -113,4 +117,11 @@ pub use lineage::{LineageEvent, LineageLog};
 pub use streaming::{
     ActiveMask, BandwidthBudget, DeltaPacket, KeyframePacket, SemanticPacket, StreamPacket,
 };
+pub use attention::{
+    AttentionPipeline, AttentionResult, AttentionStats, SemanticAttention, TemporalAttention,
+    ViewAttention, WriteAttention,
+};
+pub use layer::{GaussianLayer, LayerType, LayeredScene};
+pub use query::{QueryResult, SceneQuery};
+pub use runtime::{LoopCadence, LoopConfig, LoopMetrics, LoopScheduler};
 pub use tile::{PrimitiveBlock, QuantTier, Tile, TileCoord};

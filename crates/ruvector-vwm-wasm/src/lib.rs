@@ -329,6 +329,12 @@ pub struct WasmCoherenceGate {
     inner: CoherenceGate,
 }
 
+impl Default for WasmCoherenceGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen]
 impl WasmCoherenceGate {
     /// Create a gate with the default policy.
@@ -401,6 +407,12 @@ impl WasmCoherenceGate {
 #[wasm_bindgen]
 pub struct WasmEntityGraph {
     inner: EntityGraph,
+}
+
+impl Default for WasmEntityGraph {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[wasm_bindgen]
@@ -607,6 +619,12 @@ pub struct WasmLineageLog {
     inner: LineageLog,
 }
 
+impl Default for WasmLineageLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen]
 impl WasmLineageLog {
     /// Create an empty lineage log.
@@ -680,16 +698,22 @@ impl WasmLineageLog {
     pub fn len(&self) -> usize {
         self.inner.len()
     }
+
+    /// Check if the log is empty.
+    #[wasm_bindgen(js_name = isEmpty)]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
 }
 
 fn make_provenance(source_type: &str, confidence: f32) -> Provenance {
-    let source = if source_type.starts_with("sensor:") {
+    let source = if let Some(stripped) = source_type.strip_prefix("sensor:") {
         ProvenanceSource::Sensor {
-            sensor_id: source_type[7..].to_string(),
+            sensor_id: stripped.to_string(),
         }
-    } else if source_type.starts_with("model:") {
+    } else if let Some(stripped) = source_type.strip_prefix("model:") {
         ProvenanceSource::Inference {
-            model_id: source_type[6..].to_string(),
+            model_id: stripped.to_string(),
         }
     } else if source_type == "manual" {
         ProvenanceSource::Manual {

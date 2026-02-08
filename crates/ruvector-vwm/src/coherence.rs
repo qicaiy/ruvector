@@ -110,6 +110,7 @@ impl CoherenceGate {
     }
 
     /// Evaluate the coherence of an update.
+    #[inline]
     pub fn evaluate(&self, input: &CoherenceInput) -> CoherenceDecision {
         // Admin overrides all checks
         if input.permission_level == PermissionLevel::Admin {

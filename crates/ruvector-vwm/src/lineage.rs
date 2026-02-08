@@ -119,6 +119,7 @@ impl LineageLog {
     /// Append a new event to the log.
     ///
     /// Returns the assigned event ID.
+    #[allow(clippy::too_many_arguments)]
     pub fn append(
         &mut self,
         timestamp_ms: u64,

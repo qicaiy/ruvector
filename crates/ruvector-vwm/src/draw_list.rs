@@ -134,7 +134,8 @@ impl DrawList {
     ///   - tag(1 byte): 0=TileBind, 1=SetBudget, 2=DrawBlock, 3=End
     ///   - payload (varies by tag)
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
+        // Header = 20 bytes, plus command payload
+        let mut buf = Vec::with_capacity(20 + self.commands.len() * 14);
 
         // Header
         buf.extend_from_slice(&self.header.epoch.to_le_bytes());
@@ -150,7 +151,8 @@ impl DrawList {
 
     /// Serialize only the command portion (used internally for checksumming).
     fn serialize_commands(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
+        // Max command payload: TileBind = 1+8+4+1 = 14 bytes
+        let mut buf = Vec::with_capacity(self.commands.len() * 14);
         for cmd in &self.commands {
             match cmd {
                 DrawCommand::TileBind {

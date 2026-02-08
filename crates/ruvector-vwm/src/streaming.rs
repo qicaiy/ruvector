@@ -67,7 +67,7 @@ pub struct ActiveMask {
 impl ActiveMask {
     /// Create a new mask with all Gaussians inactive.
     pub fn new(total_count: u32) -> Self {
-        let word_count = ((total_count as usize) + 63) / 64;
+        let word_count = (total_count as usize).div_ceil(64);
         Self {
             bits: vec![0u64; word_count],
             total_count,
@@ -75,6 +75,7 @@ impl ActiveMask {
     }
 
     /// Set or clear the active bit for a Gaussian.
+    #[inline]
     pub fn set(&mut self, index: u32, active: bool) {
         if index >= self.total_count {
             return;
@@ -89,6 +90,7 @@ impl ActiveMask {
     }
 
     /// Check if a Gaussian is active.
+    #[inline]
     pub fn is_active(&self, index: u32) -> bool {
         if index >= self.total_count {
             return false;
