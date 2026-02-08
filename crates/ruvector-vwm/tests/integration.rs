@@ -176,11 +176,23 @@ fn test_full_pipeline_gaussian_to_gpu_bytes() {
     );
 
     // Stage 6: Decode the tile's Gaussians back and verify they survived the round trip.
+    // Hot8 quantization is lossy (~1/255 of range per field), so use tolerance.
     let decoded = tile.primitive_block.decode();
     assert_eq!(decoded.len(), 3);
-    assert_eq!(decoded[0].center, [0.0, 0.0, -5.0]);
-    assert_eq!(decoded[1].center, [1.0, 1.0, -8.0]);
-    assert_eq!(decoded[2].center, [-1.0, 0.5, -3.0]);
+    let tol = 0.05; // conservative tolerance for the value ranges in this test
+    for (i, (expected, actual)) in [[0.0f32, 0.0, -5.0], [1.0, 1.0, -8.0], [-1.0, 0.5, -3.0]]
+        .iter()
+        .zip(decoded.iter())
+        .enumerate()
+    {
+        for (j, (&e, &a)) in expected.iter().zip(actual.center.iter()).enumerate() {
+            assert!(
+                (e - a).abs() <= tol,
+                "Gaussian {} center[{}]: expected {}, got {}, tol={}",
+                i, j, e, a, tol
+            );
+        }
+    }
 }
 
 // ===========================================================================
@@ -1240,9 +1252,29 @@ fn test_roundtrip_fidelity_100_gaussians() {
         gaussians.push(g);
     }
 
-    // Test with every quantization tier to verify tier tagging does not
-    // corrupt the raw data (since actual quantization is not yet implemented).
+    // Test with every quantization tier. All tiers currently use Hot8 (8-bit)
+    // quantization, which is lossy: max error per field is range/255.
+    // Use tolerance-based comparison for float fields; IDs must be exact.
     let tiers = [QuantTier::Hot8, QuantTier::Warm7, QuantTier::Warm5, QuantTier::Cold3];
+
+    // Hot8 quantization tolerance: the largest per-field range in this dataset
+    // is ~29.7 (center z), giving max error ~29.7/255 ≈ 0.117.
+    let tol = 0.15;
+
+    /// Helper to assert two f32 slices are approximately equal.
+    fn assert_approx(a: &[f32], b: &[f32], tol: f32, label: &str, idx: usize, tier: QuantTier) {
+        assert_eq!(a.len(), b.len());
+        for (j, (&av, &bv)) in a.iter().zip(b.iter()).enumerate() {
+            if !av.is_finite() || !bv.is_finite() {
+                continue; // skip non-finite (e.g. infinity time_range)
+            }
+            assert!(
+                (av - bv).abs() <= tol,
+                "Gaussian {} {} [{}] mismatch at tier {:?}: orig={}, decoded={}, tol={}",
+                idx, label, j, tier, av, bv, tol
+            );
+        }
+    }
 
     for &tier in &tiers {
         let block = PrimitiveBlock::encode(&gaussians, tier);
@@ -1254,46 +1286,18 @@ fn test_roundtrip_fidelity_100_gaussians() {
         assert_eq!(decoded.len(), count);
 
         for (i, (orig, dec)) in gaussians.iter().zip(decoded.iter()).enumerate() {
-            assert_eq!(
-                orig.center, dec.center,
-                "Gaussian {} center mismatch at tier {:?}",
-                i, tier
+            assert_approx(&orig.center, &dec.center, tol, "center", i, tier);
+            assert_approx(&orig.covariance, &dec.covariance, tol, "covariance", i, tier);
+            assert_approx(&orig.sh_coeffs, &dec.sh_coeffs, tol, "sh_coeffs", i, tier);
+            assert!(
+                (orig.opacity - dec.opacity).abs() <= tol,
+                "Gaussian {} opacity mismatch at tier {:?}: {} vs {}",
+                i, tier, orig.opacity, dec.opacity
             );
-            assert_eq!(
-                orig.covariance, dec.covariance,
-                "Gaussian {} covariance mismatch at tier {:?}",
-                i, tier
-            );
-            assert_eq!(
-                orig.sh_coeffs, dec.sh_coeffs,
-                "Gaussian {} sh_coeffs mismatch at tier {:?}",
-                i, tier
-            );
-            assert_eq!(
-                orig.opacity, dec.opacity,
-                "Gaussian {} opacity mismatch at tier {:?}",
-                i, tier
-            );
-            assert_eq!(
-                orig.scale, dec.scale,
-                "Gaussian {} scale mismatch at tier {:?}",
-                i, tier
-            );
-            assert_eq!(
-                orig.rotation, dec.rotation,
-                "Gaussian {} rotation mismatch at tier {:?}",
-                i, tier
-            );
-            assert_eq!(
-                orig.time_range, dec.time_range,
-                "Gaussian {} time_range mismatch at tier {:?}",
-                i, tier
-            );
-            assert_eq!(
-                orig.velocity, dec.velocity,
-                "Gaussian {} velocity mismatch at tier {:?}",
-                i, tier
-            );
+            assert_approx(&orig.scale, &dec.scale, tol, "scale", i, tier);
+            assert_approx(&orig.rotation, &dec.rotation, tol, "rotation", i, tier);
+            assert_approx(&orig.time_range, &dec.time_range, tol, "time_range", i, tier);
+            assert_approx(&orig.velocity, &dec.velocity, tol, "velocity", i, tier);
             assert_eq!(
                 orig.id, dec.id,
                 "Gaussian {} id mismatch at tier {:?}",
