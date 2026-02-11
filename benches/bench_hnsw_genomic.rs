@@ -5,14 +5,10 @@
 //!
 //! Run: cargo bench -p ruvector-dna-bench --bench bench_hnsw_genomic
 
-use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId, Criterion,
-    Throughput,
-};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
-use ruvector_core::index::VectorIndex;
-#[cfg(feature = "hnsw")]
 use ruvector_core::index::hnsw::HnswIndex;
+use ruvector_core::index::VectorIndex;
 use ruvector_core::types::{DistanceMetric, HnswConfig};
 
 // ---------------------------------------------------------------------------

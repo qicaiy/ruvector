@@ -1602,9 +1602,1538 @@ pub enum AdapterError {
 }
 ```
 
+### 4.3 Anti-Corruption Layer Patterns (SOTA Enhancement)
+
+Beyond the adapter-level ACLs defined in Section 4.2, the DNA Analyzer employs three
+strategic anti-corruption patterns to protect bounded context integrity when
+interfacing with external systems and cross-context data flows.
+
+#### Translator Pattern
+
+External bioinformatics file formats (VCF, FASTA, GFF3, BAM/CRAM) carry legacy
+semantics that do not map cleanly to the internal domain model. A dedicated
+translator layer converts external representations to domain value objects at the
+system boundary, ensuring no external schema leaks into the core domain.
+
+```rust
+/// Anti-Corruption Layer: External format translators
+pub mod acl_translators {
+    use super::*;
+
+    /// Translator for VCF (Variant Call Format) ingestion
+    pub trait VcfTranslator: Send + Sync {
+        /// Parse a VCF record into the domain Variant model, rejecting
+        /// records that violate domain invariants (e.g., missing REF allele)
+        fn translate_record(
+            &self,
+            vcf_record: &RawVcfRecord,
+        ) -> Result<variant_calling::Variant, TranslationError>;
+
+        /// Batch-translate a VCF file, collecting errors per record
+        fn translate_file(
+            &self,
+            vcf_path: &std::path::Path,
+        ) -> Result<TranslationBatch, TranslationError>;
+    }
+
+    /// Translator for FASTA/FASTQ sequence ingestion
+    pub trait FastaTranslator: Send + Sync {
+        fn translate_record(
+            &self,
+            fasta_record: &RawFastaRecord,
+        ) -> Result<sequence_ingestion::BasecalledRead, TranslationError>;
+    }
+
+    /// Translator for GFF3 gene annotation format
+    pub trait Gff3Translator: Send + Sync {
+        fn translate_feature(
+            &self,
+            gff3_record: &RawGff3Record,
+        ) -> Result<annotation_interpretation::VariantConsequence, TranslationError>;
+    }
+
+    /// Raw external record — opaque to the domain
+    pub struct RawVcfRecord {
+        pub line_number: u64,
+        pub raw_fields: Vec<String>,
+        pub info_map: Vec<(String, String)>,
+        pub format_fields: Vec<String>,
+        pub sample_values: Vec<Vec<String>>,
+    }
+
+    pub struct RawFastaRecord {
+        pub header: String,
+        pub sequence: Vec<u8>,
+        pub quality: Option<Vec<u8>>,
+    }
+
+    pub struct RawGff3Record {
+        pub seqid: String,
+        pub source: String,
+        pub feature_type: String,
+        pub start: u64,
+        pub end: u64,
+        pub attributes: Vec<(String, String)>,
+    }
+
+    pub struct TranslationBatch {
+        pub successful: Vec<variant_calling::Variant>,
+        pub failed: Vec<(u64, TranslationError)>,  // (line_number, error)
+        pub warnings: Vec<(u64, String)>,
+    }
+
+    #[derive(Debug)]
+    pub enum TranslationError {
+        MalformedRecord { line: u64, reason: String },
+        MissingRequiredField(String),
+        InvariantViolation(String),
+        UnsupportedVersion { expected: String, actual: String },
+        EncodingError(String),
+    }
+}
+```
+
+#### Published Language Contracts
+
+Cross-context communication uses strongly-typed serialization contracts defined
+with Protocol Buffers or Cap'n Proto. These contracts form the Published Language
+that upstream and downstream contexts agree upon, versioned independently of the
+domain model.
+
+```rust
+/// Published Language: Cross-context serialization contracts
+pub mod published_language {
+    use super::*;
+
+    /// Contract for Variant Calling -> Annotation data flow
+    /// Versioned independently of both contexts
+    #[derive(Clone)]
+    pub struct VariantContract {
+        pub contract_version: ContractVersion,
+        pub variant_id: [u8; 16],       // UUID bytes
+        pub contig: String,
+        pub position: u64,
+        pub ref_allele: Vec<u8>,
+        pub alt_alleles: Vec<Vec<u8>>,
+        pub quality: f32,
+        pub genotype_indices: Vec<u8>,
+        pub genotype_phased: bool,
+        pub effect_embedding: Vec<f32>,
+    }
+
+    /// Contract for Sequence Ingestion -> Alignment data flow
+    #[derive(Clone)]
+    pub struct ReadContract {
+        pub contract_version: ContractVersion,
+        pub read_id: [u8; 16],
+        pub sequence: Vec<u8>,
+        pub quality_scores: Vec<u8>,
+        pub signal_embedding: Vec<f32>,
+        pub read_group: String,
+        pub sample_id: String,
+    }
+
+    /// Contract for Alignment -> Variant Calling data flow
+    #[derive(Clone)]
+    pub struct AlignmentContract {
+        pub contract_version: ContractVersion,
+        pub read_id: [u8; 16],
+        pub contig: String,
+        pub position: u64,
+        pub cigar_ops: Vec<(u8, u32)>,  // (op_code, length)
+        pub mapping_quality: u8,
+        pub is_primary: bool,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub struct ContractVersion {
+        pub major: u16,
+        pub minor: u16,
+    }
+
+    /// Serialization codec trait — implementations use Protocol Buffers
+    /// or Cap'n Proto depending on latency requirements
+    pub trait ContractCodec<T>: Send + Sync {
+        fn serialize(&self, value: &T) -> Result<Vec<u8>, CodecError>;
+        fn deserialize(&self, bytes: &[u8]) -> Result<T, CodecError>;
+        fn version(&self) -> ContractVersion;
+    }
+
+    #[derive(Debug)]
+    pub enum CodecError {
+        SerializationFailed(String),
+        DeserializationFailed(String),
+        VersionMismatch { expected: ContractVersion, actual: ContractVersion },
+        SchemaEvolutionRequired(String),
+    }
+}
+```
+
+#### Conformist Pattern
+
+The Pharmacogenomics context operates as a Conformist to the upstream Annotation
+context. Rather than maintaining its own translation layer, it directly adopts
+the ClinVar and PharmGKB schemas published by the Annotation context, accepting
+schema changes without modification. This is appropriate because CPIC/DPWG
+clinical guidelines already define the authoritative schema.
+
+```rust
+/// Conformist Pattern: Pharmacogenomics conforms to Annotation schemas
+pub mod conformist_pgx {
+    use super::*;
+
+    /// PGx context directly consumes Annotation's ClinicalSignificance
+    /// without translation — it is a Conformist to the upstream schema.
+    pub trait PharmacogenomicConformist: Send + Sync {
+        /// Accept annotation data as-is from the upstream context
+        fn accept_clinical_annotation(
+            &self,
+            annotation: &annotation_interpretation::ClinicalAnnotation,
+        ) -> Result<(), ConformistError>;
+
+        /// Subscribe to upstream schema changes — PGx must adapt
+        fn on_upstream_schema_change(
+            &self,
+            old_version: &str,
+            new_version: &str,
+        ) -> Result<MigrationPlan, ConformistError>;
+    }
+
+    pub struct MigrationPlan {
+        pub breaking_changes: Vec<String>,
+        pub backward_compatible: bool,
+        pub migration_steps: Vec<String>,
+    }
+
+    #[derive(Debug)]
+    pub enum ConformistError {
+        UpstreamSchemaRejected(String),
+        MigrationFailed(String),
+    }
+}
+```
+
 ---
 
-## 5. Domain Event Flow
+## 5. Event Sourcing with Genomic Event Store
+
+Every state change across all bounded contexts is captured as an immutable
+`GenomicEvent`. This event-sourcing approach provides perfect reproducibility for
+clinical-grade analysis pipelines, full auditability for FDA 21 CFR Part 11
+compliance, and the ability to reconstruct pipeline state at any point in time
+via temporal queries.
+
+### 5.1 Event Store Architecture
+
+The Genomic Event Store uses an append-only log with content-addressable hashing
+(Merkle tree). Each event is identified by its content hash, forming a tamper-evident
+chain. This maps to `ruvector-delta-core` for incremental event streaming and
+`ruvector-raft` for distributed consensus on event ordering.
+
+```rust
+/// Event Sourcing: Genomic Event Store
+/// Maps to: ruvector-delta-core (streaming), ruvector-raft (ordering)
+pub mod genomic_event_store {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    // --- Core Event Types ---
+
+    /// Content-addressable event identifier (SHA-256 of serialized event)
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    pub struct ContentHash(pub [u8; 32]);
+
+    /// Unique event identifier backed by content hash for tamper evidence
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    pub struct EventId(pub ContentHash);
+
+    /// Monotonically increasing sequence number within a stream
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+    pub struct SequenceNumber(pub u64);
+
+    /// Logical timestamp for causal ordering across contexts
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+    pub struct LamportTimestamp(pub u64);
+
+    /// Wall-clock timestamp in nanoseconds since epoch
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+    pub struct WallClock(pub u64);
+
+    // --- Domain Event Trait ---
+
+    /// Marker trait for all domain events across bounded contexts
+    pub trait DomainEvent: Send + Sync + 'static {
+        /// The bounded context that produced this event
+        fn source_context(&self) -> &'static str;
+
+        /// Human-readable event type name
+        fn event_type(&self) -> &'static str;
+
+        /// Aggregate root ID that this event belongs to
+        fn aggregate_id(&self) -> [u8; 16];
+
+        /// Serialize to bytes for content-addressable hashing
+        fn to_bytes(&self) -> Vec<u8>;
+    }
+
+    // --- Concrete Genomic Events ---
+
+    /// A variant was discovered by a caller
+    #[derive(Clone, Debug)]
+    pub struct VariantDiscovered {
+        pub variant_id: [u8; 16],
+        pub callset_id: [u8; 16],
+        pub contig: String,
+        pub position: u64,
+        pub ref_allele: Vec<u8>,
+        pub alt_alleles: Vec<Vec<u8>>,
+        pub quality: f32,
+        pub caller_name: String,
+        pub caller_version: String,
+    }
+
+    /// An annotation was added or updated on a variant
+    #[derive(Clone, Debug)]
+    pub struct AnnotationUpdated {
+        pub variant_id: [u8; 16],
+        pub annotation_source: String,      // e.g., "ClinVar", "gnomAD"
+        pub annotation_version: String,
+        pub previous_hash: Option<ContentHash>,  // hash of prior annotation
+        pub clinical_significance: Option<String>,
+        pub population_frequency: Option<f32>,
+        pub consequence_type: Option<String>,
+    }
+
+    /// A phasing block was extended or refined
+    #[derive(Clone, Debug)]
+    pub struct PhaseBlockExtended {
+        pub sample_id: String,
+        pub contig: String,
+        pub block_start: u64,
+        pub block_end: u64,
+        pub variant_count: u32,
+        pub phase_quality: f32,
+        pub extension_type: PhaseExtensionType,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum PhaseExtensionType {
+        NewBlock,
+        Merged,          // two blocks merged via long-read evidence
+        Extended,        // block boundary pushed outward
+        Refined,         // internal phasing confidence improved
+    }
+
+    /// A quality gate was triggered (pass or fail)
+    #[derive(Clone, Debug)]
+    pub struct QualityGateTriggered {
+        pub gate_name: String,
+        pub context: String,             // bounded context name
+        pub aggregate_id: [u8; 16],
+        pub passed: bool,
+        pub metric_name: String,
+        pub metric_value: f64,
+        pub threshold: f64,
+        pub action_taken: QualityGateAction,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum QualityGateAction {
+        Accepted,
+        Filtered,
+        Quarantined,
+        Escalated,       // sent for manual review
+        Requeued,        // sent back for reprocessing
+    }
+
+    // --- Event Envelope ---
+
+    /// Immutable envelope wrapping any domain event with metadata
+    #[derive(Clone, Debug)]
+    pub struct EventEnvelope<T: DomainEvent> {
+        pub event_id: EventId,
+        pub sequence_number: SequenceNumber,
+        pub lamport_timestamp: LamportTimestamp,
+        pub wall_clock: WallClock,
+        pub correlation_id: [u8; 16],     // traces event across contexts
+        pub causation_id: Option<EventId>, // the event that caused this one
+        pub source_context: &'static str,
+        pub aggregate_id: [u8; 16],
+        pub payload: T,
+        pub merkle_proof: MerkleProof,
+    }
+
+    // --- Merkle Tree for Tamper Evidence ---
+
+    /// Proof that an event exists in the append-only log
+    #[derive(Clone, Debug)]
+    pub struct MerkleProof {
+        pub root_hash: ContentHash,
+        pub leaf_hash: ContentHash,
+        pub path: Vec<MerklePathNode>,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct MerklePathNode {
+        pub hash: ContentHash,
+        pub direction: MerkleDirection,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum MerkleDirection { Left, Right }
+
+    // --- Event Stream ---
+
+    /// Typed event stream for a specific aggregate or projection
+    pub struct EventStream<T: DomainEvent> {
+        pub stream_id: String,
+        pub events: Vec<EventEnvelope<T>>,
+        pub last_sequence: SequenceNumber,
+        pub snapshot: Option<StreamSnapshot>,
+    }
+
+    /// Periodic snapshot to avoid replaying entire history
+    #[derive(Clone, Debug)]
+    pub struct StreamSnapshot {
+        pub sequence_number: SequenceNumber,
+        pub state_hash: ContentHash,
+        pub serialized_state: Vec<u8>,
+        pub created_at: WallClock,
+    }
+
+    // --- Event Store Interface ---
+
+    /// The Genomic Event Store: append-only, content-addressable, Merkle-verified
+    /// Backed by ruvector-delta-core for streaming and ruvector-raft for ordering
+    pub trait GenomicEventStore: Send + Sync {
+        /// Append events to a stream (returns assigned sequence numbers)
+        fn append<T: DomainEvent>(
+            &self,
+            stream_id: &str,
+            events: &[T],
+            expected_version: Option<SequenceNumber>,
+        ) -> Result<Vec<SequenceNumber>, EventStoreError>;
+
+        /// Read events from a stream starting at a sequence number
+        fn read_stream<T: DomainEvent>(
+            &self,
+            stream_id: &str,
+            from: SequenceNumber,
+            max_count: usize,
+        ) -> Result<EventStream<T>, EventStoreError>;
+
+        /// Read all events across all streams (for projections)
+        fn read_all(
+            &self,
+            from: SequenceNumber,
+            max_count: usize,
+        ) -> Result<Vec<EventEnvelope<Box<dyn DomainEvent>>>, EventStoreError>;
+
+        /// Temporal query: reconstruct stream state at a point in time
+        fn read_at_timestamp<T: DomainEvent>(
+            &self,
+            stream_id: &str,
+            timestamp: WallClock,
+        ) -> Result<EventStream<T>, EventStoreError>;
+
+        /// Temporal query: reconstruct stream state at a sequence number
+        fn read_at_version<T: DomainEvent>(
+            &self,
+            stream_id: &str,
+            version: SequenceNumber,
+        ) -> Result<EventStream<T>, EventStoreError>;
+
+        /// Verify Merkle proof for an event
+        fn verify_proof(&self, proof: &MerkleProof) -> Result<bool, EventStoreError>;
+
+        /// Store a snapshot for efficient replay
+        fn save_snapshot(
+            &self,
+            stream_id: &str,
+            snapshot: &StreamSnapshot,
+        ) -> Result<(), EventStoreError>;
+
+        /// Get the latest snapshot for a stream
+        fn load_snapshot(
+            &self,
+            stream_id: &str,
+        ) -> Result<Option<StreamSnapshot>, EventStoreError>;
+
+        /// Subscribe to real-time events (for projections and process managers)
+        fn subscribe(
+            &self,
+            filter: EventFilter,
+        ) -> Result<Box<dyn EventSubscription>, EventStoreError>;
+    }
+
+    pub struct EventFilter {
+        pub stream_pattern: Option<String>,  // glob pattern for stream IDs
+        pub event_types: Option<Vec<String>>,
+        pub source_contexts: Option<Vec<String>>,
+        pub from_sequence: Option<SequenceNumber>,
+    }
+
+    pub trait EventSubscription: Send {
+        fn next_event(&mut self) -> Result<EventEnvelope<Box<dyn DomainEvent>>, EventStoreError>;
+        fn unsubscribe(self);
+    }
+
+    #[derive(Debug)]
+    pub enum EventStoreError {
+        ConcurrencyConflict {
+            stream_id: String,
+            expected: SequenceNumber,
+            actual: SequenceNumber,
+        },
+        StreamNotFound(String),
+        CorruptedEvent { event_id: EventId, reason: String },
+        MerkleVerificationFailed(ContentHash),
+        SerializationError(String),
+        StorageFull,
+        RaftConsensusTimeout,
+    }
+}
+```
+
+### 5.2 Temporal Queries
+
+The event store supports temporal queries that reconstruct pipeline state at any
+historical point. This is critical for:
+
+- **Reproducibility**: Rerunning a variant calling pipeline with the exact
+  annotation database state from a specific date
+- **Audit trails**: Demonstrating to regulators (FDA 21 CFR Part 11) exactly what
+  data and models produced a clinical report
+- **Debugging**: Pinpointing when a variant classification changed and what
+  evidence triggered the change
+
+Temporal queries operate on two axes:
+1. **Wall-clock time**: "What was the state at 2026-01-15T10:30:00Z?"
+2. **Logical version**: "What was the state at sequence number 42,000?"
+
+### 5.3 FDA 21 CFR Part 11 Compliance
+
+The Merkle tree structure provides:
+- **Tamper evidence**: Any modification to historical events invalidates the hash chain
+- **Non-repudiation**: Events carry cryptographic correlation IDs linking to operator sessions
+- **Complete audit trail**: The append-only log is the single source of truth for all state changes
+- **Electronic signatures**: Quality gate events record operator approval with verifiable identity
+
+---
+
+## 6. CQRS (Command Query Responsibility Segregation)
+
+The DNA Analyzer separates write models (optimized for streaming pipeline throughput)
+from read models (optimized for clinical interpretation queries). This enables each
+side to scale independently and use storage structures tailored to their access
+patterns.
+
+### 6.1 Write Model: Variant Calling Pipeline
+
+The write side is optimized for high-throughput append-only operations. Variant
+callers, aligners, and basecallers emit domain events without maintaining query
+indexes. This maps to `ruvector-delta-core` for streaming writes.
+
+### 6.2 Read Model: Clinical Interpretation Views
+
+The read side maintains pre-materialized views optimized for clinical queries:
+variant-by-gene lookups, pathway impact summaries, drug interaction matrices, and
+population frequency dashboards. These views are updated asynchronously via domain
+event projections. This maps to `ruvector-core` (HNSW indexes) and
+`ruvector-collections` (lookup tables).
+
+### 6.3 CQRS Types
+
+```rust
+/// CQRS: Command Query Responsibility Segregation
+/// Write model maps to: ruvector-delta-core (streaming appends)
+/// Read model maps to: ruvector-core (HNSW), ruvector-collections (lookup tables)
+pub mod cqrs {
+    use super::*;
+
+    // --- Command Side ---
+
+    /// Command bus dispatches write operations to the appropriate handler
+    pub struct CommandBus {
+        pub handlers: Vec<Box<dyn CommandHandler>>,
+        pub event_store: Box<dyn genomic_event_store::GenomicEventStore>,
+        pub middleware: Vec<Box<dyn CommandMiddleware>>,
+    }
+
+    /// A command represents an intent to change state
+    pub trait Command: Send + Sync + 'static {
+        fn command_type(&self) -> &'static str;
+        fn target_aggregate(&self) -> [u8; 16];
+        fn validate(&self) -> Result<(), CommandValidationError>;
+    }
+
+    /// Handler processes a command and emits domain events
+    pub trait CommandHandler: Send + Sync {
+        fn handles(&self) -> &'static str;  // command type
+        fn handle(
+            &self,
+            command: &dyn Command,
+        ) -> Result<Vec<Box<dyn genomic_event_store::DomainEvent>>, CommandError>;
+    }
+
+    /// Middleware for cross-cutting concerns (auth, logging, rate limiting)
+    pub trait CommandMiddleware: Send + Sync {
+        fn before(&self, command: &dyn Command) -> Result<(), CommandError>;
+        fn after(&self, command: &dyn Command, events: &[Box<dyn genomic_event_store::DomainEvent>]) -> Result<(), CommandError>;
+    }
+
+    // --- Concrete Commands ---
+
+    pub struct CallVariantsCommand {
+        pub sample_id: String,
+        pub region: GenomicRegion,
+        pub caller_config: Vec<(String, String)>,
+    }
+
+    pub struct AnnotateVariantCommand {
+        pub variant_id: [u8; 16],
+        pub databases: Vec<String>,
+        pub force_refresh: bool,
+    }
+
+    pub struct ClassifyVariantCommand {
+        pub variant_id: [u8; 16],
+        pub evidence_codes: Vec<String>,
+        pub reviewer_id: String,
+    }
+
+    // --- Query Side ---
+
+    /// Query projection: a read-optimized materialized view
+    /// Updated asynchronously from domain events
+    pub struct QueryProjection<T: Send + Sync> {
+        pub projection_name: String,
+        pub last_processed_sequence: genomic_event_store::SequenceNumber,
+        pub state: T,
+        pub refresh_policy: RefreshPolicy,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub enum RefreshPolicy {
+        RealTime,          // updated on every event
+        BatchInterval(u64), // updated every N seconds
+        OnDemand,          // updated only when queried
+    }
+
+    /// Materialized view for clinical queries
+    pub struct MaterializedView {
+        pub name: String,
+        pub query_type: ClinicalQueryType,
+        pub last_updated: genomic_event_store::WallClock,
+        pub row_count: u64,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub enum ClinicalQueryType {
+        VariantsByGene,           // all variants in a gene, sorted by pathogenicity
+        PathwayImpact,            // variants grouped by biological pathway
+        DrugInteractionMatrix,    // sample x drug interaction grid
+        PopulationFrequencyDash,  // variant frequencies across populations
+        PharmacogenomicReport,    // per-sample PGx summary
+        QualityMetricsSummary,    // pipeline QC dashboard
+    }
+
+    // --- Concrete Projections ---
+
+    /// Variants indexed by gene for clinical lookup
+    pub struct VariantsByGeneProjection {
+        pub gene_index: Vec<(String, Vec<VariantSummary>)>,
+    }
+
+    pub struct VariantSummary {
+        pub variant_id: [u8; 16],
+        pub hgvs: String,
+        pub consequence: String,
+        pub acmg_class: String,
+        pub population_af: f32,
+        pub last_updated: genomic_event_store::WallClock,
+    }
+
+    /// Drug interaction matrix for pharmacogenomics queries
+    pub struct DrugInteractionProjection {
+        pub sample_id: String,
+        pub interactions: Vec<DrugInteractionEntry>,
+    }
+
+    pub struct DrugInteractionEntry {
+        pub drug_name: String,
+        pub gene_symbol: String,
+        pub metabolizer_status: String,
+        pub recommendation: String,
+        pub evidence_level: String,
+    }
+
+    // --- Projection Engine ---
+
+    /// Engine that subscribes to domain events and updates projections
+    pub trait ProjectionEngine: Send + Sync {
+        /// Register a projection to be kept up to date
+        fn register_projection(
+            &mut self,
+            projection_name: &str,
+            handler: Box<dyn ProjectionHandler>,
+        ) -> Result<(), ProjectionError>;
+
+        /// Start processing events for all registered projections
+        fn start(&self) -> Result<(), ProjectionError>;
+
+        /// Rebuild a projection from scratch (replay all events)
+        fn rebuild(&self, projection_name: &str) -> Result<(), ProjectionError>;
+
+        /// Get current lag (events behind) for a projection
+        fn lag(&self, projection_name: &str) -> Result<u64, ProjectionError>;
+    }
+
+    pub trait ProjectionHandler: Send + Sync {
+        fn handle_event(
+            &mut self,
+            event: &genomic_event_store::EventEnvelope<Box<dyn genomic_event_store::DomainEvent>>,
+        ) -> Result<(), ProjectionError>;
+    }
+
+    // --- Errors ---
+
+    #[derive(Debug)]
+    pub enum CommandValidationError {
+        MissingField(String),
+        InvalidValue { field: String, reason: String },
+        InvariantViolation(String),
+    }
+
+    #[derive(Debug)]
+    pub enum CommandError {
+        ValidationFailed(CommandValidationError),
+        ConcurrencyConflict(String),
+        AggregateNotFound([u8; 16]),
+        Unauthorized(String),
+        InternalError(String),
+    }
+
+    #[derive(Debug)]
+    pub enum ProjectionError {
+        ProjectionNotFound(String),
+        EventDeserializationFailed(String),
+        StateCorrupted(String),
+        RebuildInProgress(String),
+    }
+}
+```
+
+### 6.4 Eventual Consistency Model
+
+Write and read models are eventually consistent. The projection engine processes
+domain events asynchronously, meaning clinical query views may lag behind the latest
+variant calls by milliseconds to seconds. For safety-critical queries (e.g.,
+pharmacogenomic dosing alerts), the system enforces a maximum staleness bound
+configured per projection.
+
+---
+
+## 7. Saga Pattern for Cross-Context Transactions
+
+Genomic analysis workflows span multiple bounded contexts. The Saga Pattern
+coordinates these multi-context transactions using choreography-based sagas with
+compensating actions for rollback. Each saga progresses through a well-defined
+state machine with timeout and dead-letter handling for stalled steps.
+
+### 7.1 Genomic Saga State Machine
+
+A typical whole-genome analysis saga progresses through:
+
+```
+Initiated → VariantCalled → Annotated → ClinicallyClassified → Reported
+    |              |              |                |
+    v              v              v                v
+ (timeout)    (compensate:   (compensate:    (compensate:
+              retract call)  remove annot.)  retract class.)
+```
+
+### 7.2 Saga Types
+
+```rust
+/// Saga Pattern: Cross-context transaction coordination
+/// Maps to: ruvector-raft (saga state persistence), ruvector-delta-core (event routing)
+pub mod saga {
+    use super::*;
+
+    // --- Saga State Machine ---
+
+    /// Marker trait for saga state types
+    pub trait SagaState: Send + Sync + Clone + 'static {
+        fn state_name(&self) -> &'static str;
+        fn is_terminal(&self) -> bool;
+        fn is_compensating(&self) -> bool;
+    }
+
+    /// A step in the saga with forward action and compensating action
+    pub struct SagaStep<S: SagaState> {
+        pub step_name: String,
+        pub state: S,
+        pub forward_action: Box<dyn SagaAction>,
+        pub compensating_action: Box<dyn CompensatingAction>,
+        pub timeout: std::time::Duration,
+        pub retry_policy: RetryPolicy,
+    }
+
+    /// Forward action executed during normal saga flow
+    pub trait SagaAction: Send + Sync {
+        fn execute(
+            &self,
+            context: &SagaContext,
+        ) -> Result<SagaActionResult, SagaError>;
+    }
+
+    /// Compensating action executed during rollback
+    pub trait CompensatingAction: Send + Sync {
+        fn compensate(
+            &self,
+            context: &SagaContext,
+            original_result: &SagaActionResult,
+        ) -> Result<(), SagaError>;
+    }
+
+    pub struct SagaActionResult {
+        pub events_produced: Vec<Box<dyn genomic_event_store::DomainEvent>>,
+        pub data: Vec<(String, Vec<u8>)>,  // key-value data for subsequent steps
+    }
+
+    pub struct SagaContext {
+        pub saga_id: SagaId,
+        pub correlation_id: [u8; 16],
+        pub data: Vec<(String, Vec<u8>)>,  // accumulated data from prior steps
+        pub started_at: genomic_event_store::WallClock,
+    }
+
+    // --- Genomic Saga ---
+
+    /// A complete genomic analysis saga
+    pub struct GenomicSaga<S: SagaState> {
+        pub id: SagaId,
+        pub name: String,
+        pub current_state: S,
+        pub steps: Vec<SagaStep<S>>,
+        pub completed_steps: Vec<CompletedStep>,
+        pub context: SagaContext,
+        pub status: SagaStatus,
+        pub created_at: genomic_event_store::WallClock,
+        pub updated_at: genomic_event_store::WallClock,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    pub struct SagaId(pub [u8; 16]);
+
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum SagaStatus {
+        Running,
+        Completed,
+        Compensating,      // rolling back
+        Failed,            // compensation failed
+        TimedOut,
+        DeadLettered,      // sent to dead-letter queue for manual review
+    }
+
+    pub struct CompletedStep {
+        pub step_name: String,
+        pub result: SagaActionResult,
+        pub completed_at: genomic_event_store::WallClock,
+        pub duration_ms: u64,
+    }
+
+    // --- Whole-Genome Analysis Saga States ---
+
+    #[derive(Clone, Debug)]
+    pub enum WholeGenomeSagaState {
+        Initiated,
+        VariantsCalled,
+        Annotated,
+        ClinicallyClassified,
+        Reported,
+        // Compensating states
+        RetractingCalls,
+        RemovingAnnotations,
+        RetractingClassification,
+        CompensationComplete,
+    }
+
+    impl SagaState for WholeGenomeSagaState {
+        fn state_name(&self) -> &'static str {
+            match self {
+                Self::Initiated => "initiated",
+                Self::VariantsCalled => "variants_called",
+                Self::Annotated => "annotated",
+                Self::ClinicallyClassified => "clinically_classified",
+                Self::Reported => "reported",
+                Self::RetractingCalls => "retracting_calls",
+                Self::RemovingAnnotations => "removing_annotations",
+                Self::RetractingClassification => "retracting_classification",
+                Self::CompensationComplete => "compensation_complete",
+            }
+        }
+
+        fn is_terminal(&self) -> bool {
+            matches!(self, Self::Reported | Self::CompensationComplete)
+        }
+
+        fn is_compensating(&self) -> bool {
+            matches!(
+                self,
+                Self::RetractingCalls
+                    | Self::RemovingAnnotations
+                    | Self::RetractingClassification
+                    | Self::CompensationComplete
+            )
+        }
+    }
+
+    // --- Retry and Timeout ---
+
+    #[derive(Clone, Debug)]
+    pub struct RetryPolicy {
+        pub max_retries: u32,
+        pub base_delay_ms: u64,
+        pub backoff_multiplier: f64,
+        pub max_delay_ms: u64,
+    }
+
+    // --- Saga Orchestrator ---
+
+    /// Orchestrates saga execution, compensation, and dead-lettering
+    pub trait SagaOrchestrator: Send + Sync {
+        /// Start a new saga
+        fn start_saga<S: SagaState>(
+            &self,
+            saga: GenomicSaga<S>,
+        ) -> Result<SagaId, SagaError>;
+
+        /// Advance a saga to its next step
+        fn advance(&self, saga_id: &SagaId) -> Result<SagaStatus, SagaError>;
+
+        /// Trigger compensation (rollback) from the current step
+        fn compensate(&self, saga_id: &SagaId, reason: &str) -> Result<(), SagaError>;
+
+        /// Move a stalled saga to the dead-letter queue
+        fn dead_letter(&self, saga_id: &SagaId, reason: &str) -> Result<(), SagaError>;
+
+        /// List all sagas in a given status
+        fn list_by_status(&self, status: SagaStatus) -> Result<Vec<SagaId>, SagaError>;
+
+        /// Get current saga state
+        fn get_state<S: SagaState>(
+            &self,
+            saga_id: &SagaId,
+        ) -> Result<GenomicSaga<S>, SagaError>;
+    }
+
+    #[derive(Debug)]
+    pub enum SagaError {
+        SagaNotFound(SagaId),
+        StepExecutionFailed { step: String, reason: String },
+        CompensationFailed { step: String, reason: String },
+        TimeoutExceeded { step: String, timeout_ms: u64 },
+        InvalidStateTransition { from: String, to: String },
+        DeadLettered(SagaId),
+        PersistenceError(String),
+    }
+}
+```
+
+### 7.3 Compensating Transactions
+
+Each saga step defines a compensating action for rollback:
+
+| Step                    | Forward Action                     | Compensating Action                  |
+|-------------------------|------------------------------------|--------------------------------------|
+| VariantCalling          | Call variants from alignments      | Retract variant calls, emit `VariantRetracted` event |
+| Annotation              | Annotate called variants           | Remove annotations, emit `AnnotationRetracted` event |
+| ClinicalClassification  | Assign ACMG class with evidence    | Retract classification, emit `ClassificationRetracted` event |
+| Reporting               | Generate clinical report           | Mark report as superseded, emit `ReportRetracted` event |
+
+---
+
+## 8. Hexagonal Architecture (Ports & Adapters)
+
+Each bounded context exposes ports (trait interfaces) and adapters (concrete
+implementations). This enables testing with real adapter swaps instead of mocks,
+and allows infrastructure changes (e.g., switching from FPGA to GPU basecalling)
+without modifying domain logic.
+
+### 8.1 Port Definitions
+
+```rust
+/// Hexagonal Architecture: Ports & Adapters
+/// Each bounded context defines primary ports (driving) and secondary ports (driven)
+pub mod hexagonal {
+    use super::*;
+
+    // --- Primary Ports (Driving Side) ---
+    // These are called BY external actors (CLI, API, UI, pipeline orchestrator)
+
+    /// Primary port: Sequence ingestion entry point
+    pub trait SequenceIngestionPort: Send + Sync {
+        /// Ingest raw signal from a sequencing instrument
+        fn ingest_signal(
+            &self,
+            signal: &[f32],
+            instrument: InstrumentConfig,
+        ) -> Result<Vec<sequence_ingestion::BasecalledRead>, PortError>;
+
+        /// Ingest pre-basecalled reads (e.g., from FASTQ)
+        fn ingest_reads(
+            &self,
+            reads: Vec<sequence_ingestion::BasecalledRead>,
+        ) -> Result<u64, PortError>;
+
+        /// Start a streaming ingestion session
+        fn start_streaming_session(
+            &self,
+            config: StreamingConfig,
+        ) -> Result<SessionHandle, PortError>;
+    }
+
+    /// Primary port: Variant calling entry point
+    pub trait VariantCallingPort: Send + Sync {
+        /// Call variants from aligned reads in a region
+        fn call_variants(
+            &self,
+            sample_id: &str,
+            region: &GenomicRegion,
+            config: CallerConfig,
+        ) -> Result<variant_calling::VariantCallSet, PortError>;
+
+        /// Incrementally update calls with new alignment data
+        fn update_calls(
+            &self,
+            callset_id: &[u8; 16],
+            new_alignments: &[alignment_mapping::Alignment],
+        ) -> Result<Vec<variant_calling::Variant>, PortError>;
+    }
+
+    /// Primary port: Annotation and interpretation entry point
+    pub trait AnnotationPort: Send + Sync {
+        /// Annotate a single variant
+        fn annotate_variant(
+            &self,
+            variant_id: &[u8; 16],
+        ) -> Result<annotation_interpretation::AnnotatedVariant, PortError>;
+
+        /// Batch annotate a callset
+        fn annotate_callset(
+            &self,
+            callset_id: &[u8; 16],
+        ) -> Result<Vec<annotation_interpretation::AnnotatedVariant>, PortError>;
+
+        /// Query clinically significant variants for a sample
+        fn query_clinical_variants(
+            &self,
+            sample_id: &str,
+            min_significance: &str,
+        ) -> Result<Vec<annotation_interpretation::AnnotatedVariant>, PortError>;
+    }
+
+    // --- Secondary Ports (Driven Side) ---
+    // These are called BY the domain to interact with infrastructure
+
+    /// Secondary port: Genome storage (implemented by ruvector-core, filesystem, S3, etc.)
+    pub trait GenomeStoragePort: Send + Sync {
+        /// Store a genomic data blob (sequence, signal, alignment)
+        fn store(&self, key: &StorageKey, data: &[u8]) -> Result<(), PortError>;
+
+        /// Retrieve a genomic data blob
+        fn retrieve(&self, key: &StorageKey) -> Result<Vec<u8>, PortError>;
+
+        /// Delete a genomic data blob
+        fn delete(&self, key: &StorageKey) -> Result<(), PortError>;
+
+        /// Check if a key exists
+        fn exists(&self, key: &StorageKey) -> Result<bool, PortError>;
+
+        /// List keys matching a prefix
+        fn list_prefix(&self, prefix: &str) -> Result<Vec<StorageKey>, PortError>;
+    }
+
+    /// Secondary port: Reference data access (genome references, annotation DBs)
+    pub trait ReferenceDataPort: Send + Sync {
+        /// Load a reference genome or graph
+        fn load_reference(
+            &self,
+            reference_id: &str,
+            region: Option<&GenomicRegion>,
+        ) -> Result<ReferenceData, PortError>;
+
+        /// Query an annotation database (ClinVar, gnomAD, etc.)
+        fn query_database(
+            &self,
+            database_name: &str,
+            query: &DatabaseQuery,
+        ) -> Result<Vec<DatabaseRecord>, PortError>;
+
+        /// Get database version/timestamp
+        fn database_version(&self, database_name: &str) -> Result<String, PortError>;
+    }
+
+    /// Secondary port: Audit logging (for compliance and traceability)
+    pub trait AuditLogPort: Send + Sync {
+        /// Log a domain event for audit purposes
+        fn log_event(
+            &self,
+            entry: &AuditEntry,
+        ) -> Result<(), PortError>;
+
+        /// Query audit log by time range and context
+        fn query_log(
+            &self,
+            filter: &AuditFilter,
+        ) -> Result<Vec<AuditEntry>, PortError>;
+
+        /// Verify audit log integrity (Merkle chain)
+        fn verify_integrity(
+            &self,
+            from: u64,
+            to: u64,
+        ) -> Result<bool, PortError>;
+    }
+
+    // --- Supporting Types ---
+
+    pub struct InstrumentConfig {
+        pub instrument_type: String,
+        pub basecaller_model: String,
+        pub quality_threshold: f32,
+    }
+
+    pub struct StreamingConfig {
+        pub chunk_size: usize,
+        pub max_buffer_size: usize,
+        pub flush_interval_ms: u64,
+    }
+
+    pub struct SessionHandle {
+        pub session_id: [u8; 16],
+        pub created_at: u64,
+    }
+
+    pub struct CallerConfig {
+        pub caller_name: String,
+        pub parameters: Vec<(String, String)>,
+    }
+
+    #[derive(Clone)]
+    pub struct StorageKey(pub String);
+
+    pub struct ReferenceData {
+        pub reference_id: String,
+        pub sequence: Option<Vec<u8>>,
+        pub graph: Option<graph_genome::ContigGraph>,
+    }
+
+    pub struct DatabaseQuery {
+        pub query_type: String,
+        pub parameters: Vec<(String, String)>,
+        pub max_results: usize,
+    }
+
+    pub struct DatabaseRecord {
+        pub fields: Vec<(String, String)>,
+    }
+
+    pub struct AuditEntry {
+        pub timestamp: u64,
+        pub context: String,
+        pub action: String,
+        pub actor: String,
+        pub details: Vec<(String, String)>,
+        pub event_hash: Option<genomic_event_store::ContentHash>,
+    }
+
+    pub struct AuditFilter {
+        pub from_timestamp: Option<u64>,
+        pub to_timestamp: Option<u64>,
+        pub context: Option<String>,
+        pub actor: Option<String>,
+    }
+
+    #[derive(Debug)]
+    pub enum PortError {
+        NotFound(String),
+        StorageError(String),
+        ConnectionError(String),
+        AuthorizationError(String),
+        TimeoutError(String),
+        ValidationError(String),
+    }
+}
+```
+
+### 8.2 Adapter Implementations
+
+```rust
+/// Hexagonal Architecture: Concrete adapters
+/// These implement the ports using specific RuVector crates
+pub mod adapters {
+    use super::*;
+
+    /// Adapter: FPGA-accelerated basecalling (implements SequenceIngestionPort)
+    /// Maps to: sona (neural basecalling with FPGA offload)
+    pub struct FpgaBasecallingAdapter {
+        pub device_id: u32,
+        pub model_path: String,
+        pub batch_size: usize,
+        pub precision: ComputePrecision,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub enum ComputePrecision { Fp32, Fp16, Int8 }
+
+    /// Adapter: HNSW-backed vector search (implements nearest-neighbor queries)
+    /// Maps to: ruvector-core (HNSW index)
+    pub struct HnswSearchAdapter {
+        pub index_name: String,
+        pub ef_construction: usize,
+        pub ef_search: usize,
+        pub max_connections: usize,
+        pub distance_metric: DistanceMetric,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub enum DistanceMetric { Cosine, Euclidean, DotProduct, Hyperbolic }
+
+    /// Adapter: Delta-based storage (implements GenomeStoragePort)
+    /// Maps to: ruvector-delta-core (incremental storage)
+    pub struct DeltaStorageAdapter {
+        pub base_path: String,
+        pub compression: CompressionType,
+        pub tier_policy: TierPolicy,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub enum CompressionType { None, Lz4, Zstd, Snappy }
+
+    #[derive(Clone)]
+    pub struct TierPolicy {
+        pub hot_retention_hours: u32,
+        pub warm_retention_days: u32,
+        pub cold_storage_backend: String,
+    }
+
+    /// Adapter: Raft-replicated audit log (implements AuditLogPort)
+    /// Maps to: ruvector-raft (distributed consensus)
+    pub struct RaftAuditLogAdapter {
+        pub cluster_nodes: Vec<String>,
+        pub replication_factor: u32,
+        pub flush_interval_ms: u64,
+    }
+
+    /// Adapter: GPU-accelerated attention model (for CRISPR off-target prediction)
+    /// Maps to: ruvector-attention (transformer inference)
+    pub struct GpuAttentionAdapter {
+        pub device_id: u32,
+        pub model_path: String,
+        pub max_sequence_length: usize,
+        pub attention_heads: usize,
+    }
+}
+```
+
+### 8.3 Adapter Swap for Testing
+
+The hexagonal architecture enables testing by swapping adapters:
+
+| Production Adapter            | Test Adapter                | Port                    |
+|-------------------------------|-----------------------------|-------------------------|
+| `FpgaBasecallingAdapter`      | `InMemoryBasecallingAdapter`| `SequenceIngestionPort` |
+| `HnswSearchAdapter`           | `BruteForceSearchAdapter`   | Nearest-neighbor queries|
+| `DeltaStorageAdapter`          | `InMemoryStorageAdapter`    | `GenomeStoragePort`     |
+| `RaftAuditLogAdapter`          | `VecAuditLogAdapter`        | `AuditLogPort`          |
+| `GpuAttentionAdapter`          | `CpuAttentionAdapter`       | Attention inference     |
+
+---
+
+## 9. Domain Event Choreography with Process Managers
+
+Process managers coordinate long-running cross-context workflows by listening to
+domain events and issuing commands to advance the workflow. Unlike sagas (which
+handle compensation), process managers focus on orchestrating the happy path with
+explicit transition guards and coherence gate checkpoints.
+
+### 9.1 Whole-Genome Analysis Process Manager
+
+The `WholeGenomeAnalysisProcessManager` orchestrates the complete pipeline from
+raw sequencing signal to final clinical report. It listens for domain events from
+each bounded context and issues commands to the next context when preconditions
+(transition guards) are satisfied.
+
+```rust
+/// Process Managers: Long-running cross-context workflow coordination
+/// Maps to: ruvector-raft (state persistence), ruvector-delta-core (event routing)
+pub mod process_managers {
+    use super::*;
+
+    /// Process Manager for whole-genome analysis pipeline
+    pub struct WholeGenomeAnalysisProcessManager {
+        pub id: ProcessManagerId,
+        pub sample_id: String,
+        pub current_phase: AnalysisPhase,
+        pub phase_results: Vec<PhaseResult>,
+        pub coherence_gates: Vec<CoherenceGate>,
+        pub started_at: genomic_event_store::WallClock,
+        pub timeout: std::time::Duration,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum AnalysisPhase {
+        AwaitingSignal,
+        Basecalling,
+        QualityControl,
+        Aligning,
+        VariantCalling,
+        Annotating,
+        ClinicalClassification,
+        PharmacogenomicProfiling,
+        ReportGeneration,
+        Complete,
+        Failed,
+    }
+
+    /// Process Manager for multi-sample population study
+    pub struct PopulationStudyProcessManager {
+        pub id: ProcessManagerId,
+        pub study_name: String,
+        pub sample_count: u32,
+        pub samples_processed: u32,
+        pub current_phase: PopulationPhase,
+        pub federated_nodes: Vec<String>,
+        pub aggregation_state: AggregationState,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum PopulationPhase {
+        SampleCollection,
+        IndividualAnalysis,
+        AlleleFrequencyAggregation,
+        PcaComputation,
+        GwasAnalysis,
+        ResultsConsolidation,
+        Complete,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct AggregationState {
+        pub samples_received: u32,
+        pub samples_expected: u32,
+        pub partial_frequencies: Vec<(String, f32)>,  // (variant_key, running_af)
+    }
+
+    // --- Supporting Types ---
+
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    pub struct ProcessManagerId(pub [u8; 16]);
+
+    pub struct PhaseResult {
+        pub phase: AnalysisPhase,
+        pub completed_at: genomic_event_store::WallClock,
+        pub duration_ms: u64,
+        pub metrics: Vec<(String, f64)>,
+        pub events_produced: u32,
+    }
+
+    /// Coherence gate: a checkpoint that must pass before phase transition
+    pub struct CoherenceGate {
+        pub gate_name: String,
+        pub phase_transition: (AnalysisPhase, AnalysisPhase),
+        pub guard: Box<dyn TransitionGuard>,
+        pub on_failure: GateFailureAction,
+    }
+
+    /// Guard that evaluates whether a phase transition is allowed
+    pub trait TransitionGuard: Send + Sync {
+        fn evaluate(&self, context: &ProcessManagerContext) -> Result<bool, ProcessManagerError>;
+        fn description(&self) -> &str;
+    }
+
+    pub struct ProcessManagerContext {
+        pub sample_id: String,
+        pub phase_results: Vec<PhaseResult>,
+        pub accumulated_metrics: Vec<(String, f64)>,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum GateFailureAction {
+        Block,             // halt the pipeline
+        Retry,             // retry the previous phase
+        Skip,              // skip and continue (with warning)
+        Escalate,          // send for manual review
+    }
+
+    // --- Process Manager Trait ---
+
+    /// Core process manager interface
+    pub trait ProcessManager: Send + Sync {
+        /// Handle an incoming domain event and decide next action
+        fn handle_event(
+            &mut self,
+            event: &genomic_event_store::EventEnvelope<Box<dyn genomic_event_store::DomainEvent>>,
+        ) -> Result<Vec<ProcessManagerAction>, ProcessManagerError>;
+
+        /// Get current phase
+        fn current_phase(&self) -> &str;
+
+        /// Check if the process is complete
+        fn is_complete(&self) -> bool;
+
+        /// Get accumulated results
+        fn results(&self) -> &[PhaseResult];
+    }
+
+    pub enum ProcessManagerAction {
+        /// Issue a command to a bounded context
+        IssueCommand(Box<dyn cqrs::Command>),
+        /// Schedule a delayed action (timeout handling)
+        ScheduleTimeout { delay_ms: u64, action: String },
+        /// Emit a process-level event
+        EmitEvent(Box<dyn genomic_event_store::DomainEvent>),
+        /// No action needed for this event
+        NoAction,
+    }
+
+    #[derive(Debug)]
+    pub enum ProcessManagerError {
+        InvalidPhaseTransition { from: String, to: String },
+        CoherenceGateFailed { gate: String, reason: String },
+        TimeoutExceeded { phase: String, timeout_ms: u64 },
+        EventHandlingFailed(String),
+        PersistenceError(String),
+    }
+}
+```
+
+### 9.2 Transition Guards
+
+| Gate Name                 | Transition                           | Condition                                     |
+|---------------------------|--------------------------------------|-----------------------------------------------|
+| `MinCoverageGate`         | QualityControl -> Aligning           | Mean coverage >= 30x for WGS                  |
+| `MappingRateGate`         | Aligning -> VariantCalling           | Mapping rate >= 95%                            |
+| `TiTvRatioGate`           | VariantCalling -> Annotating         | Ti/Tv ratio in [1.8, 2.3] for WGS             |
+| `AnnotationCompletenessGate` | Annotating -> ClinicalClassification | >= 99% of variants annotated                |
+| `PgxCoverageGate`         | ClinicalClassification -> PgxProfiling | All CPIC Level 1A genes at >= 20x coverage  |
+| `ReportSignoffGate`       | ReportGeneration -> Complete         | Clinical geneticist sign-off recorded          |
+
+---
+
+## 10. Aggregate Consistency Boundaries
+
+Each aggregate root defines an explicit consistency boundary. Within a single
+aggregate, all invariants are enforced transactionally. Cross-aggregate communication
+uses eventual consistency via domain events. Optimistic concurrency with version
+vectors prevents lost updates.
+
+### 10.1 Consistency Rules
+
+```rust
+/// Aggregate Consistency: Version vectors and optimistic concurrency
+/// Maps to: ruvector-delta-consensus (version tracking), ruvector-raft (distributed locking)
+pub mod aggregate_consistency {
+    use super::*;
+
+    /// Version vector for optimistic concurrency control
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct VersionVector {
+        pub aggregate_id: [u8; 16],
+        pub version: u64,
+        pub last_event_id: Option<genomic_event_store::EventId>,
+        pub last_modified_by: String,    // actor/context that last modified
+        pub last_modified_at: genomic_event_store::WallClock,
+    }
+
+    /// Concurrency control for aggregate updates
+    pub trait AggregateRoot: Send + Sync {
+        /// Get the current version vector
+        fn version(&self) -> &VersionVector;
+
+        /// Apply an event, incrementing the version
+        fn apply_event(
+            &mut self,
+            event: &dyn genomic_event_store::DomainEvent,
+        ) -> Result<VersionVector, ConsistencyError>;
+
+        /// Check invariants after applying an event
+        fn check_invariants(&self) -> Result<(), ConsistencyError>;
+    }
+
+    /// Conflict resolution strategies for cross-aggregate eventual consistency
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum ConflictResolution {
+        /// Last writer wins (for annotations where latest data is authoritative)
+        LastWriterWins,
+        /// Merge concurrent changes (for variant calls where both may be valid)
+        Merge,
+        /// Reject conflicting updates (for clinical classifications requiring review)
+        Reject,
+        /// Custom resolution function
+        Custom,
+    }
+
+    /// Configuration per aggregate type
+    pub struct AggregateConsistencyConfig {
+        pub aggregate_type: String,
+        pub conflict_resolution: ConflictResolution,
+        pub max_events_before_snapshot: u64,
+        pub staleness_bound_ms: Option<u64>,  // for CQRS read models
+    }
+
+    /// Cross-aggregate consistency rules
+    pub struct EventualConsistencyContract {
+        pub source_aggregate: String,
+        pub target_aggregate: String,
+        pub propagation_event: String,
+        pub max_propagation_delay_ms: u64,
+        pub conflict_resolution: ConflictResolution,
+        pub idempotency_key: String,
+    }
+
+    #[derive(Debug)]
+    pub enum ConsistencyError {
+        OptimisticConcurrencyViolation {
+            aggregate_id: [u8; 16],
+            expected_version: u64,
+            actual_version: u64,
+        },
+        InvariantViolation(String),
+        ConflictDetected {
+            aggregate_id: [u8; 16],
+            conflicting_events: Vec<genomic_event_store::EventId>,
+        },
+        StaleRead {
+            aggregate_id: [u8; 16],
+            staleness_ms: u64,
+            bound_ms: u64,
+        },
+    }
+}
+```
+
+### 10.2 Per-Context Consistency Boundaries
+
+| Bounded Context         | Aggregate Root        | Transaction Scope            | Cross-Aggregate Strategy      |
+|-------------------------|-----------------------|------------------------------|-------------------------------|
+| Sequence Ingestion      | `SequencingRun`       | Single run + its read groups | Eventual: `RunComplete` event |
+| Alignment & Mapping     | `AlignmentBatch`      | Single batch of alignments   | Eventual: `AlignmentCompleted` event |
+| Variant Calling         | `VariantCallSet`      | Single sample's callset      | Merge: concurrent callers produce union |
+| Graph Genome            | `GenomeGraph`         | Single contig graph          | Eventual: `GraphUpdated` event |
+| Annotation              | `AnnotatedVariant`    | Single variant annotation    | Last-writer-wins: latest DB is authoritative |
+| Epigenomics             | `EpigenomicProfile`   | Single sample profile        | Eventual: `MethylationProfiled` event |
+| Pharmacogenomics        | `PharmacogenomicProfile` | Single sample PGx profile | Eventual: `StarAllelesCalled` event |
+| Population Genomics     | `PopulationStudy`     | Single study cohort          | Merge: federated frequency aggregation |
+| Pathogen Surveillance   | `SurveillanceSample`  | Single surveillance sample   | Eventual: `OutbreakClusterExpanded` event |
+| CRISPR Engineering      | `CrisprExperiment`    | Single experiment            | Reject: guide designs require explicit review |
+
+---
+
+## 11. Domain Event Flow (Pipeline)
 
 The complete event-driven pipeline flows as follows:
 
@@ -1660,7 +3189,7 @@ CRISPR Engineering operates on-demand:
 
 ---
 
-## 6. Mapping to RuVector Crates
+## 12. Mapping to RuVector Crates
 
 Each bounded context maps to specific RuVector infrastructure crates:
 
@@ -1725,7 +3254,7 @@ Each bounded context maps to specific RuVector infrastructure crates:
 +===========================================================================+
 ```
 
-### 6.1 Crate Mapping Rationale
+### 12.1 Crate Mapping Rationale
 
 **ruvector-core** serves as the foundational vector storage layer across all ten
 contexts. Every entity with an embedding field (reads, variants, guides, taxonomy
@@ -1813,7 +3342,7 @@ ensures ACID properties for concurrent pipeline stages.
 
 ---
 
-## 7. Deployment Architecture
+## 13. Deployment Architecture
 
 ```
 +===========================================================================+

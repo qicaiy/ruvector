@@ -64,6 +64,7 @@ impl From<WasmInferenceConfig> for InferenceConfig {
 
 /// Generation configuration for text generation
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct GenerationConfig {
     pub max_new_tokens: usize,
     pub temperature: f32,
@@ -86,6 +87,7 @@ impl Default for GenerationConfig {
 
 /// Simple KV cache for autoregressive generation
 struct KVCache {
+    #[allow(dead_code)]
     max_size: usize,
     keys: Vec<Vec<f32>>,
     values: Vec<Vec<f32>>,
