@@ -634,3 +634,908 @@ END-TO-END GENOMIC ANALYSIS PIPELINE
 5. Goranci, G., Henzinger, M., Kiss, A., Momeni, M., Zocklein, D. (Jan 2026).
    "Dynamic Hierarchical j-Tree Decomposition and Its Applications."
    arXiv:2601.09139.
+
+---
+
+## 10. Pipeline DAG & Delta State Management
+
+### 10.1 Analysis Pipeline as a Directed Acyclic Graph
+
+The end-to-end genomic analysis pipeline -- from raw sequencer signal to clinical
+report -- forms a directed acyclic graph where each node is a computational stage
+with typed inputs and outputs, and each edge is a data dependency. This DAG is
+represented using the `ruvector-dag` crate's `QueryDag` structure, extended with
+genomic-specific operator types.
+
+```
+GENOMIC ANALYSIS PIPELINE DAG
+
+                    +------------------+
+                    |   Raw Signal     |  (FAST5 / POD5 / BCL)
+                    +--------+---------+
+                             |
+                    +--------v---------+
+                    |   Basecalling    |  GPU-accelerated (Dorado / Guppy)
+                    +--------+---------+
+                             |
+              +--------------+--------------+
+              |                             |
+     +--------v---------+         +--------v---------+
+     |   Quality        |         |   Adapter        |
+     |   Control        |         |   Trimming       |
+     +--------+---------+         +--------+---------+
+              |                             |
+              +-------+       +-------------+
+                      |       |
+             +--------v-------v-+
+             |   Read Filtering  |  (length, quality, complexity)
+             +--------+---------+
+                      |
+           +----------+----------+
+           |                     |
+  +--------v---------+  +-------v----------+
+  |   Alignment      |  |   QC Statistics  |  (FastQC-equivalent)
+  |   (minimap2/BWA) |  +------------------+
+  +--------+---------+
+           |
+    +------+------+
+    |             |
++---v----+  +----v---------+
+| Dedup  |  |   Coverage   |  (mosdepth-equivalent)
+| (UMI / |  |   Analysis   |
+|  coord)|  +--------------+
++---+----+
+    |
+    +-------------+--------------+
+    |             |              |
++---v-----+  +---v------+  +---v---------+
+| Variant |  | Dedup    |  | Insert Size |
+| Calling |  | Metrics  |  | Metrics     |
+| (GATK / |  +----------+  +-------------+
+|  DeepV) |
++---+-----+
+    |
+    +----------+-----------+
+    |                      |
++---v-----------+  +-------v---------+
+| Annotation    |  | Structural      |
+| (VEP / CADD / |  | Variant Calling |
+|  ClinVar)     |  | (Regime 1/3     |
++---+-----------+  |  from Sec. 2/4) |
+    |              +-------+---------+
+    +------+       +-------+
+           |       |
+    +------v-------v-------+
+    |   Interpretation     |  (ACMG classification)
+    +----------+-----------+
+               |
+    +----------v-----------+
+    |   Clinical Report    |  (PDF / HL7 FHIR)
+    +-----------------------+
+```
+
+#### 10.1.1 Mapping Pipeline Nodes to `QueryDag`
+
+Each computational stage is an `OperatorNode` with a domain-specific `OperatorType`
+extension. The table below maps genomic stages to their DAG representation and
+resource requirements.
+
+| Pipeline Stage | `OperatorType` | Input Type | Output Type | Resource | Est. Time (30x WGS) |
+|----------------|----------------|------------|-------------|----------|---------------------|
+| Raw Signal | `Source` | Device stream | FAST5/POD5 | I/O | Continuous |
+| Basecalling | `Transform("basecall")` | FAST5 | FASTQ | GPU | 4-8h |
+| QC / Filtering | `Filter("qc")` | FASTQ | FASTQ | CPU | 15 min |
+| Alignment | `Transform("align")` | FASTQ + REF | BAM/CRAM | CPU (16c) | 2-4h |
+| Deduplication | `Transform("dedup")` | BAM | BAM | CPU + RAM | 30 min |
+| Variant Calling | `Transform("varcall")` | BAM + REF | VCF | CPU/GPU | 1-6h |
+| Annotation | `Transform("annotate")` | VCF + DB | Annotated VCF | CPU + I/O | 20 min |
+| Interpretation | `Transform("interpret")` | Ann. VCF | Classifications | CPU | 5 min |
+| Clinical Report | `Sink("report")` | Classifications | PDF/FHIR | CPU | 1 min |
+
+```rust
+// Pipeline construction using ruvector-dag
+use ruvector_dag::{QueryDag, OperatorNode, OperatorType};
+
+fn build_genomic_pipeline() -> QueryDag {
+    let mut dag = QueryDag::new();
+
+    let raw       = dag.add_node(OperatorNode::new(OperatorType::Source,                "raw_signal"));
+    let basecall  = dag.add_node(OperatorNode::new(OperatorType::Transform("basecall"), "basecalling"));
+    let qc        = dag.add_node(OperatorNode::new(OperatorType::Filter("qc"),          "quality_control"));
+    let align     = dag.add_node(OperatorNode::new(OperatorType::Transform("align"),    "alignment"));
+    let dedup     = dag.add_node(OperatorNode::new(OperatorType::Transform("dedup"),    "deduplication"));
+    let varcall   = dag.add_node(OperatorNode::new(OperatorType::Transform("varcall"),  "variant_calling"));
+    let annotate  = dag.add_node(OperatorNode::new(OperatorType::Transform("annotate"),"annotation"));
+    let interpret = dag.add_node(OperatorNode::new(OperatorType::Transform("interpret"),"interpretation"));
+    let report    = dag.add_node(OperatorNode::new(OperatorType::Sink("report"),        "clinical_report"));
+
+    // Side-channel outputs (independent, parallelizable)
+    let qc_stats  = dag.add_node(OperatorNode::new(OperatorType::Sink("stats"),     "qc_statistics"));
+    let coverage  = dag.add_node(OperatorNode::new(OperatorType::Sink("coverage"),   "coverage_analysis"));
+    let metrics   = dag.add_node(OperatorNode::new(OperatorType::Sink("metrics"),    "dedup_metrics"));
+
+    // Main pipeline spine
+    dag.add_edge(raw,       basecall).unwrap();
+    dag.add_edge(basecall,  qc).unwrap();
+    dag.add_edge(qc,        align).unwrap();
+    dag.add_edge(align,     dedup).unwrap();
+    dag.add_edge(dedup,     varcall).unwrap();
+    dag.add_edge(varcall,   annotate).unwrap();
+    dag.add_edge(annotate,  interpret).unwrap();
+    dag.add_edge(interpret, report).unwrap();
+
+    // Side channels (automatically parallelized by scheduler)
+    dag.add_edge(qc,    qc_stats).unwrap();
+    dag.add_edge(align, coverage).unwrap();
+    dag.add_edge(dedup, metrics).unwrap();
+
+    dag
+}
+```
+
+#### 10.1.2 DAG Properties Enabling Optimization
+
+The DAG representation provides four structural properties that the scheduler exploits.
+
+**Automatic parallelization.** The topological sort produced by `QueryDag::topological_sort()`
+identifies all nodes whose dependencies are satisfied. At any point during execution,
+all such ready nodes may run concurrently. In the pipeline above, `qc_stats`, `coverage`,
+and `metrics` are side-channel sinks with no downstream consumers, so they execute in
+parallel with the main spine as soon as their single parent completes.
+
+**Critical path identification.** The `CriticalPathAttention` mechanism (in
+`ruvector-dag::attention::critical_path`) assigns attention scores proportional
+to the longest path through each node. For the genomic pipeline, the critical path
+is `raw -> basecall -> qc -> align -> dedup -> varcall -> annotate -> interpret -> report`.
+The scheduler prioritizes resource allocation to critical-path nodes to minimize
+end-to-end latency.
+
+**Fault isolation.** If a node fails -- for example, variant calling crashes on a
+malformed region -- the DAG structure makes it possible to identify exactly which
+downstream nodes are affected (annotation, interpretation, report) and which are
+unaffected (QC stats, coverage, dedup metrics). Recovery restarts from the failed
+node's last checkpoint, not from the beginning of the pipeline.
+
+**Incremental re-execution.** When the DAG is combined with the delta system
+(Section 10.2), only the subgraph affected by a change needs re-execution. The
+`QueryDag::subgraph(affected_nodes)` method extracts the minimal re-execution DAG.
+
+---
+
+### 10.2 Delta-Based Incremental Processing
+
+The delta system, implemented across five crates (`ruvector-delta-core`,
+`ruvector-delta-graph`, `ruvector-delta-index`, `ruvector-delta-consensus`,
+`ruvector-delta-wasm`), enables incremental processing so that new data does not
+trigger full pipeline re-execution. The delta lifecycle has four phases that map
+directly to the bounded contexts defined in ADR-DB-001.
+
+#### 10.2.1 Phase 1: Delta Capture
+
+When new sequencing reads arrive, the capture layer detects which genomic regions
+are affected. The system maintains an interval index over the reference genome,
+partitioned into fixed-size bins (default: 100 kbp). Each bin tracks:
+
+- Current coverage depth (running mean)
+- Last-processed read timestamp
+- Materialized state hash (SHA-256 of aligned BAM slice)
+
+A delta is emitted when new reads land in a bin, represented as a `VectorDelta`
+from `ruvector-delta-core`:
+
+```rust
+use ruvector_delta_core::{VectorDelta, Delta, DeltaOp};
+
+/// Genomic region delta - captures what changed and where
+struct GenomicDelta {
+    chromosome: String,
+    bin_start: u64,            // Genomic coordinate (0-based)
+    bin_end: u64,
+    new_read_count: u32,       // Reads added to this bin
+    coverage_delta: f32,       // Change in mean coverage
+    vector_delta: VectorDelta, // Underlying sparse delta on feature vector
+    causal_id: u64,            // Lamport timestamp for causal ordering
+}
+```
+
+The capture policy uses adaptive thresholds. A bin emits a delta when any of
+these conditions hold:
+
+| Condition | Threshold | Rationale |
+|-----------|-----------|-----------|
+| New reads exceed count | >= 10 reads in bin | Minimum signal for meaningful update |
+| Coverage change exceeds ratio | >= 5% relative change | Noise suppression |
+| Time since last emission | >= 60 seconds | Bounded staleness guarantee |
+| Urgent region flag | Any read in flagged locus | Immediate delta for clinical hotspots |
+
+#### 10.2.2 Phase 2: Delta Propagation
+
+Captured deltas propagate through the pipeline DAG using the reactive push protocol
+from ADR-DB-003. Each pipeline node registers as a subscriber for the delta topics
+it depends on. The propagation router uses the DAG's edge structure to determine
+which downstream nodes must be notified.
+
+```
+DELTA PROPAGATION THROUGH PIPELINE DAG
+
+  [Capture: chr17 bin updated]
+       |
+       v
+  Propagation Router (inspects DAG edges from "alignment" node)
+       |
+       +---> Deduplication (re-dedup affected reads in chr17 bin)
+       |         |
+       |         +---> Variant Calling (re-call variants in chr17 bin)
+       |         |         |
+       |         |         +---> Annotation (re-annotate affected variants)
+       |         |                   |
+       |         |                   +---> Interpretation (re-classify)
+       |         |                             |
+       |         |                             +---> Report (regenerate)
+       |         |
+       |         +---> Dedup Metrics (update incrementally)
+       |
+       +---> Coverage Analysis (update chr17 coverage stats)
+```
+
+Crucially, nodes not in the affected subgraph -- such as QC Statistics (which
+depends on raw reads, not aligned data) -- are not triggered. The propagation
+router computes the affected subgraph in O(V + E) via BFS from the changed node
+using `QueryDag::bfs(changed_node_id)`.
+
+**Backpressure.** When a downstream node (e.g., variant calling, which is
+computationally expensive) cannot keep up with delta arrivals, the propagation
+layer applies backpressure using the bounded-queue mechanism from ADR-DB-003.
+Pending deltas accumulate in the delta window (Section 10.2.3) until the consumer
+signals readiness. The backpressure threshold is configurable per node:
+
+| Pipeline Stage | Max Pending Deltas | Backpressure Action |
+|---------------|-------------------|---------------------|
+| Alignment | 1,000 | Pause upstream basecalling output |
+| Variant Calling | 100 | Aggregate pending into larger batch |
+| Annotation | 500 | Queue (annotation is fast) |
+| Interpretation | 50 | Priority queue by clinical urgency |
+
+#### 10.2.3 Phase 3: Delta Aggregation
+
+Small deltas arriving in rapid succession are aggregated before triggering
+expensive recomputation. The `DeltaWindow` from `ruvector-delta-core::window`
+provides adaptive windowing.
+
+For genomic pipelines, the system uses a **tumbling window with adaptive sizing**:
+
+```rust
+use ruvector_delta_core::window::{DeltaWindow, WindowConfig, WindowType};
+
+let window_config = WindowConfig {
+    window_type: WindowType::Tumbling,
+    max_count: 500,           // Flush after 500 deltas
+    max_duration_ms: 30_000,  // Or after 30 seconds
+    max_bytes: 64 * 1024 * 1024, // Or after 64 MB of delta data
+    adaptive: true,           // Shrink window under load
+};
+
+let mut window = DeltaWindow::new(window_config);
+```
+
+Aggregation merges deltas that affect overlapping genomic regions. If bin chr17:7,500,000
+receives 50 individual read-level deltas, these are composed into a single aggregate
+delta that represents the net coverage and alignment change:
+
+```
+Individual deltas:           Aggregated delta:
+  chr17:7,500,000 +1 read      chr17:7,500,000-7,600,000
+  chr17:7,500,100 +1 read      +50 reads total
+  chr17:7,500,200 +1 read      coverage: 30x -> 31.7x
+  ... (47 more)                 hash: SHA256(merged BAM slice)
+```
+
+The aggregation reduces downstream computation. Instead of 50 separate variant
+calling invocations, a single invocation processes the merged delta.
+
+#### 10.2.4 Phase 4: Delta Application
+
+The aggregated delta is applied to the pipeline stage's materialized state. Each
+stage maintains a checkpoint of its output, and the delta applicator updates this
+checkpoint incrementally rather than recomputing from scratch.
+
+For variant calling (the most expensive stage), delta application means:
+
+1. Load the existing VCF for the affected region from the checkpoint store
+2. Re-extract reads from the updated BAM for only the affected bins
+3. Run the variant caller on only those bins (not the full genome)
+4. Merge the new variant calls into the existing VCF
+5. Persist the updated checkpoint
+
+The `Delta::apply()` method from `ruvector-delta-core` handles the merge at the
+vector level. For VCF records, which are keyed by position, the merge is a
+positional upsert: new variants are inserted, changed variants are updated,
+and removed variants (due to alignment changes) are deleted.
+
+---
+
+### 10.3 Concrete Example: Incremental Variant Calling
+
+This section traces a complete incremental update through the system to demonstrate
+the end-to-end delta lifecycle with concrete numbers.
+
+**Initial state:** A 30x whole-genome sequencing run has been fully analyzed.
+The pipeline DAG has executed to completion. All checkpoints are materialized.
+Total initial analysis time: approximately 12 hours.
+
+**New data event:** A supplementary sequencing run produces 5x additional reads
+for chromosome 17. These reads cover the TP53 tumor suppressor gene region
+(chr17:7,668,421-7,687,490 on GRCh38).
+
+**Step 1: Delta Capture (latency: < 1 second)**
+
+The capture layer detects new reads in two 100 kbp bins:
+- Bin chr17:7,600,000-7,700,000 (primary -- contains TP53)
+- Bin chr17:7,700,000-7,800,000 (secondary -- reads spanning bin boundary)
+
+Two `GenomicDelta` records are emitted with causal IDs derived from a Lamport
+clock maintained by `ruvector-delta-consensus`.
+
+**Step 2: Delta Propagation (latency: < 10 ms)**
+
+The propagation router traverses the DAG from the alignment node and identifies
+the affected subgraph. Unaffected nodes (QC statistics, chromosomes other than 17)
+are not notified. The router produces:
+
+```
+Affected subgraph: {alignment, dedup, varcall, annotate, interpret, report,
+                     coverage, dedup_metrics}
+Unaffected:        {raw_signal, basecall, qc, qc_stats,
+                     all other chromosome checkpoints}
+```
+
+**Step 3: Delta Aggregation (latency: 0 -- waits for window)**
+
+The two deltas from Step 1 are within the same tumbling window. After the window
+closes (either by count, time, or byte threshold), they are merged:
+
+```
+Aggregated delta:
+  region:    chr17:7,600,000-7,800,000 (200 kbp)
+  reads:     ~833 new reads (5x coverage * 200 kbp / 1.2 kbp avg read length)
+  coverage:  30x -> 35x in affected region
+  bins:      2 of 30,000 total bins (0.007% of genome)
+```
+
+**Step 4: Delta Application (latency: 2-5 minutes)**
+
+Each affected pipeline stage processes only the delta:
+
+| Stage | Full Reprocess Time | Delta Time | Speedup |
+|-------|-------------------|------------|---------|
+| Re-alignment | 2-4 hours | 1-2 seconds | ~5,000x |
+| Re-deduplication | 30 min | < 1 second | ~2,000x |
+| Re-variant calling | 1-6 hours | 1-3 minutes | ~100x |
+| Re-annotation | 20 min | 2 seconds | ~600x |
+| Re-interpretation | 5 min | < 1 second | ~500x |
+| Report regeneration | 1 min | 5 seconds | ~12x |
+| **Total** | **~12 hours** | **~3 minutes** | **~240x** |
+
+The composite speedup of approximately 240x comes from processing 0.007% of the
+genome. The variant calling step dominates the delta processing time because it
+requires loading the statistical model and performing pileup analysis, but it
+operates on only 200 kbp instead of 3 Gbp.
+
+**Correctness guarantee:** The delta-applied variant calls are identical to what
+a full reprocessing would produce for the affected region, because the variant
+caller operates on the complete set of reads (original 30x + new 5x) for those
+bins. Only the scope is restricted, not the computation within that scope.
+
+---
+
+### 10.4 DAG Scheduling & Resource Management
+
+The DAG scheduler determines execution order, resource allocation, and fault
+recovery. It extends the topological traversal from `ruvector-dag::dag::traversal`
+with genomic-specific scheduling policies.
+
+#### 10.4.1 Priority Scheduling Algorithm
+
+The scheduler assigns a composite priority to each ready node based on four factors:
+
+```
+priority(node) = w_c * clinical_urgency(node)
+               + w_p * critical_path_score(node)
+               + w_d * delta_staleness(node)
+               + w_r * resource_availability(node)
+```
+
+where the default weights are:
+
+| Weight | Symbol | Default | Rationale |
+|--------|--------|---------|-----------|
+| Clinical urgency | w_c | 0.4 | Patient safety dominates |
+| Critical path | w_p | 0.3 | Minimize end-to-end latency |
+| Delta staleness | w_d | 0.2 | Prevent starvation of queued deltas |
+| Resource fit | w_r | 0.1 | Prefer nodes matching available hardware |
+
+**Clinical urgency levels:**
+
+| Level | Score | Trigger | Example |
+|-------|-------|---------|---------|
+| STAT | 1.0 | Emergency pathogen or pharmacogenomic alert | MRSA detection, CYP2D6 poor metabolizer |
+| Urgent | 0.7 | Tumor board deadline or active treatment decision | Oncology panel with upcoming appointment |
+| Routine | 0.3 | Standard clinical turnaround | Carrier screening |
+| Research | 0.1 | No clinical deadline | Population study |
+
+The scheduler uses a priority queue (backed by `priority-queue = "2.0"`, already a
+dependency of `ruvector-delta-index`) and dequeues the highest-priority ready node
+on each scheduling tick.
+
+#### 10.4.2 Resource-Aware Scheduling
+
+Pipeline stages have heterogeneous resource requirements. The scheduler maintains
+a resource inventory and matches nodes to available resources:
+
+```
+RESOURCE MATCHING
+
+  Available resources:
+    GPU pool:  4x A100 (80 GB each)
+    CPU pool:  128 cores (AMD EPYC)
+    RAM pool:  1 TB
+    NVMe:      8 TB
+
+  Node requirements:
+    basecalling:     GPU=1, CPU=4,  RAM=16GB   --> Schedule to GPU node
+    alignment:       GPU=0, CPU=16, RAM=32GB   --> Schedule to CPU node
+    variant_calling: GPU=1, CPU=8,  RAM=64GB   --> Schedule to GPU node (if available)
+                     GPU=0, CPU=32, RAM=64GB   --> Fallback to CPU-only mode
+    annotation:      GPU=0, CPU=2,  RAM=8GB    --> Schedule anywhere
+```
+
+The matching algorithm is a greedy bin-packing heuristic:
+
+1. Sort ready nodes by priority (descending)
+2. For each node, find the resource pool that satisfies its requirements
+3. If GPU is preferred but unavailable, check for CPU fallback mode
+4. If no resources available, node remains in ready queue (backpressure)
+
+#### 10.4.3 Backpressure Protocol
+
+When consumers are overwhelmed, the scheduler applies backpressure upstream through
+the DAG edges. The protocol uses a credit-based flow control mechanism:
+
+```
+BACKPRESSURE FLOW CONTROL
+
+  Each edge in the DAG carries a credit counter:
+    credit(edge) = consumer_capacity - pending_deltas
+
+  When credit(edge) <= 0:
+    1. Producer node is suspended (no new output emitted)
+    2. Upstream edges inherit the backpressure (transitive)
+    3. Delta window at producer grows (absorbs pending work)
+
+  When credit(edge) > 0:
+    1. Producer node resumes
+    2. Emits min(available_output, credit) items
+    3. Credits are replenished by consumer acknowledgments
+```
+
+The backpressure propagates transitively: if variant calling is slow, it applies
+backpressure to deduplication, which propagates to alignment, which propagates to
+basecalling. This prevents memory exhaustion from unbounded intermediate buffers.
+
+#### 10.4.4 Checkpointing and Crash Recovery
+
+Each pipeline node persists its output as a checkpoint after successful completion.
+Checkpoints are stored using `ruvector-temporal-tensor`'s block-based storage
+(ADR-018) with tiered quantization for space efficiency.
+
+The checkpoint protocol:
+
+1. **On node completion:** Serialize output to a `TemporalBlock` with the current
+   delta sequence number as the temporal key
+2. **On pipeline restart after crash:** The scheduler inspects each node's last
+   checkpoint sequence number against the current delta log head
+3. **Replay:** Nodes whose checkpoint is behind the delta log re-execute from their
+   checkpoint, processing only the missed deltas
+4. **Skip:** Nodes whose checkpoint is current are skipped entirely
+
+```
+CRASH RECOVERY EXAMPLE
+
+  Pipeline state at crash:
+    raw_signal:   checkpoint at delta #1000  (current)
+    basecalling:  checkpoint at delta #1000  (current)
+    alignment:    checkpoint at delta #998   (2 deltas behind)
+    dedup:        checkpoint at delta #995   (5 deltas behind)
+    varcall:      checkpoint at delta #990   (10 deltas behind)
+
+  Recovery plan:
+    Skip:    raw_signal, basecalling
+    Replay:  alignment (deltas 999-1000)
+             dedup     (deltas 996-1000, after alignment completes)
+             varcall   (deltas 991-1000, after dedup completes)
+
+  Recovery time: minutes (not hours) because only delta replay is needed
+```
+
+---
+
+### 10.5 Distributed Delta Consensus
+
+When the pipeline runs across multiple nodes -- for example, basecalling on GPU
+servers, alignment on CPU servers, and variant calling on a mixed cluster -- deltas
+must be ordered consistently across all participants. The `ruvector-delta-consensus`
+crate, backed by `ruvector-raft` for leader election, provides this guarantee.
+
+#### 10.5.1 Causal Ordering Protocol
+
+Every delta carries a causal identifier comprising a Lamport timestamp and a node
+ID. The consensus layer enforces the following invariant:
+
+> If delta B depends on delta A (i.e., B's pipeline node is downstream of A's
+> node in the DAG), then B's causal ID is strictly greater than A's causal ID,
+> and B is never applied before A on any replica.
+
+The causal ordering uses vector clocks scoped to chromosome partitions. Each
+chromosome shard maintains an independent causal timeline, enabling concurrent
+processing of independent chromosomes without cross-shard coordination:
+
+```
+CHROMOSOME-PARTITIONED VECTOR CLOCKS
+
+  Shard chr1:   [node_A: 42, node_B: 38, node_C: 41]
+  Shard chr17:  [node_A: 15, node_B: 22, node_C: 20]
+  Shard chrX:   [node_A: 8,  node_B: 7,  node_C: 9]
+
+  Delta for chr17 on node_B:
+    causal_id = (chr17, node_B, 23)  // Increment chr17 clock for node_B
+    depends_on = (chr17, node_A, 15) // Depends on node_A's last chr17 delta
+
+  This delta can be applied independently of any chr1 or chrX deltas.
+```
+
+#### 10.5.2 Conflict Resolution for Concurrent Deltas
+
+When two nodes produce deltas for the same genomic region concurrently (e.g., two
+alignment servers both process reads mapping to the same chr17 bin), the CRDT-based
+resolution from ADR-DB-004 applies. For genomic data, the merge strategy is
+domain-specific:
+
+| Conflict Type | Resolution | Rationale |
+|--------------|------------|-----------|
+| Overlapping read alignments | Union of aligned reads | Reads are independent observations |
+| Duplicate read removal | Deterministic tiebreak by read name hash | Reproducibility |
+| Variant calls at same position | Highest-confidence call wins | Statistical soundness |
+| Coverage values | Sum of deltas | Coverage is additive |
+| Annotation conflicts | Most recent database version wins | Temporal freshness |
+
+The conflict resolution is commutative and associative, satisfying the CRDT
+convergence guarantee: all replicas converge to the same state regardless of
+the order in which concurrent deltas are received.
+
+#### 10.5.3 Raft Consensus for Delta Log
+
+The delta log itself is replicated across nodes using `ruvector-raft`. The Raft
+leader sequences all deltas, assigns monotonic sequence numbers, and replicates
+the log to followers. In a typical deployment:
+
+```
+RAFT TOPOLOGY FOR GENOMIC PIPELINE
+
+  Leader:     Pipeline coordinator (manages delta log)
+  Followers:  3-5 compute nodes (replicate delta log for fault tolerance)
+  Learners:   Archive nodes (replicate log for audit trail, no vote)
+
+  Write path:
+    1. Compute node produces delta
+    2. Delta sent to Raft leader
+    3. Leader appends to log, assigns sequence number
+    4. Leader replicates to majority of followers
+    5. Leader responds with committed sequence number
+    6. Compute node applies delta to local state
+
+  Latency: 2-5 ms for intra-datacenter consensus (dominated by network RTT)
+  Throughput: 10,000-50,000 deltas/second (bounded by Raft log serialization)
+```
+
+---
+
+### 10.6 Temporal Queries
+
+The delta log, combined with `ruvector-temporal-tensor`'s block-based storage,
+enables temporal queries that reconstruct pipeline state at any historical point.
+
+#### 10.6.1 Point-in-Time Reconstruction
+
+To answer "What were the variant calls at time T?", the system:
+
+1. Finds the checkpoint with the largest sequence number <= T
+2. Replays all deltas from that checkpoint's sequence number to T
+3. Returns the reconstructed variant call set
+
+The reconstruction cost is proportional to the number of deltas between the nearest
+checkpoint and time T, not the total number of deltas in history. With checkpoints
+every 1,000 deltas, worst-case reconstruction replays at most 999 deltas.
+
+```rust
+// Temporal query API
+fn variant_calls_at(
+    chromosome: &str,
+    position_range: Range<u64>,
+    timepoint: DeltaSequenceId,
+) -> Result<Vec<VariantCall>> {
+    // 1. Find nearest checkpoint <= timepoint
+    let checkpoint = checkpoint_store
+        .find_nearest(chromosome, position_range.clone(), timepoint)?;
+
+    // 2. Collect deltas from checkpoint to timepoint
+    let deltas = delta_log
+        .range(checkpoint.sequence_id..=timepoint)
+        .filter(|d| d.chromosome == chromosome && d.overlaps(&position_range))
+        .collect::<Vec<_>>();
+
+    // 3. Replay deltas onto checkpoint state
+    let mut state = checkpoint.variant_calls.clone();
+    for delta in &deltas {
+        delta.apply(&mut state)?;
+    }
+
+    Ok(state)
+}
+```
+
+#### 10.6.2 Delta Diff Between Analysis Runs
+
+To answer "What changed between analysis run A and run B?", the system computes
+a delta diff:
+
+```
+DELTA DIFF ALGORITHM
+
+  Input: run_A_sequence_id, run_B_sequence_id
+  Output: Set of genomic changes between the two runs
+
+  1. Collect all deltas in range (run_A_sequence_id, run_B_sequence_id]
+  2. Group by (chromosome, bin)
+  3. For each group, compose deltas into a single net delta
+  4. Filter out groups where net delta is zero (no effective change)
+  5. Return non-zero net deltas as the diff
+
+  Complexity: O(D * log D) where D = number of deltas between runs
+              Dominated by the group-by sort step
+```
+
+This is essential for three clinical workflows:
+
+| Workflow | Query | Use Case |
+|----------|-------|----------|
+| Audit trail | "Show all changes to patient X's results in January" | Regulatory compliance (CAP/CLIA) |
+| Longitudinal monitoring | "How did tumor variants evolve between biopsy 1 and biopsy 2?" | Treatment response assessment |
+| Pipeline validation | "What changed when we upgraded the variant caller from v4.1 to v4.2?" | Software validation for clinical use |
+
+#### 10.6.3 Integration with `ruvector-temporal-tensor`
+
+The temporal tensor store (ADR-017, ADR-021) provides the physical storage layer
+for checkpoints and reconstructed states. The mapping:
+
+| Temporal Tensor Concept | Genomic Pipeline Usage |
+|------------------------|----------------------|
+| `TemporalBlock` | Checkpoint of one pipeline stage's output for one chromosome shard |
+| `DeltaFrame` (ADR-021) | Sparse delta encoding of incremental changes between checkpoints |
+| Tier migration (ADR-020) | Hot checkpoints (recent) in 8-bit; warm in 5-bit; cold in 3-bit; evicted to Tier0 |
+| Factor reconstruction (ADR-021) | Reconstruct evicted checkpoints via delta chain replay |
+
+---
+
+### 10.7 WASM Pipeline Execution
+
+The `ruvector-dag-wasm` and `ruvector-delta-wasm` crates enable pipeline execution
+and delta processing in the browser, supporting interactive genomic analysis
+interfaces.
+
+#### 10.7.1 Architecture
+
+```
+BROWSER-SIDE PIPELINE EXECUTION
+
+  +-----------------------------------------------------------+
+  |  BROWSER (JavaScript / TypeScript)                         |
+  |                                                            |
+  |  +------------------+  +-------------------------------+  |
+  |  | ruvector-dag-wasm|  | ruvector-delta-wasm           |  |
+  |  |                  |  |                               |  |
+  |  | - DAG construction|  | - Delta capture / apply      |  |
+  |  | - Topo sort      |  | - Delta window aggregation   |  |
+  |  | - Subgraph extract|  | - Delta stream subscription  |  |
+  |  | - Attention scores|  | - Incremental state update   |  |
+  |  +--------+---------+  +---------------+---------------+  |
+  |           |                             |                  |
+  |  +--------v-----------------------------v---------+        |
+  |  |           Shared WASM Linear Memory             |        |
+  |  |   (pipeline state, delta buffers, checkpoints)  |        |
+  |  +------------------------------------------------+        |
+  |                          |                                  |
+  |  +-----------------------v-----------------------+          |
+  |  |        WebSocket / SSE to Pipeline Server     |          |
+  |  +-----------------------------------------------+          |
+  +-----------------------------------------------------------+
+```
+
+#### 10.7.2 Progressive Result Streaming
+
+The WASM pipeline supports progressive rendering: as each DAG node completes
+on the server, its results stream to the browser via Server-Sent Events (SSE)
+and are applied as deltas to the browser-side state.
+
+```
+PROGRESSIVE STREAMING PROTOCOL
+
+  Time  Server                      Browser
+  ----  ------                      -------
+  t=0   Pipeline starts             Show "Processing..." with DAG visualization
+  t=1   QC stats complete           SSE: {node: "qc_stats", data: {...}}
+                                    --> Browser renders QC charts immediately
+  t=5   Coverage complete           SSE: {node: "coverage", data: {...}}
+                                    --> Browser renders coverage plot
+  t=30  Alignment complete          SSE: {node: "alignment", status: "done"}
+                                    --> Browser updates progress bar
+  t=45  Variant calling 50%         SSE: {node: "varcall", progress: 0.5,
+                                          partial: [{chr1: 142 variants}, ...]}
+                                    --> Browser shows partial variant table
+  t=90  Variant calling complete    SSE: {node: "varcall", data: {...}}
+                                    --> Browser renders full variant table
+  t=95  Annotation complete         SSE: {node: "annotate", data: {...}}
+                                    --> Browser adds annotation columns
+  t=100 Report ready                SSE: {node: "report", url: "/reports/..."}
+                                    --> Browser enables "Download Report" button
+```
+
+Each SSE message contains a `VectorDelta` payload that the browser-side
+`ruvector-delta-wasm` module applies incrementally to the current display state.
+This avoids resending the entire result set when a single pipeline stage updates.
+
+#### 10.7.3 WASM Binary Size Budget
+
+The WASM modules are compiled with `opt-level = "z"`, LTO, and single codegen unit
+(as configured in `ruvector-dag-wasm/Cargo.toml`). Target sizes:
+
+| Module | Estimated Size | Contents |
+|--------|---------------|----------|
+| `ruvector-dag-wasm` | ~45 KB | DAG construction, topological sort, attention |
+| `ruvector-delta-wasm` | ~60 KB | Delta capture, apply, window, stream |
+| Combined | ~95 KB | Full pipeline visualization + incremental updates |
+
+These sizes fit comfortably within the performance budget for clinical web
+applications (target: < 500 KB total WASM payload, initial load < 2 seconds
+on broadband connections).
+
+#### 10.7.4 Offline-Capable Delta Application
+
+For field deployments (e.g., portable sequencing with Oxford Nanopore MinION),
+the WASM modules support offline operation. Delta logs are persisted to IndexedDB
+and replayed when connectivity is restored:
+
+1. **Offline:** Deltas accumulate in browser-side IndexedDB
+2. **Reconnect:** `ruvector-delta-wasm` streams accumulated deltas to server
+3. **Server applies:** Delta consensus merges offline deltas with any concurrent
+   server-side updates using the CRDT merge from Section 10.5.2
+4. **Sync complete:** Server sends reconciliation delta back to browser
+
+---
+
+### 10.8 Performance Projections
+
+The following table summarizes expected performance for the delta-enabled genomic
+pipeline compared to full reprocessing baselines.
+
+#### 10.8.1 Incremental Update Latency
+
+| Scenario | Full Reprocess | Delta Update | Speedup | Delta Size |
+|----------|---------------|-------------|---------|------------|
+| 5x new reads, single gene | 12 h | 3 min | 240x | 200 kbp / 3 Gbp = 0.007% |
+| Panel re-analysis (50 genes) | 12 h | 15 min | 48x | 5 Mbp / 3 Gbp = 0.17% |
+| Exome re-analysis (20,000 genes) | 12 h | 2 h | 6x | 60 Mbp / 3 Gbp = 2% |
+| Database update (re-annotate) | 20 min | 20 min | 1x | 100% (all variants) |
+| New chromosome arm | 12 h | 1.5 h | 8x | ~125 Mbp / 3 Gbp = 4.2% |
+
+The speedup is proportional to the fraction of the genome affected by the delta.
+For database re-annotation (where all existing variants need updated annotations),
+the delta system provides no speedup because the affected subgraph is the entire
+annotation stage. However, it still avoids re-alignment and re-variant-calling.
+
+#### 10.8.2 Throughput Under Continuous Streaming
+
+For real-time nanopore analysis where reads arrive continuously:
+
+```
+STREAMING THROUGHPUT MODEL
+
+  Read arrival rate:           10,000 reads/second
+  Average read length:         10 kbp (nanopore long reads)
+  Genome bins affected/read:   ~1-3 bins (100 kbp bins)
+  Delta emission rate:         ~500 deltas/second (after aggregation window)
+  Delta consensus latency:     2-5 ms per batch (Raft)
+  Delta application latency:   Variant calling: 1-3 min per aggregated batch
+
+  Steady-state pipeline lag:
+    Alignment:      < 1 second behind sequencer
+    Variant calling: 3-5 minutes behind sequencer (batch aggregation)
+    Clinical report: 5-8 minutes behind sequencer
+
+  This enables near-real-time adaptive sequencing decisions:
+    "Stop sequencing chr17 -- coverage target reached"
+    "Redirect capacity to chr3 -- low coverage detected"
+```
+
+#### 10.8.3 Storage Efficiency
+
+Delta storage is significantly more compact than full-state snapshots:
+
+| Storage Approach | 30x WGS Size | With 10 Incremental Updates |
+|-----------------|-------------|---------------------------|
+| Full snapshots per update | 100 GB x 10 = 1 TB | 1 TB |
+| Delta-only (with checkpoints every 5) | 100 GB + (10 * 0.5 GB) + (2 * 100 GB) = 305 GB | 305 GB |
+| Delta + temporal tensor tiering | 100 GB hot + 100 GB warm (5-bit) + 5 GB deltas = 163 GB | 163 GB |
+
+The delta approach combined with temporal tensor tiering achieves a 6x storage
+reduction compared to naive full snapshots, while maintaining the ability to
+reconstruct any historical state via delta replay.
+
+#### 10.8.4 Consensus Overhead
+
+The Raft consensus layer adds minimal overhead to the pipeline:
+
+| Metric | Value | Impact |
+|--------|-------|--------|
+| Consensus latency per delta batch | 2-5 ms | Negligible vs. minutes of computation |
+| Log replication bandwidth | ~10 MB/s at 50K deltas/s | < 1% of typical datacenter bandwidth |
+| Leader election time | 150-300 ms | One-time cost on leader failure |
+| Snapshot transfer (new follower) | 1-5 minutes | Proportional to checkpoint size |
+
+---
+
+### 10.9 Crate Dependency Map for Pipeline DAG & Delta
+
+The following table summarizes how the six crates compose to deliver the genomic
+pipeline architecture described in this section.
+
+```
+CRATE DEPENDENCY GRAPH
+
+  ruvector-dag ──────────────────┐
+    (DAG construction,           |
+     topological sort,           |
+     attention scoring,          |
+     critical path analysis)     |
+         |                       |
+         v                       v
+  ruvector-dag-wasm        ruvector-delta-core
+    (browser DAG             (Delta, VectorDelta,
+     visualization)           DeltaStream, DeltaWindow,
+                              encoding, compression)
+                                  |
+                   +--------------+---------+-----------+
+                   |              |         |           |
+                   v              v         v           v
+         ruvector-delta-   ruvector-  ruvector-   ruvector-
+         graph             delta-     delta-      delta-wasm
+         (graph-level      index      consensus   (browser delta
+          delta tracking)  (HNSW      (CRDT,       operations)
+                           incremental vector clocks,
+                           updates)   Raft integration)
+                                          |
+                                          v
+                                    ruvector-raft
+                                    (leader election,
+                                     log replication)
+                                          |
+                                          v
+                                    ruvector-temporal-tensor
+                                    (checkpoint storage,
+                                     tiered quantization,
+                                     temporal reconstruction)
+```
+
+This architecture ensures that each crate has a single, well-defined responsibility:
+`ruvector-dag` manages computation structure, `ruvector-delta-core` manages change
+representation, `ruvector-delta-consensus` manages distributed ordering, and
+`ruvector-temporal-tensor` manages durable state with temporal access.
