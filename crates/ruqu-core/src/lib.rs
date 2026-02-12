@@ -51,7 +51,11 @@ pub mod decomposition;
 
 // -- QEC control plane --
 pub mod decoder;
+pub mod subpoly_decoder;
 pub mod qec_scheduler;
+
+// -- Benchmark & proof suite --
+pub mod benchmark;
 
 /// Re-exports of the most commonly used items.
 pub mod prelude {
