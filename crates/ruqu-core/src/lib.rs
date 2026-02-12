@@ -53,6 +53,7 @@ pub mod decomposition;
 pub mod decoder;
 pub mod subpoly_decoder;
 pub mod qec_scheduler;
+pub mod control_theory;
 
 // -- Benchmark & proof suite --
 pub mod benchmark;
