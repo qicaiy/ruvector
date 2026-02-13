@@ -5673,8 +5673,10 @@ dependencies = [
 name = "ospipe"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "chrono",
  "cognitum-gate-kernel 0.1.0",
+ "console_error_panic_hook",
  "getrandom 0.2.16",
  "js-sys",
  "rand 0.8.5",
@@ -5692,9 +5694,12 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.17",
  "tokio",
+ "tower 0.5.2",
+ "tower-http 0.6.8",
  "tracing",
  "uuid",
  "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
