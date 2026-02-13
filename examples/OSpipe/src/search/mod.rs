@@ -5,7 +5,9 @@
 //! query characteristics.
 
 pub mod hybrid;
+pub mod reranker;
 pub mod router;
 
 pub use hybrid::HybridSearch;
+pub use reranker::AttentionReranker;
 pub use router::{QueryRoute, QueryRouter};

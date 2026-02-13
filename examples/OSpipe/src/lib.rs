@@ -28,7 +28,10 @@
 pub mod capture;
 pub mod config;
 pub mod error;
+pub mod graph;
+pub mod learning;
 pub mod pipeline;
+pub mod quantum;
 pub mod safety;
 pub mod search;
 pub mod storage;

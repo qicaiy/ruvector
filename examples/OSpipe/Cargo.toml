@@ -33,7 +33,11 @@ ruvector-filter = { path = "../../crates/ruvector-filter" }
 ruvector-cluster = { path = "../../crates/ruvector-cluster" }
 ruvector-delta-core = { path = "../../crates/ruvector-delta-core", features = ["serde"] }
 ruvector-router-core = { path = "../../crates/ruvector-router-core" }
+ruvector-graph = { path = "../../crates/ruvector-graph", default-features = false }
+ruvector-gnn = { path = "../../crates/ruvector-gnn", default-features = false }
 cognitum-gate-kernel = { path = "../../crates/cognitum-gate-kernel", default-features = true }
+ruqu-algorithms = { version = "2.0.5", path = "../../crates/ruqu-algorithms", default-features = false }
+ruvector-attention = { path = "../../crates/ruvector-attention", default-features = false }
 
 # WASM-only dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]
