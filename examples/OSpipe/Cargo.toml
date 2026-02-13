@@ -28,22 +28,23 @@ rand = { workspace = true }
 # These crates pull in platform-specific code (mmap, tokio, ring, etc.) that
 # does not compile for wasm32-unknown-unknown.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-ruvector-core = { path = "../../crates/ruvector-core" }
-ruvector-filter = { path = "../../crates/ruvector-filter" }
-ruvector-cluster = { path = "../../crates/ruvector-cluster" }
-ruvector-delta-core = { path = "../../crates/ruvector-delta-core", features = ["serde"] }
-ruvector-router-core = { path = "../../crates/ruvector-router-core" }
-ruvector-graph = { path = "../../crates/ruvector-graph", default-features = false }
-ruvector-gnn = { path = "../../crates/ruvector-gnn", default-features = false }
-cognitum-gate-kernel = { path = "../../crates/cognitum-gate-kernel", default-features = true }
+ruvector-core = { version = "2.0", path = "../../crates/ruvector-core" }
+ruvector-filter = { version = "2.0", path = "../../crates/ruvector-filter" }
+ruvector-cluster = { version = "2.0", path = "../../crates/ruvector-cluster" }
+ruvector-delta-core = { version = "0.1", path = "../../crates/ruvector-delta-core", features = ["serde"] }
+ruvector-router-core = { version = "2.0", path = "../../crates/ruvector-router-core" }
+ruvector-graph = { version = "2.0", path = "../../crates/ruvector-graph", default-features = false }
+ruvector-gnn = { version = "2.0", path = "../../crates/ruvector-gnn", default-features = false }
+cognitum-gate-kernel = { version = "0.1", path = "../../crates/cognitum-gate-kernel", default-features = true }
 ruqu-algorithms = { version = "2.0.5", path = "../../crates/ruqu-algorithms", default-features = false }
-ruvector-attention = { path = "../../crates/ruvector-attention", default-features = false }
+ruvector-attention = { version = "0.1", path = "../../crates/ruvector-attention", default-features = false }
 
 # HTTP server dependencies (native only)
 axum = { version = "0.7", features = ["json"] }
 tower-http = { version = "0.6", features = ["cors"] }
 tower = { version = "0.5" }
 tokio = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # WASM-only dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -64,3 +65,8 @@ default = ["console_error_panic_hook"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "ospipe-server"
+path = "src/bin/ospipe-server.rs"
+required-features = []

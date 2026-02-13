@@ -156,7 +156,7 @@ impl IngestionPipeline {
         self.stats.total_ingested += 1;
 
         // Step 5: Graph entity extraction (if knowledge graph is attached)
-        if let Some(ref kg) = self.knowledge_graph {
+        if let Some(ref mut kg) = self.knowledge_graph {
             let frame_id_str = id.to_string();
             let _ = kg.ingest_frame_entities(&frame_id_str, store_frame.text_content());
         }

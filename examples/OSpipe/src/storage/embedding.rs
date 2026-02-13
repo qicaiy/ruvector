@@ -5,7 +5,7 @@
 //! a real model (ONNX, Candle, or an API-based provider via ruvector-core's
 //! EmbeddingProvider trait).
 //!
-//! `EmbeddingEngine` also implements [`EmbeddingModel`](super::traits::EmbeddingModel)
+//! `EmbeddingEngine` also implements [`EmbeddingModel`]
 //! so it can be used anywhere a trait-based embedding source is required.
 
 use std::collections::hash_map::DefaultHasher;
