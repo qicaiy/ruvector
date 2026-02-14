@@ -1489,6 +1489,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
 
 [[package]]
+name = "crc32c"
+version = "0.6.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a47af21622d091a8f0fb295b88bc886ac74efcc613efc19f5d0b21de5c89e47"
+dependencies = [
+ "rustc_version 0.4.1",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4272,6 +4281,15 @@ checksum = "464a3709c7f55f1f721e5389aa6ea4e3bc6aba669353300af094b29ffbdde1d8"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "keccak"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
+dependencies = [
+ "cpufeatures",
 ]
 
 [[package]]
@@ -9314,6 +9332,67 @@ dependencies = [
 ]
 
 [[package]]
+name = "rvf-crypto"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "rand 0.8.5",
+ "rvf-types",
+ "sha3",
+]
+
+[[package]]
+name = "rvf-index"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "rvf-manifest"
+version = "0.1.0"
+dependencies = [
+ "crc32c",
+ "rvf-types",
+ "tempfile",
+]
+
+[[package]]
+name = "rvf-quant"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "rand 0.8.5",
+ "rvf-types",
+]
+
+[[package]]
+name = "rvf-runtime"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "rvf-types",
+ "tempfile",
+]
+
+[[package]]
+name = "rvf-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "rvf-wire"
+version = "0.1.0"
+dependencies = [
+ "crc32c",
+ "rvf-types",
+ "tempfile",
+ "xxhash-rust",
+]
+
+[[package]]
 name = "rvlite"
 version = "0.3.0"
 dependencies = [
@@ -9591,6 +9670,16 @@ dependencies = [
  "cfg-if 1.0.4",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "sha3"
+version = "0.10.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75872d278a8f37ef87fa0ddbda7802605cb18344497949862c0d4dcb291eba60"
+dependencies = [
+ "digest",
+ "keccak",
 ]
 
 [[package]]
