@@ -93,68 +93,117 @@ A single `.rvf` file is crash-safe (no WAL needed), self-describing, and progres
 
 ## Quick Start
 
-### Rust
+### Install
 
-Add to your `Cargo.toml`:
+```bash
+# Rust crate (library)
+cargo add rvf-runtime
+
+# CLI tool
+cargo install rvf-cli
+# or build from source:
+cd crates/rvf && cargo build -p rvf-cli --release
+
+# Node.js / npm
+npm install @ruvector/rvf-node
+
+# WASM (browser / edge)
+rustup target add wasm32-unknown-unknown
+cargo build -p rvf-wasm --target wasm32-unknown-unknown --release
+# → target/wasm32-unknown-unknown/release/rvf_wasm.wasm (~46 KB)
+
+# MCP Server (for Claude Code, Cursor, etc.)
+npx @ruvector/rvf-mcp-server --transport stdio
+```
+
+### Rust Crate
 
 ```toml
+# Cargo.toml
 [dependencies]
-rvf-runtime = "0.1"
+rvf-runtime = "0.1"          # full store API
+rvf-types   = "0.1"          # types only (no_std)
+rvf-wire    = "0.1"          # wire format (no_std)
+rvf-crypto  = "0.1"          # signatures + witness chains
+rvf-import  = "0.1"          # JSON/CSV/NumPy importers
 ```
 
 ```rust
 use rvf_runtime::{RvfStore, options::{RvfOptions, QueryOptions, DistanceMetric}};
-use std::path::Path;
 
-// Create a store
-let options = RvfOptions {
+let mut store = RvfStore::create("vectors.rvf", RvfOptions {
     dimension: 384,
     metric: DistanceMetric::Cosine,
     ..Default::default()
-};
-let mut store = RvfStore::create(Path::new("vectors.rvf"), options)?;
+})?;
 
-// Insert vectors
-let embedding = vec![0.1f32; 384];
+// Insert
 store.ingest_batch(&[&embedding], &[1], None)?;
 
 // Query
-let results = store.query(&embedding, 10, &QueryOptions::default())?;
-println!("Nearest: id={}, distance={}", results[0].id, results[0].distance);
+let results = store.query(&query, 10, &QueryOptions::default())?;
+
+// Derive a child with lineage tracking
+let child = store.derive("child.rvf", DerivationType::Filter, None)?;
+
+// Embed a kernel — file now boots as a microservice
+store.embed_kernel(0x00, 0x01, 0, &kernel_image, 8080, None)?;
 
 store.close()?;
 ```
 
-### Node.js
+### Node.js / npm
+
+```bash
+npm install @ruvector/rvf-node
+```
 
 ```javascript
 const { RvfDatabase } = require('@ruvector/rvf-node');
 
+// Create, insert, query
 const db = RvfDatabase.create('vectors.rvf', { dimension: 384 });
 db.ingestBatch(new Float32Array(384), [1]);
 const results = db.query(new Float32Array(384), 10);
 
 // Lineage & inspection
-console.log('file_id:', db.fileId());
-console.log('dimension:', db.dimension());
-console.log('segments:', db.segments());
+console.log(db.fileId());       // unique file UUID
+console.log(db.dimension());    // 384
+console.log(db.segments());     // [{ type, id, size }]
 
 db.close();
 ```
 
+### WASM (Browser / Edge)
+
+```html
+<script type="module">
+  import init, { WasmRvfStore } from './rvf_wasm.js';
+  await init();
+
+  const store = WasmRvfStore.create(384);
+  store.ingest(1, new Float32Array(384));
+  const results = store.query(new Float32Array(384), 10);
+  console.log(results); // [{ id, distance }]
+</script>
+```
+
+The WASM binary is **~46 KB** (control plane with in-memory store) or **~5.5 KB** (tile microkernel for Cognitum). No backend required.
+
 ### CLI
 
 ```bash
-# Create, ingest, query, inspect -- all from the command line
+# Full lifecycle from the command line
 rvf create vectors.rvf --dimension 384
 rvf ingest vectors.rvf --input data.json --format json
-rvf query vectors.rvf --vector "0.1,0.2,..." --k 10
+rvf query  vectors.rvf --vector "0.1,0.2,..." --k 10
 rvf status vectors.rvf
-rvf inspect vectors.rvf
-rvf compact vectors.rvf
+rvf inspect vectors.rvf          # show all segments
+rvf compact vectors.rvf          # reclaim deleted space
 rvf derive parent.rvf child.rvf --type filter
+rvf serve  vectors.rvf --port 8080
 
-# All commands support --json for machine-readable output
+# Machine-readable output
 rvf status vectors.rvf --json
 ```
 
@@ -163,14 +212,19 @@ rvf status vectors.rvf --json
 ```rust
 use rvf_adapter_rvlite::{RvliteCollection, RvliteConfig};
 
-let config = RvliteConfig::new("my_vectors.rvf", 128);
-let mut col = RvliteCollection::create(config)?;
-
+let mut col = RvliteCollection::create(RvliteConfig::new("vectors.rvf", 128))?;
 col.add(1, &[0.1; 128])?;
-col.add(2, &[0.2; 128])?;
-
 let matches = col.search(&[0.15; 128], 5);
-// matches[0].id, matches[0].distance
+```
+
+### Generate Sample Files
+
+```bash
+cd examples/rvf
+cargo run --example generate_all
+ls output/   # 46 .rvf files ready to inspect
+rvf status output/sealed_engine.rvf
+rvf inspect output/linux_microkernel.rvf
 ```
 
 ---
@@ -499,10 +553,12 @@ let mut store = RvfStore::open(Path::new("vectors.rvf"))?;
 
 // Embed a compressed unikernel image
 store.embed_kernel(
-    KernelArch::X86_64,
-    KernelType::HermitOs,
-    &compressed_kernel_image,
-    8080, // API port
+    KernelArch::X86_64 as u8,       // arch
+    KernelType::Hermit as u8,        // kernel type
+    0x0018,                          // flags: HAS_QUERY_API | HAS_NETWORKING
+    &compressed_kernel_image,        // kernel binary
+    8080,                            // API port
+    Some("console=ttyS0 quiet"),     // cmdline (optional)
 )?;
 
 // Later, extract it
@@ -518,15 +574,15 @@ use rvf_types::ebpf::{EbpfProgramType, EbpfAttachType};
 
 // Embed an eBPF XDP program for fast-path vector lookup
 store.embed_ebpf(
-    EbpfProgramType::Xdp,
-    EbpfAttachType::XdpIngress,
-    384, // max vector dimension
-    &ebpf_bytecode,
-    &btf_section,
+    EbpfProgramType::XdpDistance as u8,   // program type
+    EbpfAttachType::XdpIngress as u8,     // attach point
+    384,                                   // max vector dimension
+    &ebpf_bytecode,                        // BPF ELF object
+    Some(&btf_section),                    // BTF data (optional)
 )?;
 
 if let Some((header, program_data)) = store.extract_ebpf()? {
-    println!("eBPF: {:?} ({} bytes)", header.program_type(), program_data.len());
+    println!("eBPF: {:?} ({} bytes)", header.program_type, program_data.len());
 }
 ```
 

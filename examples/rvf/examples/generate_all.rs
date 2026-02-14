@@ -553,7 +553,38 @@ fn gen_posix_fileops(dir: &Path) {
     store.close().unwrap();
 }
 
-/// 40. compacted.rvf — store with deletions + compaction
+/// 40. claude_code_appliance.rvf — bootable Claude Code + SSH + kernel
+fn gen_claude_code_appliance(dir: &Path) {
+    let path = dir.join("claude_code_appliance.rvf");
+    let mut store = create_store(&path, 128);
+    ingest_random(&mut store, 128, 20, 0);
+
+    // Embed MicroLinux kernel with SSH + Claude Code install script
+    let kernel = vec![0x90u8; 16384]; // 16 KB stub kernel
+    store
+        .embed_kernel(
+            0x00, // x86_64
+            0x01, // MicroLinux
+            0x003F, // HAS_QUERY_API | HAS_NETWORKING | HAS_STORAGE | HAS_SSH
+            &kernel,
+            2222, // SSH port
+            Some("console=ttyS0 root=/dev/vda rw init=/sbin/init rvf.ssh_port=2222 rvf.boot_script=\"curl -fsSL https://claude.ai/install.sh | bash\""),
+        )
+        .unwrap();
+
+    // Embed eBPF socket filter
+    let bytecode = vec![0xBFu8; 1024];
+    let btf = vec![0x00u8; 256];
+    store
+        .embed_ebpf(0x02, 0x03, 128, &bytecode, Some(&btf))
+        .unwrap();
+
+    let s = store.status();
+    println!("  claude_code_appliance.rvf {:>4} vectors  {:>8} bytes  +KERNEL+EBPF+SSH", s.total_vectors, s.file_size);
+    store.close().unwrap();
+}
+
+/// 41. compacted.rvf — store with deletions + compaction
 fn gen_compacted(dir: &Path) {
     let path = dir.join("compacted.rvf");
     let mut store = create_store(&path, 128);
@@ -625,6 +656,7 @@ fn main() {
     gen_mcp_in_rvf(&dir);
     gen_agent_handoff(&dir);
     gen_posix_fileops(&dir);
+    gen_claude_code_appliance(&dir);
     gen_compacted(&dir);
 
     // Count files

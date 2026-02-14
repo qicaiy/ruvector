@@ -181,3 +181,7 @@ path = "examples/mcp_in_rvf.rs"
 [[example]]
 name = "generate_all"
 path = "examples/generate_all.rs"
+
+[[example]]
+name = "claude_code_appliance"
+path = "examples/claude_code_appliance.rs"
