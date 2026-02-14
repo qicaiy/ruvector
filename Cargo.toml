@@ -86,6 +86,14 @@ members = [
     "crates/rvf/rvf-manifest",
     "crates/rvf/rvf-index",
     "crates/rvf/rvf-runtime",
+    "crates/rvf/rvf-kernel",
+    "crates/rvf/rvf-ebpf",
+    "crates/rvf/rvf-launch",
+    "crates/rvf/rvf-server",
+    "crates/rvf/rvf-import",
+    "crates/rvf/rvf-cli",
+    "crates/rvf/tests/rvf-integration",
+    "crates/rvf/benches",
 ]
 resolver = "2"
 
