@@ -555,6 +555,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dlmalloc"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6738d2e996274e499bc7b0d693c858b7720b9cd2543a0643a3087e6cb0a4fa16"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "ed25519"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1553,6 +1564,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rvf-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "rvf-manifest",
+ "rvf-runtime",
+ "rvf-types",
+ "rvf-wire",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rvf-crypto"
 version = "0.1.0"
 dependencies = [
@@ -1664,6 +1688,7 @@ dependencies = [
 name = "rvf-wasm"
 version = "0.1.0"
 dependencies = [
+ "dlmalloc",
  "rvf-types",
 ]
 

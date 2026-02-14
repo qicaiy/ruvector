@@ -159,6 +159,49 @@ export interface RvfIngestEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Lineage types
+// ---------------------------------------------------------------------------
+
+/** Derivation type for creating derived stores. */
+export type DerivationType = 'filter' | 'merge' | 'snapshot' | 'transform';
+
+// ---------------------------------------------------------------------------
+// Kernel / eBPF types
+// ---------------------------------------------------------------------------
+
+/** Data returned from kernel extraction. */
+export interface RvfKernelData {
+  /** Serialized KernelHeader bytes. */
+  header: Uint8Array;
+  /** Raw kernel image bytes. */
+  image: Uint8Array;
+}
+
+/** Data returned from eBPF extraction. */
+export interface RvfEbpfData {
+  /** Serialized EbpfHeader bytes. */
+  header: Uint8Array;
+  /** Program bytecode + optional BTF. */
+  payload: Uint8Array;
+}
+
+// ---------------------------------------------------------------------------
+// Segment inspection
+// ---------------------------------------------------------------------------
+
+/** Information about a segment in the store. */
+export interface RvfSegmentInfo {
+  /** Segment ID. */
+  id: number;
+  /** File offset of the segment. */
+  offset: number;
+  /** Payload length in bytes. */
+  payloadLength: number;
+  /** Segment type name (e.g. "vec", "manifest", "kernel"). */
+  segType: string;
+}
+
+// ---------------------------------------------------------------------------
 // Backend identifier
 // ---------------------------------------------------------------------------
 

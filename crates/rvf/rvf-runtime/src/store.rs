@@ -727,6 +727,16 @@ impl RvfStore {
         Ok(Some((ebpf_header, ebpf_bytecode)))
     }
 
+    /// Get the segment directory.
+    pub fn segment_dir(&self) -> &[(u64, u64, u64, u8)] {
+        &self.segment_dir
+    }
+
+    /// Get the store's vector dimensionality.
+    pub fn dimension(&self) -> u16 {
+        self.options.dimension
+    }
+
     /// Get the file identity (lineage metadata) for this store.
     pub fn file_identity(&self) -> &FileIdentity {
         &self.file_identity

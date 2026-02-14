@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <em>The portable cognitive runtime &mdash; data, model, graph, kernel, and trust chain in one sealed artifact</em>
+  <em>One file. Store vectors. Ship models. Boot services. Prove everything.</em>
 </p>
 
 <p align="center">
@@ -16,9 +16,10 @@
 </p>
 
 <p align="center">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-453_passing-brightgreen?style=flat-square" />
-  <img alt="Crates" src="https://img.shields.io/badge/crates-12-blue?style=flat-square" />
-  <img alt="Lines" src="https://img.shields.io/badge/rust-32.7k_lines-orange?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-543_passing-brightgreen?style=flat-square" />
+  <img alt="Examples" src="https://img.shields.io/badge/examples-40_runnable-brightgreen?style=flat-square" />
+  <img alt="Crates" src="https://img.shields.io/badge/crates-13-blue?style=flat-square" />
+  <img alt="Lines" src="https://img.shields.io/badge/rust-34.5k_lines-orange?style=flat-square" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT%2FApache--2.0-blue?style=flat-square" />
   <img alt="MSRV" src="https://img.shields.io/badge/MSRV-1.87-purple?style=flat-square" />
   <img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-green?style=flat-square" />
@@ -28,9 +29,32 @@
 
 ## What is RVF?
 
-**RVF (RuVector Format)** is a universal binary substrate that merges database, model, graph engine, kernel, and attestation into a single deployable artifact. A `.rvf` file can store vector embeddings, carry LoRA adapter deltas, embed GNN graph state, include a bootable unikernel, and prove every operation through a cryptographic witness chain &mdash; all in one file that runs anywhere from a browser to bare metal.
+**RVF (RuVector Format)** is a universal binary substrate that merges database, model, graph engine, kernel, and attestation into a single deployable file. 
+
+A `.rvf` file can store vector embeddings, carry LoRA adapter deltas, embed GNN graph state, include a bootable Linux microkernel, run queries in a 5.5 KB WASM runtime, and prove every operation through a cryptographic witness chain &mdash; all in one file that runs anywhere from a browser to bare metal.
 
 This is not a database format. It is an **executable knowledge unit**.
+
+```
+                          .rvf file
+              +---------------------------+
+              | MANIFEST  (4 KB, instant) |
+              | VEC_SEG   (embeddings)    |   Store it  -- single-file vector DB
+              | INDEX_SEG (HNSW graph)    |   Send it   -- wire-format streaming
+              | OVERLAY   (LoRA deltas)   |   Run it    -- boots Linux or WASM
+              | KERNEL    (Linux/uni)     |   Trust it  -- witness + attestation
+              | EBPF      (XDP accel)     |   Track it  -- DNA-style lineage
+              | WASM      (5.5 KB)        |
+              | WITNESS   (audit chain)   |
+              | CRYPTO    (signatures)    |
+              +---------------------------+
+                    |            |
+          +---------+            +---------+
+          |                                |
+   Boots as Linux              Runs in browser
+   microservice on             via 5.5 KB WASM
+   bare metal / VM             microkernel
+```
 
 ### The Category Shift
 
@@ -51,15 +75,19 @@ RVF merges these layers into one sealed object:
 
 ### Where It Runs
 
-- **On a server** &mdash; Full HNSW index with millions of vectors, sub-millisecond queries
-- **In a browser** &mdash; 5.5 KB WASM microkernel queries the same file format
-- **On the edge** &mdash; Lightweight `rvlite` API for embedded devices
-- **Inside a TEE** &mdash; Confidential Core attestation proves operations ran securely
-- **Self-booting** &mdash; Embedded unikernel boots as a standalone microservice (<125 ms)
-- **Kernel-accelerated** &mdash; Embedded eBPF runs sub-microsecond hot cache hits in the Linux kernel
-- **On Cognitum tiles** &mdash; 64 KB WASM tiles on custom silicon
+The same `.rvf` file boots a Linux microkernel on bare metal **and** runs queries in a browser &mdash; no conversion, no re-indexing, no external dependencies.
 
-A single `.rvf` file is crash-safe (no WAL needed), self-describing, and progressively loadable. With optional KERNEL_SEG and EBPF_SEG, the file becomes a computational container that boots without external dependencies.
+| Environment | How | Latency |
+|-------------|-----|---------|
+| **Server** | Full HNSW index, millions of vectors | Sub-millisecond queries |
+| **Browser** | 5.5 KB WASM microkernel (WASM_SEG) | Same file, no backend |
+| **Edge / IoT** | Lightweight `rvlite` API | Tiny footprint |
+| **TEE enclave** | Confidential Core attestation | Cryptographic proof |
+| **Bare metal / VM** | KERNEL_SEG boots Linux microkernel as standalone service | < 125 ms cold start |
+| **Linux kernel** | EBPF_SEG hot-path acceleration | Sub-microsecond |
+| **Cognitum tiles** | 64 KB WASM tiles | Custom silicon |
+
+A single `.rvf` file is crash-safe (no WAL needed), self-describing, and progressively loadable. With KERNEL_SEG, the file embeds a complete Linux microkernel (packages, SSH keys, network config) and boots as a standalone service on Firecracker, QEMU, or bare metal. With WASM_SEG, the same file serves queries in a browser with zero backend. With EBPF_SEG, hot vectors get sub-microsecond lookups in the Linux kernel data path. All three can coexist in one file.
 
 ---
 
@@ -105,7 +133,29 @@ const { RvfDatabase } = require('@ruvector/rvf-node');
 const db = RvfDatabase.create('vectors.rvf', { dimension: 384 });
 db.ingestBatch(new Float32Array(384), [1]);
 const results = db.query(new Float32Array(384), 10);
+
+// Lineage & inspection
+console.log('file_id:', db.fileId());
+console.log('dimension:', db.dimension());
+console.log('segments:', db.segments());
+
 db.close();
+```
+
+### CLI
+
+```bash
+# Create, ingest, query, inspect -- all from the command line
+rvf create vectors.rvf --dimension 384
+rvf ingest vectors.rvf --input data.json --format json
+rvf query vectors.rvf --vector "0.1,0.2,..." --k 10
+rvf status vectors.rvf
+rvf inspect vectors.rvf
+rvf compact vectors.rvf
+rvf derive parent.rvf child.rvf --type filter
+
+# All commands support --json for machine-readable output
+rvf status vectors.rvf --json
 ```
 
 ### Lightweight (rvlite)
@@ -164,26 +214,28 @@ When an RVF file combines these segments, it stops being a database and becomes 
 | LoRA deltas | OVERLAY_SEG | Fine-tuned model behavior without full weights |
 | GNN graph state | GRAPH_SEG | Relationship modeling, pathway analysis |
 | Quantum state | SKETCH_SEG | VQE snapshots, molecular similarity, Hilbert space indexing |
-| Query kernel | WASM_SEG / KERNEL_SEG | Self-contained inference runtime |
+| Browser runtime | WASM_SEG | 5.5 KB query microkernel for browsers and edge |
+| Linux service | KERNEL_SEG | Boots as standalone Linux microservice on VM or bare metal |
 | Fast path | EBPF_SEG | Kernel-level acceleration for hot vectors |
 | Trust chain | WITNESS_SEG + CRYPTO_SEG | Every query recorded, every operation attested |
 
 ### Example: Domain Intelligence Unit
 
 ```
-ClinicalOncologyEngine.rvdna
+ClinicalOncologyEngine.rvdna           (one file, ~50 MB)
   Contains:
-  -- Medical corpus embeddings (VEC_SEG, 384-dim, 2M vectors)
-  -- MicroLoRA fine-tuned on oncology literature (OVERLAY_SEG)
-  -- GNN for biological pathway modeling (GRAPH_SEG)
-  -- Quantum-enhanced molecular similarity (SKETCH_SEG)
-  -- Bootable microVM runtime (KERNEL_SEG, HermitOS, 400 KB)
-  -- eBPF fast-path for frequent drug lookups (EBPF_SEG)
-  -- Attested execution proof (WITNESS_SEG + CRYPTO_SEG)
-  -- ML-DSA-65 post-quantum signature (CRYPTO_SEG)
+  -- Medical corpus embeddings          VEC_SEG      384-dim, 2M vectors
+  -- MicroLoRA oncology fine-tune       OVERLAY_SEG  adapter deltas
+  -- Biological pathway GNN             GRAPH_SEG    pathway modeling
+  -- Molecular similarity state         SKETCH_SEG   quantum-enhanced
+  -- Linux microkernel service          KERNEL_SEG   boots on Firecracker
+  -- Browser query runtime              WASM_SEG     5.5 KB, no backend
+  -- eBPF drug lookup accelerator       EBPF_SEG     sub-microsecond
+  -- Attested execution proof           WITNESS_SEG  tamper-evident chain
+  -- Post-quantum signature             CRYPTO_SEG   ML-DSA-65
 ```
 
-This is not a database. It is a **sealed, auditable, self-booting domain expert** that can run air-gapped, produce identical results under audit, and cryptographically prove it was not modified.
+This is not a database. It is a **sealed, auditable, self-booting domain expert**. Copy it to a Firecracker VM and it boots a Linux service. Open it in a browser and WASM serves queries locally. Ship it air-gapped and it produces identical results under audit. Every operation is cryptographically proven unmodified.
 
 ### What This Enables
 
@@ -240,6 +292,7 @@ The same `.rvf` file format runs on cloud servers, Firecracker microVMs, TEE enc
 | **Metadata filtering** | Filtered k-NN with boolean expressions (AND/OR/NOT/IN/RANGE). |
 | **4 KB instant boot** | Root manifest fits in one page read. Cold boot < 5 ms. |
 | **Domain profiles** | `.rvdna`, `.rvtext`, `.rvgraph`, `.rvvis` extensions map to optimized profiles. |
+| **Unified CLI** | 9 subcommands: create, ingest, query, delete, status, inspect, compact, derive, serve. |
 | **6 library adapters** | Drop-in integration for claude-flow, agentdb, ospipe, agentic-flow, rvlite, sona. |
 
 ---
@@ -264,10 +317,10 @@ The same `.rvf` file format runs on cloud servers, Firecracker microVMs, TEE enc
   |  rvf-manifest | rvf-types | rvf-import | rvf-adapters            |
   +---+--------+---------+----------+-----------+------------------+
       |        |         |          |           |
-  +---v---+ +--v----+ +--v-----+ +-v--------+ +v-----------+
-  |server | | node  | | wasm   | | kernel   | | ebpf       |
-  |HTTP   | | N-API | | 5.5 KB | | microVM  | | XDP/TC     |
-  +-------+ +-------+ +--------+ +----------+ +------------+
+  +---v---+ +--v----+ +--v-----+ +-v--------+ +v-----------+ +v------+
+  |server | | node  | | wasm   | | kernel   | | ebpf       | | cli   |
+  |HTTP   | | N-API | | ~46 KB | | microVM  | | XDP/TC     | | clap  |
+  +-------+ +-------+ +--------+ +----------+ +------------+ +-------+
 ```
 
 ### Segment Model
@@ -294,8 +347,9 @@ An `.rvf` file is a sequence of 64-byte-aligned segments. Each segment has a sel
 | `rvf-quant` | 1,443 | Scalar, product, and binary quantization |
 | `rvf-crypto` | 1,725 | SHAKE-256, Ed25519, witness chains, attestation, lineage witnesses |
 | `rvf-runtime` | 3,607 | Full store API with compaction, lineage derivation, kernel/eBPF embed |
-| `rvf-wasm` | 766 | WASM microkernel for browsers/edge |
-| `rvf-node` | 601 | Node.js N-API bindings |
+| `rvf-wasm` | 1,616 | WASM control plane: in-memory store, query, segment inspection (~46 KB) |
+| `rvf-node` | 852 | Node.js N-API bindings with lineage, kernel/eBPF, and inspection |
+| `rvf-cli` | 665 | Unified CLI with 9 subcommands (create, ingest, query, delete, status, inspect, compact, derive, serve) |
 | `rvf-server` | 1,165 | HTTP REST + TCP streaming server |
 | `rvf-import` | 980 | JSON, CSV, NumPy (.npy) importers |
 | **Adapters** | **6,493** | **6 library integrations (see below)** |
@@ -309,7 +363,8 @@ An `.rvf` file is a sequence of 64-byte-aligned segments. Each segment has a sel
 | Cold boot (4 KB manifest read) | < 5 ms | **1.6 us** |
 | First query recall@10 (Layer A only) | >= 0.70 | >= 0.70 |
 | Full quality recall@10 (Layer C) | >= 0.95 | >= 0.95 |
-| WASM binary size | < 8 KB | **~5.5 KB** |
+| WASM binary (tile microkernel) | < 8 KB | **~5.5 KB** |
+| WASM binary (control plane) | < 50 KB | **~46 KB** |
 | Segment header size | 64 bytes | 64 bytes |
 | Minimum file overhead | < 1 KB | < 256 bytes |
 
@@ -503,6 +558,100 @@ RVF provides drop-in adapters for 6 libraries in the RuVector ecosystem:
 ---
 
 <details>
+<summary><strong>40 Runnable Examples</strong></summary>
+
+Every example uses real RVF APIs end-to-end &mdash; no mocks, no stubs. Run any example with:
+
+```bash
+cd examples/rvf
+cargo run --example <name>
+```
+
+#### Core Fundamentals (6)
+
+| # | Example | What It Demonstrates |
+|---|---------|---------------------|
+| 1 | `basic_store` | Create, insert 100 vectors, k-NN query, close, reopen, verify persistence |
+| 2 | `progressive_index` | Build three-layer HNSW, measure recall@10 progression (0.70 &rarr; 0.95) |
+| 3 | `quantization` | Scalar, product, and binary quantization with temperature tiering |
+| 4 | `wire_format` | Raw 64-byte segment I/O, CRC32c hash validation, manifest tail-scan |
+| 5 | `crypto_signing` | Ed25519 segment signing, SHAKE-256 witness chains, tamper detection |
+| 6 | `filtered_search` | Metadata-filtered queries: Eq, Ne, Gt, Range, In, And, Or |
+
+#### Agentic AI (6)
+
+| # | Example | What It Demonstrates |
+|---|---------|---------------------|
+| 7 | `agent_memory` | Persistent agent memory across sessions with witness audit trail |
+| 8 | `swarm_knowledge` | Multi-agent shared knowledge base, cross-agent semantic search |
+| 9 | `reasoning_trace` | Chain-of-thought lineage: parent &rarr; child &rarr; grandchild derivation |
+| 10 | `tool_cache` | Tool call result caching with TTL expiry, delete_by_filter, compaction |
+| 11 | `agent_handoff` | Transfer agent state between instances via derive + clone |
+| 12 | `experience_replay` | Reinforcement learning replay buffer with priority sampling |
+
+#### Production Patterns (5)
+
+| # | Example | What It Demonstrates |
+|---|---------|---------------------|
+| 13 | `semantic_search` | Document search engine with 4 filter workflows |
+| 14 | `recommendation` | Collaborative filtering with genre and quality filters |
+| 15 | `rag_pipeline` | 5-step RAG: chunk, embed, retrieve, rerank, assemble context |
+| 16 | `embedding_cache` | Zipf access patterns, 3-tier quantization, memory savings |
+| 17 | `dedup_detector` | Near-duplicate detection, clustering, compaction |
+
+#### Industry Verticals (4)
+
+| # | Example | What It Demonstrates |
+|---|---------|---------------------|
+| 18 | `genomic_pipeline` | DNA k-mer search with `.rvdna` profile and lineage tracking |
+| 19 | `financial_signals` | Market signals with Ed25519 signing and TEE attestation |
+| 20 | `medical_imaging` | Radiology embedding search with `.rvvis` profile |
+| 21 | `legal_discovery` | Legal document similarity with `.rvtext` profile |
+
+#### Computational Containers (5)
+
+| # | Example | What It Demonstrates |
+|---|---------|---------------------|
+| 22 | `self_booting` | Embed/extract unikernel (KERNEL_SEG), header verification |
+| 23 | `ebpf_accelerator` | Embed/extract eBPF (EBPF_SEG), XDP program co-existence |
+| 24 | `hyperbolic_taxonomy` | Hierarchy-aware Poincar&eacute; embeddings, depth-filtered search |
+| 25 | `multimodal_fusion` | Cross-modal text + image search with modality filtering |
+| 26 | `sealed_engine` | Capstone: vectors + kernel + eBPF + witness + lineage in one file |
+
+#### Runtime Targets (5)
+
+| # | Example | What It Demonstrates |
+|---|---------|---------------------|
+| 27 | `browser_wasm` | WASM-compatible API surface, raw wire segments, size budget |
+| 28 | `edge_iot` | Constrained IoT device with binary quantization |
+| 29 | `serverless_function` | Cold-start optimization, manifest tail-scan, progressive loading |
+| 30 | `ruvllm_inference` | LLM KV cache + LoRA adapters + policy store via RVF |
+| 31 | `postgres_bridge` | PostgreSQL export/import with lineage and witness audit |
+
+#### Network & Security (4)
+
+| # | Example | What It Demonstrates |
+|---|---------|---------------------|
+| 32 | `network_sync` | Peer-to-peer vector store synchronization |
+| 33 | `tee_attestation` | TEE platform attestation, sealed keys, computation proof |
+| 34 | `access_control` | Role-based vector access control with audit trails |
+| 35 | `zero_knowledge` | Zero-knowledge proofs for privacy-preserving vector ops |
+
+#### Systems & Integration (5)
+
+| # | Example | What It Demonstrates |
+|---|---------|---------------------|
+| 36 | `ruvbot` | Autonomous agent with RVF memory, planning, and tool use |
+| 37 | `posix_fileops` | POSIX raw I/O, atomic rename, advisory locking, segment access |
+| 38 | `linux_microkernel` | 20-package Linux distro with SSH keys and kernel embed |
+| 39 | `mcp_in_rvf` | MCP server runtime + eBPF filter embedded in RVF |
+| 40 | `network_interfaces` | 6-chassis / 60-interface network telemetry with anomaly detection |
+
+See the [examples README](../../examples/rvf/README.md) for tutorials, usage patterns, and detailed walkthroughs.
+
+</details>
+
+<details>
 <summary><strong>Importing Data</strong></summary>
 
 ### From NumPy (.npy)
@@ -549,11 +698,16 @@ let records = parse_json_file(Path::new("vectors.json"), &config)?;
 ### CLI Import Tool
 
 ```bash
+# Using rvf-import binary directly
 cargo run --bin rvf-import -- \
     --input data.npy \
     --output vectors.rvf \
     --format npy \
     --dimension 384
+
+# Or via the unified rvf CLI
+rvf create vectors.rvf --dimension 384
+rvf ingest vectors.rvf --input data.json --format json
 ```
 
 </details>
@@ -605,6 +759,68 @@ curl http://localhost:8080/status
 ```bash
 curl -X POST http://localhost:8080/compact
 ```
+
+</details>
+
+<details>
+<summary><strong>MCP Server (Model Context Protocol)</strong></summary>
+
+### Overview
+
+The `@ruvector/rvf-mcp-server` package exposes RVF stores to AI agents via the Model Context Protocol. Supports stdio and SSE transports.
+
+### Starting the MCP Server
+
+```bash
+# stdio transport (for Claude Code, Cursor, etc.)
+npx @ruvector/rvf-mcp-server --transport stdio
+
+# SSE transport (for web clients)
+npx @ruvector/rvf-mcp-server --transport sse --port 3100
+```
+
+### Claude Code Integration
+
+Add to your Claude Code MCP config:
+
+```json
+{
+  "mcpServers": {
+    "rvf": {
+      "command": "npx",
+      "args": ["@ruvector/rvf-mcp-server", "--transport", "stdio"]
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `rvf_create_store` | Create a new RVF vector store |
+| `rvf_open_store` | Open an existing store (read-write or read-only) |
+| `rvf_close_store` | Close a store and release the writer lock |
+| `rvf_ingest` | Insert vectors with optional metadata |
+| `rvf_query` | k-NN similarity search with metadata filters |
+| `rvf_delete` | Delete vectors by ID |
+| `rvf_delete_filter` | Delete vectors matching a metadata filter |
+| `rvf_compact` | Compact store to reclaim dead space |
+| `rvf_status` | Get store status (dimensions, vector count, etc.) |
+| `rvf_list_stores` | List all open stores |
+
+### MCP Resources
+
+| URI | Description |
+|-----|-------------|
+| `rvf://stores` | JSON listing of all open stores and their status |
+
+### MCP Prompts
+
+| Prompt | Description |
+|--------|-------------|
+| `rvf-search` | Natural language similarity search |
+| `rvf-ingest` | Data ingestion with auto-embedding |
 
 </details>
 
@@ -971,6 +1187,13 @@ cargo build --target wasm32-unknown-unknown -p rvf-wasm --release
 ls target/wasm32-unknown-unknown/release/rvf_wasm.wasm
 ```
 
+### Build CLI
+
+```bash
+cargo build -p rvf-cli
+./target/debug/rvf --help
+```
+
 ### Build Node.js Bindings
 
 ```bash
@@ -1060,7 +1283,7 @@ cd ruvector/crates/rvf
 cargo test --workspace
 ```
 
-All contributions must pass `cargo clippy --all-targets` with zero warnings and maintain the existing test count (currently 453+).
+All contributions must pass `cargo clippy --all-targets` with zero warnings and maintain the existing test count (currently 543+).
 
 ## License
 

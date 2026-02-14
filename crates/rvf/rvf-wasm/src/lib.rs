@@ -6,8 +6,13 @@
 
 #![no_std]
 
+extern crate alloc;
+
+mod alloc_setup;
 mod distance;
 mod memory;
+mod segment;
+mod store;
 mod topk;
 
 use memory::*;
@@ -429,6 +434,283 @@ fn f32_to_f16(val: f32) -> u16 {
     }
     sign | ((new_exp as u16) << 10) | ((mantissa >> 13) as u16)
 }
+
+// =====================================================================
+// Control Plane — In-Memory Store
+// =====================================================================
+
+/// Create an in-memory store. Returns a handle (>0) or negative on error.
+#[no_mangle]
+pub extern "C" fn rvf_store_create(dim: i32, metric: i32) -> i32 {
+    if dim <= 0 {
+        return -1;
+    }
+    store::registry().create(dim as u32, metric as u8)
+}
+
+/// Open a .rvf file from raw bytes. Returns a store handle.
+#[no_mangle]
+pub extern "C" fn rvf_store_open(buf_ptr: i32, buf_len: i32) -> i32 {
+    if buf_len <= 0 {
+        return -1;
+    }
+    let buf = unsafe { core::slice::from_raw_parts(buf_ptr as *const u8, buf_len as usize) };
+    let segments = segment::parse_segments(buf);
+
+    let reg = store::registry();
+    let mut dim: u32 = 0;
+    let mut entries: alloc::vec::Vec<(u64, alloc::vec::Vec<f32>)> = alloc::vec::Vec::new();
+
+    for seg in &segments {
+        // SegmentType::Vec = 0x01
+        if seg.seg_type == 0x01 {
+            let payload_start = seg.offset + rvf_types::constants::SEGMENT_HEADER_SIZE;
+            let payload_end = payload_start + seg.payload_length as usize;
+            if payload_end > buf.len() || seg.payload_length < 6 {
+                continue;
+            }
+            let payload = &buf[payload_start..payload_end];
+
+            let count = u16::from_le_bytes([payload[0], payload[1]]) as usize;
+            let seg_dim = u32::from_le_bytes([payload[2], payload[3], payload[4], payload[5]]);
+            if dim == 0 {
+                dim = seg_dim;
+            }
+
+            let mut offset = 6;
+            for _ in 0..count {
+                if offset + 8 > payload.len() {
+                    break;
+                }
+                let id = u64::from_le_bytes([
+                    payload[offset],
+                    payload[offset + 1],
+                    payload[offset + 2],
+                    payload[offset + 3],
+                    payload[offset + 4],
+                    payload[offset + 5],
+                    payload[offset + 6],
+                    payload[offset + 7],
+                ]);
+                offset += 8;
+                let vec_bytes = (seg_dim as usize) * 4;
+                if offset + vec_bytes > payload.len() {
+                    break;
+                }
+                let mut vec_data = alloc::vec::Vec::with_capacity(seg_dim as usize);
+                for d in 0..seg_dim as usize {
+                    let f = f32::from_le_bytes([
+                        payload[offset + d * 4],
+                        payload[offset + d * 4 + 1],
+                        payload[offset + d * 4 + 2],
+                        payload[offset + d * 4 + 3],
+                    ]);
+                    vec_data.push(f);
+                }
+                offset += vec_bytes;
+                entries.push((id, vec_data));
+            }
+        }
+    }
+
+    if dim == 0 {
+        dim = 1;
+    }
+    let handle = reg.create(dim, 0);
+    if handle <= 0 {
+        return handle;
+    }
+
+    if let Some(s) = reg.get_mut(handle) {
+        for (id, data) in entries {
+            s.entries.push(store::VecEntry {
+                id,
+                data,
+                deleted: false,
+            });
+        }
+    }
+
+    handle
+}
+
+/// Ingest vectors into a store. Returns count ingested or negative on error.
+#[no_mangle]
+pub extern "C" fn rvf_store_ingest(handle: i32, vecs_ptr: i32, ids_ptr: i32, count: i32) -> i32 {
+    if count <= 0 {
+        return 0;
+    }
+    match store::registry().get_mut(handle) {
+        Some(s) => s.ingest(vecs_ptr as *const f32, ids_ptr as *const u64, count as u32),
+        None => -1,
+    }
+}
+
+/// Query a store for k nearest neighbors.
+/// Results written to out_ptr as (id: u64, dist: f32) pairs.
+/// Returns number of results.
+#[no_mangle]
+pub extern "C" fn rvf_store_query(
+    handle: i32,
+    query_ptr: i32,
+    k: i32,
+    metric: i32,
+    out_ptr: i32,
+) -> i32 {
+    if k <= 0 {
+        return 0;
+    }
+    match store::registry().get(handle) {
+        Some(s) => s.query(query_ptr as *const f32, k as u32, metric, out_ptr as *mut u8),
+        None => -1,
+    }
+}
+
+/// Delete vectors by ID. Returns count deleted.
+#[no_mangle]
+pub extern "C" fn rvf_store_delete(handle: i32, ids_ptr: i32, count: i32) -> i32 {
+    if count <= 0 {
+        return 0;
+    }
+    match store::registry().get_mut(handle) {
+        Some(s) => s.delete(ids_ptr as *const u64, count as u32),
+        None => -1,
+    }
+}
+
+/// Get live vector count.
+#[no_mangle]
+pub extern "C" fn rvf_store_count(handle: i32) -> i32 {
+    match store::registry().get(handle) {
+        Some(s) => s.count() as i32,
+        None => -1,
+    }
+}
+
+/// Get store dimension.
+#[no_mangle]
+pub extern "C" fn rvf_store_dimension(handle: i32) -> i32 {
+    match store::registry().get(handle) {
+        Some(s) => s.dimension() as i32,
+        None => -1,
+    }
+}
+
+/// Write store status to output buffer (20 bytes).
+#[no_mangle]
+pub extern "C" fn rvf_store_status(handle: i32, out_ptr: i32) -> i32 {
+    match store::registry().get(handle) {
+        Some(s) => s.status(out_ptr as *mut u8),
+        None => -1,
+    }
+}
+
+/// Export store as .rvf bytes. Returns bytes written or negative if buffer too small.
+#[no_mangle]
+pub extern "C" fn rvf_store_export(handle: i32, out_ptr: i32, out_len: i32) -> i32 {
+    match store::registry().get(handle) {
+        Some(s) => s.export(out_ptr as *mut u8, out_len as u32),
+        None => -1,
+    }
+}
+
+/// Close and free a store.
+#[no_mangle]
+pub extern "C" fn rvf_store_close(handle: i32) -> i32 {
+    store::registry().close(handle)
+}
+
+// =====================================================================
+// Segment Parsing & Inspection
+// =====================================================================
+
+/// Parse a segment header from raw bytes.
+/// Writes 24 bytes to out_ptr.
+#[no_mangle]
+pub extern "C" fn rvf_parse_header(buf_ptr: i32, buf_len: i32, out_ptr: i32) -> i32 {
+    if buf_len < 64 {
+        return -1;
+    }
+    let buf = unsafe { core::slice::from_raw_parts(buf_ptr as *const u8, buf_len as usize) };
+    segment::parse_header_to_buf(buf, out_ptr as *mut u8)
+}
+
+/// Count segments in a .rvf buffer.
+#[no_mangle]
+pub extern "C" fn rvf_segment_count(buf_ptr: i32, buf_len: i32) -> i32 {
+    if buf_len <= 0 {
+        return 0;
+    }
+    let buf = unsafe { core::slice::from_raw_parts(buf_ptr as *const u8, buf_len as usize) };
+    segment::parse_segments(buf).len() as i32
+}
+
+/// Get info for segment at index `idx` in the buffer.
+/// Writes to out_ptr: [seg_id: u64, type: u8, padding: 3 bytes, payload_len: u64, offset: u64] = 28 bytes
+#[no_mangle]
+pub extern "C" fn rvf_segment_info(buf_ptr: i32, buf_len: i32, idx: i32, out_ptr: i32) -> i32 {
+    if buf_len <= 0 || idx < 0 {
+        return -1;
+    }
+    let buf = unsafe { core::slice::from_raw_parts(buf_ptr as *const u8, buf_len as usize) };
+    let segments = segment::parse_segments(buf);
+    let i = idx as usize;
+    if i >= segments.len() {
+        return -1;
+    }
+
+    let seg = &segments[i];
+    let out = out_ptr as *mut u8;
+    unsafe {
+        let id_bytes = seg.seg_id.to_le_bytes();
+        for b in 0..8 {
+            *out.add(b) = id_bytes[b];
+        }
+        *out.add(8) = seg.seg_type;
+        *out.add(9) = 0;
+        *out.add(10) = 0;
+        *out.add(11) = 0; // padding
+        let pl_bytes = seg.payload_length.to_le_bytes();
+        for b in 0..8 {
+            *out.add(12 + b) = pl_bytes[b];
+        }
+        let off_bytes = (seg.offset as u64).to_le_bytes();
+        for b in 0..8 {
+            *out.add(20 + b) = off_bytes[b];
+        }
+    }
+    0
+}
+
+/// Verify checksum of a data region.
+/// The last 4 bytes of the buffer are treated as the expected CRC32C.
+/// Returns 1 if CRC32C matches, 0 if not.
+#[no_mangle]
+pub extern "C" fn rvf_verify_checksum(buf_ptr: i32, buf_len: i32) -> i32 {
+    if buf_len < 4 {
+        return -1;
+    }
+    let buf = unsafe { core::slice::from_raw_parts(buf_ptr as *const u8, buf_len as usize) };
+    let data = &buf[..buf.len() - 4];
+    let expected = u32::from_le_bytes([
+        buf[buf.len() - 4],
+        buf[buf.len() - 3],
+        buf[buf.len() - 2],
+        buf[buf.len() - 1],
+    ]);
+    let computed = crc32c_compute(data);
+    if computed == expected {
+        1
+    } else {
+        0
+    }
+}
+
+// =====================================================================
+// Memory Management
+// =====================================================================
+
+// rvf_alloc and rvf_free are exported from alloc_setup module.
 
 /// Panic handler for no_std WASM.
 #[cfg(not(test))]

@@ -33,6 +33,10 @@ export type {
   RvfCompactionResult,
   CompactionState,
   RvfStatus,
+  DerivationType,
+  RvfKernelData,
+  RvfEbpfData,
+  RvfSegmentInfo,
   BackendType,
 } from './types';
 

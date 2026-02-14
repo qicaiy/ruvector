@@ -332,6 +332,37 @@ fn parse_metadata_entry(e: &RvfMetadataEntry) -> Result<RustMetadataEntry> {
     })
 }
 
+/// Data returned from kernel extraction.
+#[napi(object)]
+pub struct RvfKernelData {
+    /// Serialized 128-byte KernelHeader.
+    pub header: Buffer,
+    /// Raw kernel image bytes.
+    pub image: Buffer,
+}
+
+/// Data returned from eBPF extraction.
+#[napi(object)]
+pub struct RvfEbpfData {
+    /// Serialized 64-byte EbpfHeader.
+    pub header: Buffer,
+    /// Program bytecode + optional BTF.
+    pub payload: Buffer,
+}
+
+/// Information about a segment in the store.
+#[napi(object)]
+pub struct RvfSegmentInfo {
+    /// Segment ID.
+    pub id: i64,
+    /// File offset of the segment.
+    pub offset: i64,
+    /// Payload length in bytes.
+    pub payload_length: i64,
+    /// Segment type as a string (e.g. "vec", "manifest", "kernel").
+    pub seg_type: String,
+}
+
 // ── Main RvfDatabase class ───────────────────────────────────────────
 
 /// The main RVF database handle exposed to Node.js.
@@ -597,5 +628,225 @@ impl RvfDatabase {
             .ok_or_else(|| napi::Error::from_reason("Store is already closed"))?;
 
         store.close().map_err(map_rvf_err)
+    }
+
+    // ── Lineage methods ──────────────────────────────────────────────
+
+    /// Get this file's unique identifier as a hex string.
+    #[napi]
+    pub fn file_id(&self) -> Result<String> {
+        let guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+        Ok(hex_encode(store.file_id()))
+    }
+
+    /// Get the parent file's identifier as a hex string (all zeros if root).
+    #[napi]
+    pub fn parent_id(&self) -> Result<String> {
+        let guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+        Ok(hex_encode(store.parent_id()))
+    }
+
+    /// Get the lineage depth (0 for root files).
+    #[napi]
+    pub fn lineage_depth(&self) -> Result<u32> {
+        let guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+        Ok(store.lineage_depth())
+    }
+
+    /// Derive a child store from this parent.
+    #[napi]
+    pub fn derive(&self, child_path: String, options: Option<RvfOptions>) -> Result<RvfDatabase> {
+        let guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+
+        let child_opts = match options {
+            Some(ref o) => Some(js_options_to_rust(o)?),
+            None => None,
+        };
+
+        let child_store = store.derive(
+            Path::new(&child_path),
+            rvf_types::DerivationType::Filter,
+            child_opts,
+        ).map_err(map_rvf_err)?;
+
+        Ok(RvfDatabase {
+            inner: Mutex::new(Some(child_store)),
+        })
+    }
+
+    // ── Kernel / eBPF methods ────────────────────────────────────────
+
+    /// Embed a kernel image into this RVF file.
+    /// Returns the segment ID of the new kernel segment.
+    #[napi]
+    pub fn embed_kernel(
+        &self,
+        arch: u32,
+        kernel_type: u32,
+        flags: u32,
+        image: Buffer,
+        api_port: u32,
+        cmdline: Option<String>,
+    ) -> Result<i64> {
+        let mut guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_mut()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+
+        let seg_id = store.embed_kernel(
+            arch as u8,
+            kernel_type as u8,
+            flags,
+            &image,
+            api_port as u16,
+            cmdline.as_deref(),
+        ).map_err(map_rvf_err)?;
+
+        Ok(seg_id as i64)
+    }
+
+    /// Extract the kernel image from this RVF file.
+    /// Returns null if no kernel segment is present.
+    #[napi]
+    pub fn extract_kernel(&self) -> Result<Option<RvfKernelData>> {
+        let guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+
+        match store.extract_kernel().map_err(map_rvf_err)? {
+            Some((header, image)) => Ok(Some(RvfKernelData {
+                header: Buffer::from(header),
+                image: Buffer::from(image),
+            })),
+            None => Ok(None),
+        }
+    }
+
+    /// Embed an eBPF program into this RVF file.
+    /// Returns the segment ID of the new eBPF segment.
+    #[napi]
+    pub fn embed_ebpf(
+        &self,
+        program_type: u32,
+        attach_type: u32,
+        max_dimension: u32,
+        bytecode: Buffer,
+        btf: Option<Buffer>,
+    ) -> Result<i64> {
+        let mut guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_mut()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+
+        let btf_ref = btf.as_ref().map(|b| b.as_ref());
+        let seg_id = store.embed_ebpf(
+            program_type as u8,
+            attach_type as u8,
+            max_dimension as u16,
+            &bytecode,
+            btf_ref,
+        ).map_err(map_rvf_err)?;
+
+        Ok(seg_id as i64)
+    }
+
+    /// Extract the eBPF program from this RVF file.
+    /// Returns null if no eBPF segment is present.
+    #[napi]
+    pub fn extract_ebpf(&self) -> Result<Option<RvfEbpfData>> {
+        let guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+
+        match store.extract_ebpf().map_err(map_rvf_err)? {
+            Some((header, payload)) => Ok(Some(RvfEbpfData {
+                header: Buffer::from(header),
+                payload: Buffer::from(payload),
+            })),
+            None => Ok(None),
+        }
+    }
+
+    // ── Inspection methods ───────────────────────────────────────────
+
+    /// Get the list of segments in the store.
+    #[napi]
+    pub fn segments(&self) -> Result<Vec<RvfSegmentInfo>> {
+        let guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+
+        let seg_dir = store.segment_dir();
+        Ok(seg_dir.iter().map(|&(id, offset, payload_len, seg_type)| {
+            RvfSegmentInfo {
+                id: id as i64,
+                offset: offset as i64,
+                payload_length: payload_len as i64,
+                seg_type: segment_type_name(seg_type),
+            }
+        }).collect())
+    }
+
+    /// Get the vector dimensionality of this store.
+    #[napi]
+    pub fn dimension(&self) -> Result<u32> {
+        let guard = self.inner.lock()
+            .map_err(|_| napi::Error::from_reason("Lock poisoned"))?;
+        let store = guard.as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Store is closed"))?;
+        Ok(store.dimension() as u32)
+    }
+}
+
+// ── Helper functions ─────────────────────────────────────────────────
+
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        s.push(HEX_CHARS[(b >> 4) as usize]);
+        s.push(HEX_CHARS[(b & 0x0f) as usize]);
+    }
+    s
+}
+
+const HEX_CHARS: [char; 16] = [
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+];
+
+fn segment_type_name(seg_type: u8) -> String {
+    match seg_type {
+        0x00 => "invalid".to_string(),
+        0x01 => "vec".to_string(),
+        0x02 => "index".to_string(),
+        0x03 => "overlay".to_string(),
+        0x04 => "journal".to_string(),
+        0x05 => "manifest".to_string(),
+        0x06 => "quant".to_string(),
+        0x07 => "meta".to_string(),
+        0x08 => "hot".to_string(),
+        0x09 => "sketch".to_string(),
+        0x0A => "witness".to_string(),
+        0x0B => "profile".to_string(),
+        0x0C => "crypto".to_string(),
+        0x0D => "meta_idx".to_string(),
+        0x0E => "kernel".to_string(),
+        0x0F => "ebpf".to_string(),
+        other => format!("unknown(0x{:02X})", other),
     }
 }

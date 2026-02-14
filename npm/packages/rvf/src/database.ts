@@ -8,6 +8,9 @@ import type {
   RvfCompactionResult,
   RvfStatus,
   RvfFilterExpr,
+  RvfKernelData,
+  RvfEbpfData,
+  RvfSegmentInfo,
   BackendType,
 } from './types';
 import type { RvfBackend } from './backend';
@@ -80,6 +83,17 @@ export class RvfDatabase {
     const impl = resolveBackend(backend);
     await impl.openReadonly(path);
     return new RvfDatabase(impl);
+  }
+
+  /**
+   * Create an RvfDatabase from an already-initialized backend.
+   *
+   * Used internally (e.g. by `derive()`) to wrap a child backend that was
+   * created by the native layer without going through the normal open/create
+   * flow.
+   */
+  static fromBackend(backend: RvfBackend): RvfDatabase {
+    return new RvfDatabase(backend);
   }
 
   // -----------------------------------------------------------------------
@@ -157,6 +171,91 @@ export class RvfDatabase {
   async status(): Promise<RvfStatus> {
     this.ensureOpen();
     return this.backend.status();
+  }
+
+  // -----------------------------------------------------------------------
+  // Lineage
+  // -----------------------------------------------------------------------
+
+  /** Get this file's unique identifier as a hex string. */
+  async fileId(): Promise<string> {
+    this.ensureOpen();
+    return this.backend.fileId();
+  }
+
+  /** Get the parent file's identifier as a hex string (all zeros if root). */
+  async parentId(): Promise<string> {
+    this.ensureOpen();
+    return this.backend.parentId();
+  }
+
+  /** Get the lineage depth (0 for root files). */
+  async lineageDepth(): Promise<number> {
+    this.ensureOpen();
+    return this.backend.lineageDepth();
+  }
+
+  /**
+   * Derive a child store from this parent.
+   *
+   * Creates a new RVF file at `childPath` that records this store as its
+   * parent for provenance tracking. Returns a new `RvfDatabase` wrapping
+   * the child store.
+   */
+  async derive(childPath: string, options?: RvfOptions): Promise<RvfDatabase> {
+    this.ensureOpen();
+    const childBackend = await this.backend.derive(childPath, options);
+    return RvfDatabase.fromBackend(childBackend);
+  }
+
+  // -----------------------------------------------------------------------
+  // Kernel / eBPF
+  // -----------------------------------------------------------------------
+
+  /** Embed a kernel image. Returns the segment ID. */
+  async embedKernel(
+    arch: number, kernelType: number, flags: number,
+    image: Uint8Array, apiPort: number, cmdline?: string,
+  ): Promise<number> {
+    this.ensureOpen();
+    return this.backend.embedKernel(arch, kernelType, flags, image, apiPort, cmdline);
+  }
+
+  /** Extract the kernel image. Returns null if not present. */
+  async extractKernel(): Promise<RvfKernelData | null> {
+    this.ensureOpen();
+    return this.backend.extractKernel();
+  }
+
+  /** Embed an eBPF program. Returns the segment ID. */
+  async embedEbpf(
+    programType: number, attachType: number, maxDimension: number,
+    bytecode: Uint8Array, btf?: Uint8Array,
+  ): Promise<number> {
+    this.ensureOpen();
+    return this.backend.embedEbpf(programType, attachType, maxDimension, bytecode, btf);
+  }
+
+  /** Extract the eBPF program. Returns null if not present. */
+  async extractEbpf(): Promise<RvfEbpfData | null> {
+    this.ensureOpen();
+    return this.backend.extractEbpf();
+  }
+
+  // -----------------------------------------------------------------------
+  // Inspection
+  // -----------------------------------------------------------------------
+
+  /** Get the list of segments in the store. */
+  async segments(): Promise<RvfSegmentInfo[]> {
+    this.ensureOpen();
+    return this.backend.segments();
+  }
+
+  /** Get the vector dimensionality. */
+  async dimension(): Promise<number> {
+    this.ensureOpen();
+    return this.backend.dimension();
   }
 
   // -----------------------------------------------------------------------

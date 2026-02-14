@@ -177,3 +177,7 @@ path = "examples/linux_microkernel.rs"
 [[example]]
 name = "mcp_in_rvf"
 path = "examples/mcp_in_rvf.rs"
+
+[[example]]
+name = "generate_all"
+path = "examples/generate_all.rs"

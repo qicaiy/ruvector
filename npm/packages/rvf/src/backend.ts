@@ -8,6 +8,9 @@ import type {
   RvfCompactionResult,
   RvfStatus,
   RvfFilterExpr,
+  RvfKernelData,
+  RvfEbpfData,
+  RvfSegmentInfo,
   BackendType,
 } from './types';
 import { RvfError, RvfErrorCode } from './errors';
@@ -42,6 +45,21 @@ export interface RvfBackend {
   status(): Promise<RvfStatus>;
   /** Close the store, releasing locks. */
   close(): Promise<void>;
+  // Lineage
+  fileId(): Promise<string>;
+  parentId(): Promise<string>;
+  lineageDepth(): Promise<number>;
+  derive(childPath: string, options?: RvfOptions): Promise<RvfBackend>;
+  // Kernel / eBPF
+  embedKernel(arch: number, kernelType: number, flags: number,
+              image: Uint8Array, apiPort: number, cmdline?: string): Promise<number>;
+  extractKernel(): Promise<RvfKernelData | null>;
+  embedEbpf(programType: number, attachType: number, maxDimension: number,
+            bytecode: Uint8Array, btf?: Uint8Array): Promise<number>;
+  extractEbpf(): Promise<RvfEbpfData | null>;
+  // Inspection
+  segments(): Promise<RvfSegmentInfo[]>;
+  dimension(): Promise<number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +219,125 @@ export class NodeBackend implements RvfBackend {
       this.handle = null;
     }
   }
+
+  async fileId(): Promise<string> {
+    this.ensureHandle();
+    try {
+      return this.handle.fileId();
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async parentId(): Promise<string> {
+    this.ensureHandle();
+    try {
+      return this.handle.parentId();
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async lineageDepth(): Promise<number> {
+    this.ensureHandle();
+    try {
+      return this.handle.lineageDepth();
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async derive(childPath: string, options?: RvfOptions): Promise<RvfBackend> {
+    this.ensureHandle();
+    try {
+      const nativeOpts = options ? mapOptionsToNative(options) : undefined;
+      const childHandle = this.handle.derive(childPath, nativeOpts);
+      const child = new NodeBackend();
+      child.native = this.native;
+      child.handle = childHandle;
+      return child;
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async embedKernel(
+    arch: number, kernelType: number, flags: number,
+    image: Uint8Array, apiPort: number, cmdline?: string
+  ): Promise<number> {
+    this.ensureHandle();
+    try {
+      return this.handle.embedKernel(arch, kernelType, flags,
+        Buffer.from(image), apiPort, cmdline);
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async extractKernel(): Promise<RvfKernelData | null> {
+    this.ensureHandle();
+    try {
+      const result = this.handle.extractKernel();
+      if (!result) return null;
+      return {
+        header: new Uint8Array(result.header),
+        image: new Uint8Array(result.image),
+      };
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async embedEbpf(
+    programType: number, attachType: number, maxDimension: number,
+    bytecode: Uint8Array, btf?: Uint8Array
+  ): Promise<number> {
+    this.ensureHandle();
+    try {
+      return this.handle.embedEbpf(programType, attachType, maxDimension,
+        Buffer.from(bytecode), btf ? Buffer.from(btf) : undefined);
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async extractEbpf(): Promise<RvfEbpfData | null> {
+    this.ensureHandle();
+    try {
+      const result = this.handle.extractEbpf();
+      if (!result) return null;
+      return {
+        header: new Uint8Array(result.header),
+        payload: new Uint8Array(result.payload),
+      };
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async segments(): Promise<RvfSegmentInfo[]> {
+    this.ensureHandle();
+    try {
+      const segs = this.handle.segments();
+      return segs.map((s: any) => ({
+        id: s.id,
+        offset: s.offset,
+        payloadLength: s.payloadLength ?? s.payload_length,
+        segType: s.segType ?? s.seg_type,
+      }));
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
+
+  async dimension(): Promise<number> {
+    this.ensureHandle();
+    try {
+      return this.handle.dimension();
+    } catch (err) {
+      throw RvfError.fromNative(err);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -358,6 +495,37 @@ export class WasmBackend implements RvfBackend {
     } finally {
       this.handle = null;
     }
+  }
+
+  async fileId(): Promise<string> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'fileId not supported in WASM backend');
+  }
+  async parentId(): Promise<string> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'parentId not supported in WASM backend');
+  }
+  async lineageDepth(): Promise<number> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'lineageDepth not supported in WASM backend');
+  }
+  async derive(_childPath: string, _options?: RvfOptions): Promise<RvfBackend> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'derive not supported in WASM backend');
+  }
+  async embedKernel(): Promise<number> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'embedKernel not supported in WASM backend');
+  }
+  async extractKernel(): Promise<RvfKernelData | null> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'extractKernel not supported in WASM backend');
+  }
+  async embedEbpf(): Promise<number> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'embedEbpf not supported in WASM backend');
+  }
+  async extractEbpf(): Promise<RvfEbpfData | null> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'extractEbpf not supported in WASM backend');
+  }
+  async segments(): Promise<RvfSegmentInfo[]> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'segments not supported in WASM backend');
+  }
+  async dimension(): Promise<number> {
+    throw new RvfError(RvfErrorCode.BackendNotFound, 'dimension not supported in WASM backend');
   }
 }
 

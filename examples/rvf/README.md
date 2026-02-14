@@ -20,7 +20,7 @@
   <img alt="License" src="https://img.shields.io/badge/license-MIT%2FApache--2.0-blue?style=flat-square" />
   <img alt="Tests" src="https://img.shields.io/badge/tests-453_passing-brightgreen?style=flat-square" />
   <img alt="no_std" src="https://img.shields.io/badge/no__std-compatible-green?style=flat-square" />
-  <img alt="Crates" src="https://img.shields.io/badge/crates-12-blue?style=flat-square" />
+  <img alt="Crates" src="https://img.shields.io/badge/crates-13-blue?style=flat-square" />
 </p>
 
 ---
@@ -90,7 +90,31 @@ cargo run --example basic_store
 
 That's it. You'll see a store created, 100 vectors inserted, nearest neighbors found, and persistence verified &mdash; all in under a second.
 
-### Run All Examples
+### Using the CLI
+
+You can also work with RVF stores from the command line without writing any Rust:
+
+```bash
+# Build the CLI
+cd crates/rvf && cargo build -p rvf-cli
+
+# Create a store, ingest data, and query
+rvf create vectors.rvf --dimension 384
+rvf ingest vectors.rvf --input data.json --format json
+rvf query vectors.rvf --vector "0.1,0.2,..." --k 10
+rvf status vectors.rvf
+rvf inspect vectors.rvf
+rvf compact vectors.rvf
+
+# Derive a child store with lineage tracking
+rvf derive parent.rvf child.rvf --type filter
+
+# All commands support --json for machine-readable output
+rvf status vectors.rvf --json
+```
+
+<details>
+<summary><strong>Run All 40 Examples</strong></summary>
 
 **Core (6):**
 ```bash
@@ -172,6 +196,8 @@ cargo run --example mcp_in_rvf           # MCP server embedded in RVF
 cargo run --example network_interfaces   # Network OS telemetry (60 interfaces)
 ```
 
+</details>
+
 ### Prerequisites
 
 - **Rust 1.87+** &mdash; install via [rustup](https://rustup.rs/)
@@ -180,7 +206,8 @@ cargo run --example network_interfaces   # Network OS telemetry (60 interfaces)
 
 ---
 
-## Examples at a Glance
+<details>
+<summary><strong>Examples at a Glance (40 examples)</strong></summary>
 
 ### Core
 
@@ -272,9 +299,12 @@ cargo run --example network_interfaces   # Network OS telemetry (60 interfaces)
 |---|---------|-----------|-------------------|
 | 40 | network_interfaces | Intermediate | Multi-chassis telemetry, anomaly detection, filtered queries |
 
+</details>
+
 ---
 
-## Features Covered
+<details>
+<summary><strong>Features Covered</strong></summary>
 
 ### Storage &mdash; vectors in, answers out
 
@@ -324,13 +354,15 @@ cargo run --example network_interfaces   # Network OS telemetry (60 interfaces)
 | DNA-Style Lineage | (API) | Every derived file records its parent's hash and derivation type |
 | Domain Profiles | (API) | `.rvdna`, `.rvtext`, `.rvgraph`, `.rvvis` &mdash; same format, domain-specific hints |
 | Computational Container | (API) | Embed a WASM microkernel, eBPF program, or bootable unikernel |
-| Import (JSON/CSV/NumPy) | (API) | Load embeddings from `.json`, `.csv`, or `.npy` files via `rvf-import` |
+| Import (JSON/CSV/NumPy) | (API) | Load embeddings from `.json`, `.csv`, or `.npy` files via `rvf-import` or `rvf ingest` CLI |
+| Unified CLI | `rvf` | 9 subcommands: create, ingest, query, delete, status, inspect, compact, derive, serve |
 | Compaction | (API) | Garbage-collect tombstoned vectors and reclaim disk space |
 | Batch Delete | (API) | Delete vectors by ID with tombstone markers |
 
----
+</details>
 
-## What RVF Contains
+<details>
+<summary><strong>What RVF Contains</strong></summary>
 
 An RVF file is built from **segments** &mdash; self-describing blocks that can be combined freely. Here are all 16 types, grouped by purpose:
 
@@ -359,9 +391,7 @@ An RVF file is built from **segments** &mdash; self-describing blocks that can b
 
 Any segment you don't need is simply absent. A basic vector store uses VEC + INDEX + MANIFEST. A sealed cognitive engine might use all 16.
 
----
-
-## RuVector Ecosystem Integration
+### RuVector Ecosystem Integration
 
 RVF is the universal substrate for the entire RuVector ecosystem. Here's how the 75+ Rust crates map onto RVF segments:
 
@@ -380,9 +410,10 @@ RVF is the universal substrate for the entire RuVector ecosystem. Here's how the
 | **Routing / inference** | `ruvector-tiny-dancer-core`, `ruvector-sparse-inference` | VEC (feature vectors), META (routing policies) |
 | **Observation pipeline** | `ospipe` | META (state vectors), WITNESS (provenance) |
 
----
+</details>
 
-## Performance
+<details>
+<summary><strong>Performance & Comparison</strong></summary>
 
 RVF is designed for speed at every layer:
 
@@ -410,11 +441,9 @@ recall ~0.70   recall ~0.85   recall ~0.95
 
 The `progressive_index` example measures this recall progression with brute-force ground truth.
 
----
+### Comparison
 
-## Comparison
-
-### vs. vector databases
+#### vs. vector databases
 
 | Feature | RVF | Annoy | FAISS | Qdrant | Milvus |
 |---------|-----|-------|-------|--------|--------|
@@ -434,7 +463,7 @@ The `progressive_index` example measures this recall progression with brute-forc
 | Domain profiles | 5 profiles | No | No | No | No |
 | Language bindings | Rust, Node, WASM | C++, Python | C++, Python | Rust, Python | Go, Python |
 
-### vs. model registries, graph DBs, and container formats
+#### vs. model registries, graph DBs, and container formats
 
 RVF replaces multiple tools because it carries data, model, graph, runtime, and trust chain together:
 
@@ -451,9 +480,10 @@ RVF replaces multiple tools because it carries data, model, graph, runtime, and 
 | Single portable file | Yes | Yes | Yes | Yes | No | Image tarball |
 | Runs in browser | 5.5 KB WASM | No | ONNX.js | No | No | No |
 
----
+</details>
 
-## Usage Patterns
+<details>
+<summary><strong>Usage Patterns (8 patterns)</strong></summary>
 
 ### Pattern 1: Simple Vector Store
 
@@ -625,7 +655,7 @@ let (hdr, img) = store.extract_kernel()?.unwrap();
 let (hdr, prog) = store.extract_ebpf()?.unwrap();
 ```
 
----
+</details>
 
 <details>
 <summary><strong>Tutorial: Your First RVF Store (Step by Step)</strong></summary>
@@ -1360,10 +1390,10 @@ See [ADR-029](../../docs/adr/ADR-029-rvf-canonical-format.md) for the full forma
                     |  rvf-manifest | rvf-crypto | rvf-wire     |
                     +---+-------------+---------------+-------+
                         |             |               |
-               +--------v------+ +---v--------+ +----v-------+
-               |  rvf-server   | |  rvf-node  | |  rvf-wasm  |
-               |  HTTP + TCP   | |  N-API     | |  5.5 KB    |
-               +---------------+ +------------+ +------------+
+               +--------v------+ +---v--------+ +----v-------+ +----v------+
+               |  rvf-server   | |  rvf-node  | |  rvf-wasm  | |  rvf-cli  |
+               |  HTTP + TCP   | |  N-API     | |  ~46 KB    | |  clap     |
+               +---------------+ +------------+ +------------+ +-----------+
 ```
 
 ### Crate Details
@@ -1378,8 +1408,9 @@ See [ADR-029](../../docs/adr/ADR-029-rvf-canonical-format.md) for the full forma
 | `rvf-crypto` | 1,725 | Partial | SHAKE-256, Ed25519, witness chains, attestation, lineage |
 | `rvf-runtime` | 3,607 | No | Full store API, compaction, lineage, kernel/eBPF embed |
 | `rvf-import` | 980 | No | JSON, CSV, NumPy (.npy) importers |
-| `rvf-wasm` | 766 | Yes | WASM microkernel for browsers/edge |
-| `rvf-node` | 601 | No | Node.js N-API bindings |
+| `rvf-wasm` | 1,616 | Yes | WASM control plane: in-memory store, query, segment inspection |
+| `rvf-node` | 852 | No | Node.js N-API bindings with lineage, kernel/eBPF, inspection |
+| `rvf-cli` | 665 | No | Unified CLI: create, ingest, query, delete, status, inspect, compact, derive, serve |
 | `rvf-server` | 1,165 | No | HTTP REST + TCP streaming server |
 
 ### Library Adapters
@@ -1512,7 +1543,8 @@ cargo bench --bench rvf_benchmarks
 
 ---
 
-## Project Structure
+<details>
+<summary><strong>Project Structure</strong></summary>
 
 ```
 examples/rvf/
@@ -1570,6 +1602,8 @@ examples/rvf/
     # Network Operations (1)
     network_interfaces.rs     # Network OS telemetry (60 interfaces)
 ```
+
+</details>
 
 ## Learn More
 

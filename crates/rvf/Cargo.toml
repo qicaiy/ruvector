@@ -18,6 +18,7 @@ members = [
     "rvf-adapters/agentic-flow",
     "rvf-adapters/rvlite",
     "rvf-adapters/sona",
+    "rvf-cli",
     "tests/rvf-integration",
     "benches",
 ]
@@ -45,6 +46,7 @@ rvf-adapter-ospipe = { path = "rvf-adapters/ospipe" }
 rvf-adapter-agentic-flow = { path = "rvf-adapters/agentic-flow" }
 rvf-adapter-rvlite = { path = "rvf-adapters/rvlite" }
 rvf-adapter-sona = { path = "rvf-adapters/sona" }
+rvf-import = { path = "rvf-import" }
 
 # External
 serde = { version = "1", default-features = false, features = ["derive"] }
