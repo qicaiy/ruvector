@@ -35,6 +35,7 @@ pub mod status;
 pub mod store;
 pub mod witness;
 pub mod write_path;
+pub mod agi_container;
 
 pub use adversarial::{
     adaptive_n_probe, centroid_distance_cv, combined_effective_n_probe,
@@ -72,4 +73,7 @@ pub use status::StoreStatus;
 pub use store::RvfStore;
 pub use witness::{
     GovernancePolicy, ParsedWitness, ScorecardBuilder, WitnessBuilder, WitnessError,
+};
+pub use agi_container::{
+    AgiContainerBuilder, ParsedAgiManifest,
 };

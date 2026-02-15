@@ -44,6 +44,7 @@ pub mod sha256;
 pub mod ed25519;
 pub mod wasm_bootstrap;
 pub mod witness;
+pub mod agi_container;
 
 pub use attestation::{AttestationHeader, AttestationWitnessType, TeePlatform, KEY_TYPE_TEE_BOUND};
 pub use ebpf::{
@@ -117,4 +118,11 @@ pub use wasm_bootstrap::{
     WASM_FEAT_SIMD, WASM_FEAT_BULK_MEMORY, WASM_FEAT_MULTI_VALUE,
     WASM_FEAT_REFERENCE_TYPES, WASM_FEAT_THREADS, WASM_FEAT_TAIL_CALL,
     WASM_FEAT_GC, WASM_FEAT_EXCEPTION_HANDLING,
+};
+pub use agi_container::{
+    AgiContainerHeader, ContainerSegments, ContainerError, ExecutionMode,
+    AGI_MAGIC, AGI_HEADER_SIZE,
+    AGI_HAS_KERNEL, AGI_HAS_WASM, AGI_HAS_ORCHESTRATOR, AGI_HAS_WORLD_MODEL,
+    AGI_HAS_EVAL, AGI_HAS_SKILLS, AGI_HAS_WITNESS, AGI_SIGNED,
+    AGI_REPLAY_CAPABLE, AGI_OFFLINE_CAPABLE, AGI_HAS_TOOLS, AGI_HAS_COHERENCE_GATES,
 };

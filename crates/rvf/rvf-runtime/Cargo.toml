@@ -24,3 +24,7 @@ rvf-types = { version = "0.1.0", path = "../rvf-types", features = ["std"] }
 [dev-dependencies]
 tempfile = "3"
 rand = "0.8"
+
+[[example]]
+name = "qr_seed_encode"
+required-features = ["qr"]
