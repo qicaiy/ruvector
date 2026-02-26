@@ -17,10 +17,12 @@
 //! | [`syndrome_diagnosis`] | QEC syndrome extraction for system diagnosis | Log-based monitoring |
 //! | [`reversible_memory`] | Time-reversible state for counterfactual debugging | Forward-only ML |
 //! | [`reality_check`] | Browser-native quantum verification circuits | Trust-based claims |
+//! | [`quantum_rag`] | Decoherence-aware retrieval with interference | Classical RAG |
 
 pub mod interference_search;
 pub mod quantum_collapse;
 pub mod quantum_decay;
+pub mod quantum_rag;
 pub mod reality_check;
 pub mod reasoning_qec;
 pub mod reversible_memory;
