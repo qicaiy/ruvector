@@ -224,10 +224,10 @@ use ruvector_core::{EnhancedPQ, PQConfig};
 fn product_quantization_example() -> Result<(), Box<dyn std::error::Error>> {
     let mut options = DbOptions::default();
     options.dimensions = 128;
-    options.quantization = QuantizationConfig::Product {
+    options.quantization = Some(QuantizationConfig::Product {
         subspaces: 16,  // Split into 16 subvectors of 8D each
         k: 256,         // 256 centroids per subspace
-    };
+    });
 
     let db = VectorDB::new(options)?;
 
@@ -360,7 +360,7 @@ cargo build --release -vv | grep target-cpu
 
 ```rust
 let mut options = DbOptions::default();
-options.mmap_vectors = true;  // Enable memory mapping
+// options.mmap_vectors = true;  // Enable memory mapping (if supported by storage backend)
 
 let db = VectorDB::new(options)?;
 ```
@@ -408,26 +408,26 @@ let results: Vec<Vec<SearchResult>> = queries
 
 ```rust
 // For speed (lower recall)
-options.hnsw.ef_search = 50;
+options.hnsw_config.as_mut().unwrap().ef_search = 50;
 
 // For accuracy (slower)
-options.hnsw.ef_search = 500;
+options.hnsw_config.as_mut().unwrap().ef_search = 500;
 
 // Balanced (recommended)
-options.hnsw.ef_search = 100;
+options.hnsw_config.as_mut().unwrap().ef_search = 100;
 ```
 
 ### 6. Quantization
 
 ```rust
 // 4x compression, 97-99% recall
-options.quantization = QuantizationConfig::Scalar;
+options.quantization = Some(QuantizationConfig::Scalar);
 
 // 16x compression, 90-95% recall
-options.quantization = QuantizationConfig::Product {
+options.quantization = Some(QuantizationConfig::Product {
     subspaces: 16,
     k: 256,
-};
+});
 ```
 
 ### 7. Distance Metric Selection
@@ -463,18 +463,17 @@ fn advanced_demo() -> Result<(), Box<dyn std::error::Error>> {
     let mut options = DbOptions::default();
     options.dimensions = 384;
     options.storage_path = "./advanced_db.db".to_string();
-    options.hnsw = HnswConfig {
+    options.hnsw_config = Some(HnswConfig {
         m: 64,
         ef_construction: 400,
         ef_search: 200,
         max_elements: 10_000_000,
-    };
+    });
     options.distance_metric = DistanceMetric::Cosine;
-    options.quantization = QuantizationConfig::Product {
+    options.quantization = Some(QuantizationConfig::Product {
         subspaces: 16,
         k: 256,
-    };
-    options.mmap_vectors = true;
+    });
 
     let db = VectorDB::new(options)?;
 
