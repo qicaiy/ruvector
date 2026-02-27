@@ -184,20 +184,20 @@ User Query → [SONA Engine] → Model Response → User Feedback
 
 RuVector isn't a database you add to your stack — it's the entire stack. Self-learning, self-optimizing, and self-deploying. Everything an AI application needs to run, from bare metal hardware up to the application layer, in one package:
 
-| | Layer | What RuVector Replaces | What It Does |
-|---|-------|----------------------|--------------|
-| 🔄 | **Self-Learning** | Manual retraining, MLOps | SONA adapts in <1 ms — LoRA fine-tuning + EWC++ memory preservation on every request |
+| | Layer | Replaces | What It Does |
+|---|-------|----------|--------------|
+| 🔄 | **Self-Learning** | Manual retraining, MLOps | SONA adapts in <1 ms — LoRA fine-tuning + EWC++ memory on every request |
 | ⚡ | **Self-Optimizing** | Manual tuning, config files | Auto-tunes routing, ranking, compression, and index parameters to your workload |
-| 🔧 | **Hardware** | CUDA toolkit, driver configs | Talks directly to your GPU, Neural Engine, or FPGA — Metal, CUDA, WebGPU, AVX-512 |
-| 🐧 | **Kernel** | Linux + Docker + eBPF tools | A single `.rvf` file boots its own Linux kernel in 125 ms — eBPF accelerates hot paths |
-| 🗄️ | **Storage** | PostgreSQL + Redis + S3 | Vector store, graph database, key-value cache, and 230+ SQL functions built in |
-| 🔍 | **Search** | Pinecone, Weaviate, Qdrant | Self-learning HNSW — a GNN watches every query and improves results automatically |
-| 🔗 | **Graph** | Separate graph database | Neo4j-compatible Cypher, W3C SPARQL 1.1, hyperedges, and 8 verified graph transformer modules — built in |
-| 🤖 | **AI Runtime** | llama.cpp, vLLM, Ollama | ruvllm — GGUF inference with Metal, CUDA, ANE, WebGPU; MicroLoRA per-request tuning in <1 ms; speculative decoding; continuous batching; runs in browser via WASM |
-| 🧠 | **ML Framework** | PyTorch, TensorFlow | 46 attention mechanisms, 8 verified graph transformer modules (physics, bio, manifold, temporal, economic), spiking neural networks, sparse inference, mincut-gated attention, hyperbolic embeddings, sublinear solvers, domain expansion, verified training, quantum coherence, coherence measurement |
+| 🔧 | **Hardware** | CUDA toolkit, driver configs | Optimized for sparse/spiking CPU (AVX-512, NEON) — GPU for bursts (Metal, CUDA, ANE, WebGPU, FPGA) |
+| 🐧 | **Kernel** | Linux + Docker + eBPF | `.rvf` file boots its own Linux kernel in 125 ms — eBPF accelerates hot paths |
+| 🗄️ | **Storage** | Separate database + cache | Vector store, graph DB, key-value cache, and 230+ SQL functions (drops into PostgreSQL) |
+| 🔍 | **Search** | Pinecone, Weaviate, Qdrant | Self-learning HNSW — GNN improves results from every query automatically |
+| 🔗 | **Graph** | Separate graph database | Cypher (Neo4j-compatible), W3C SPARQL 1.1, hyperedges — all built in |
+| 🤖 | **AI Runtime** | llama.cpp, vLLM, Ollama | ruvllm — GGUF models, MicroLoRA tuning (<1 ms), speculative decoding, continuous batching, WASM |
+| 🧠 | **ML Framework** | PyTorch, TensorFlow | 46 attention types, 8 graph transformer modules, spiking networks, sparse inference, sublinear solvers, hyperbolic embeddings, domain expansion, quantum coherence |
 | 🌐 | **Coordination** | etcd, ZooKeeper, Consul | Raft consensus, multi-master replication, CRDT delta sync, auto-sharding |
-| 📦 | **Packaging** | Docker, Kubernetes | One `.rvf` file = your entire service. Runs on servers, browsers, phones, and IoT |
-| 🔐 | **Security** | Vault, manual audit logs | Post-quantum signatures (ML-DSA-65, SLH-DSA-128s, Ed25519), SHAKE-256 hashing, witness chains, tamper-proof audit trail, hardware attestation (TEE/enclave), cryptographic lineage tracking, formal verification with proof-carrying operations, COW branching with integrity checks |
+| 📦 | **Packaging** | Docker, Kubernetes | One `.rvf` file = your entire service — servers, browsers, phones, IoT, bare metal |
+| 🔐 | **Security** | Vault, manual audit logs | Post-quantum crypto (ML-DSA-65, Ed25519), SHAKE-256, witness chains, hardware attestation, formal verification, cryptographic lineage |
 
 The [RVF cognitive container](./crates/rvf/README.md) ties it all together: a single file that packages your vectors, models, data, and a bootable kernel. Drop it on any machine and it starts serving in 125 ms — no install, no dependencies. It branches like Git (only changes are copied), logs every operation in a tamper-proof chain, and runs anywhere from a browser to bare metal.
 
