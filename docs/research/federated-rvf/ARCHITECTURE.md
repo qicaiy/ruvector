@@ -103,8 +103,10 @@ rvf-crypto (ed25519, shake-256)
 **Note**: `mcp-federation` and `rvf-fed-server` are interface crates — they expose
 federation functionality through MCP (JSON-RPC 2.0 over stdio) and REST API (axum HTTP)
 respectively. Both delegate to `rvf-federation` for core logic and `rvf-gcloud` for
-cloud operations. The old crate dependency graph (without these two) is shown below
-for reference.
+cloud operations. The `domain-expansion` node in the graph above refers to the
+[`ruvector-domain-expansion`](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-domain-expansion)
+crate, which bridges into the federation pipeline via `rvf_bridge`. The old crate
+dependency graph (without these two) is shown below for reference.
 
 ### Original Dependency Graph (pre-MCP/API)
 
@@ -667,7 +669,7 @@ Offset  Size    Field
 ## MCP Server Interface (mcp-federation)
 
 AI agents (Claude Code, claude-flow, agentic-flow) interact with federation
-through MCP tools over stdio JSON-RPC 2.0 — same pattern as `mcp-gate`.
+through MCP tools over stdio JSON-RPC 2.0 — same pattern as [`mcp-gate`](https://github.com/ruvnet/ruvector/blob/main/crates/mcp-gate).
 
 ```
     AI AGENT (Claude Code, claude-flow, etc.)
@@ -849,7 +851,7 @@ through MCP tools over stdio JSON-RPC 2.0 — same pattern as `mcp-gate`.
 ## REST API Interface (rvf-fed-server)
 
 The federation server exposes a REST API for programmatic access beyond MCP.
-Built on axum (same as `ruvector-server`), deployed as the Cloud Run service.
+Built on axum (same as [`ruvector-server`](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-server)), deployed as the Cloud Run service.
 
 ```
     REST API ENDPOINTS

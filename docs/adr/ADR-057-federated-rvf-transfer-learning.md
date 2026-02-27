@@ -18,7 +18,7 @@ The existing infrastructure already supports local federated learning within a s
 
 1. **SONA `FederatedCoordinator`** (`crates/sona/src/training/federated.rs`) aggregates `AgentExport` from `EphemeralAgent` instances, replaying trajectories above a quality threshold into a master engine. Supports `Star`, `Hierarchical`, and `PeerToPeer` topologies.
 
-2. **Domain Expansion Engine** (`crates/ruvector-domain-expansion/`) implements cross-domain transfer via `MetaThompsonEngine` with `TransferPrior` (compact Beta posteriors), `PolicyKernel` (population-based policy search), and `CostCurve` (acceleration scoreboard). The `rvf_bridge` module already serializes these into RVF segments `0x30`, `0x31`, `0x32`.
+2. **[Domain Expansion Engine](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-domain-expansion)** (`crates/ruvector-domain-expansion/`) implements cross-domain transfer via `MetaThompsonEngine` with `TransferPrior` (compact Beta posteriors), `PolicyKernel` (population-based policy search), and `CostCurve` (acceleration scoreboard). Supports 13+ domains including genomics (rvDNA), algorithmic trading, quantum computing (ruQu), neuromorphic AI, graph intelligence, and more. The `rvf_bridge` module already serializes these into RVF segments `0x30`, `0x31`, `0x32`.
 
 3. **RVF Format** (`crates/rvf/`) provides 25 segment types with 64-byte headers, SHAKE-256 hashing, Ed25519 signing, WITNESS_SEG audit trails, and forward-compatible unknown-segment passthrough. Segments `TransferPrior (0x30)`, `PolicyKernel (0x31)`, and `CostCurve (0x32)` already exist.
 
@@ -71,7 +71,7 @@ Nine new crates (seven within `crates/rvf/`, two interface crates):
 | `rvf-fed-wasm` | `crates/rvf/rvf-fed-wasm` | no (wasm32) | WASM-compatible export path: browser-side PII stripping and export packaging |
 | `mcp-federation` | `crates/mcp-federation` | no (std-only) | MCP server for AI agent access: 6 tools + 4 resources over JSON-RPC 2.0 stdio |
 | `rvf-fed-server` | `crates/rvf/rvf-fed-server` | no (std-only) | REST API server (axum): export/import/aggregate endpoints, SSE events, Prometheus metrics |
-| `rvf-adapters/federation` | `crates/rvf/rvf-adapters/federation` | no (std-only) | Adapter connecting SONA's `FederatedCoordinator` and domain expansion's `MetaThompsonEngine` to the federation protocol |
+| `rvf-adapters/federation` | `crates/rvf/rvf-adapters/federation` | no (std-only) | Adapter connecting SONA's `FederatedCoordinator` and [domain expansion](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-domain-expansion)'s `MetaThompsonEngine` to the federation protocol |
 
 ### 3. PII Stripping Pipeline
 
@@ -262,4 +262,4 @@ Users control what they share via a `FederationPolicy`:
 - Blanchard et al., "Machine Learning with Adversaries: Byzantine Tolerant Gradient Descent" (Byzantine tolerance)
 - RVF Format Specification (ADR-029)
 - SONA Architecture (crates/sona)
-- Domain Expansion Engine (crates/ruvector-domain-expansion)
+- [Domain Expansion Engine](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-domain-expansion) (`crates/ruvector-domain-expansion`)

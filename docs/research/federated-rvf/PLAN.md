@@ -12,23 +12,23 @@
 
 | State Variable | Value | Evidence |
 |---|---|---|
-| `rvf_segment_types_defined` | 25 types (0x00-0x32) | `crates/rvf/rvf-types/src/segment_type.rs` |
+| `rvf_segment_types_defined` | 25 types (0x00-0x32) | [`crates/rvf/rvf-types/src/segment_type.rs`](https://github.com/ruvnet/ruvector/blob/main/crates/rvf/rvf-types/src/segment_type.rs) |
 | `transfer_prior_segment_exists` | true (0x30) | `SegmentType::TransferPrior` |
 | `policy_kernel_segment_exists` | true (0x31) | `SegmentType::PolicyKernel` |
 | `cost_curve_segment_exists` | true (0x32) | `SegmentType::CostCurve` |
-| `rvf_bridge_serialization_works` | true | `ruvector-domain-expansion/src/rvf_bridge.rs` -- 11 passing tests |
-| `witness_chain_support` | true | `rvf-crypto/src/witness.rs` -- `create_witness_chain`, `verify_witness_chain` |
-| `ed25519_signing_support` | true | `rvf-crypto/src/sign.rs` -- feature-gated `ed25519` |
-| `shake256_hashing_support` | true | `rvf-crypto/src/hash.rs` -- `shake256_128`, `shake256_256` |
-| `sona_federated_coordinator_exists` | true | `crates/sona/src/training/federated.rs` -- `FederatedCoordinator`, `EphemeralAgent` |
+| `rvf_bridge_serialization_works` | true | [`ruvector-domain-expansion/src/rvf_bridge.rs`](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-domain-expansion/src/rvf_bridge.rs) -- 11 passing tests |
+| `witness_chain_support` | true | [`rvf-crypto/src/witness.rs`](https://github.com/ruvnet/ruvector/blob/main/crates/rvf/rvf-crypto/src/witness.rs) -- `create_witness_chain`, `verify_witness_chain` |
+| `ed25519_signing_support` | true | [`rvf-crypto/src/sign.rs`](https://github.com/ruvnet/ruvector/blob/main/crates/rvf/rvf-crypto/src/sign.rs) -- feature-gated `ed25519` |
+| `shake256_hashing_support` | true | [`rvf-crypto/src/hash.rs`](https://github.com/ruvnet/ruvector/blob/main/crates/rvf/rvf-crypto/src/hash.rs) -- `shake256_128`, `shake256_256` |
+| `sona_federated_coordinator_exists` | true | [`crates/sona/src/training/federated.rs`](https://github.com/ruvnet/ruvector/blob/main/crates/sona/src/training/federated.rs) -- `FederatedCoordinator`, `EphemeralAgent` |
 | `sona_agent_export_works` | true | `AgentExport`, `TrajectoryExport` with quality gating |
 | `sona_lora_weights_accessible` | true | `SonaEngine::apply_micro_lora`, `MicroLoRA`, `BaseLoRA` |
-| `sona_ewc_support` | true | `crates/sona/src/ewc.rs` -- `EwcPlusPlus`, `TaskFisher` |
-| `domain_expansion_engine_exists` | true | `crates/ruvector-domain-expansion/` -- 3 domains, Meta-TS, population search |
+| `sona_ewc_support` | true | [`crates/sona/src/ewc.rs`](https://github.com/ruvnet/ruvector/blob/main/crates/sona/src/ewc.rs) -- `EwcPlusPlus`, `TaskFisher` |
+| `domain_expansion_engine_exists` | true | [`crates/ruvector-domain-expansion/`](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-domain-expansion) -- 3 domains, Meta-TS, population search |
 | `domain_expansion_transfer_works` | true | `MetaThompsonEngine::init_domain_with_transfer` with sqrt dampening |
 | `beta_params_merge_exists` | true | `BetaParams::merge()` in `transfer.rs` |
-| `gcloud_example_exists` | true | `examples/google-cloud/` -- Cloud Run, axum server |
-| `rvf_workspace_defined` | true | `crates/rvf/Cargo.toml` -- 25 workspace members |
+| `gcloud_example_exists` | true | [`examples/google-cloud/`](https://github.com/ruvnet/ruvector/blob/main/examples/google-cloud) -- Cloud Run, axum server |
+| `rvf_workspace_defined` | true | [`crates/rvf/Cargo.toml`](https://github.com/ruvnet/ruvector/blob/main/crates/rvf/Cargo.toml) -- 25 workspace members |
 | `no_std_types_core` | true | `rvf-types` is `no_std` by default |
 | `pii_stripping_exists` | false | No PII detection or redaction crate |
 | `differential_privacy_exists` | false | No DP primitives in codebase |
@@ -61,7 +61,7 @@
 | `gcloud_firestore_integration` | true -- `rvf-gcloud` with Firestore registry |
 | `aggregation_server` | true -- `rvf-fed-aggregate` with FedAvg, Byzantine tolerance |
 | `wasm_export_path` | true -- `rvf-fed-wasm` with browser PII strip + export |
-| `federation_adapter` | true -- `rvf-adapters/federation` connecting SONA + domain expansion |
+| `federation_adapter` | true -- `rvf-adapters/federation` connecting SONA + [domain expansion](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-domain-expansion) |
 | `mcp_federation_server` | true -- `mcp-federation` crate with 6 tools + 4 resources over JSON-RPC 2.0 |
 | `rest_api_server` | true -- `rvf-fed-server` crate with REST API, SSE events, Prometheus metrics |
 | `all_tests_pass` | true |
@@ -197,7 +197,7 @@ Each action has: preconditions, effects, estimated cost (story points, 1-13), an
 - **Cost**: 8 SP
 - **Dependencies**: [3.1]
 - **New Files**:
-  - `crates/rvf/rvf-adapters/federation/Cargo.toml` -- deps: `rvf-federation`, `sona`, `ruvector-domain-expansion`, `rvf-adapter-sona`
+  - `crates/rvf/rvf-adapters/federation/Cargo.toml` -- deps: `rvf-federation`, `sona`, [`ruvector-domain-expansion`](https://github.com/ruvnet/ruvector/blob/main/crates/ruvector-domain-expansion), `rvf-adapter-sona`
   - `crates/rvf/rvf-adapters/federation/src/lib.rs` -- Module structure
   - `crates/rvf/rvf-adapters/federation/src/export_coordinator.rs` -- `FederationExportCoordinator`:
     - Takes `&SonaEngine` and `&DomainExpansionEngine`
@@ -930,7 +930,7 @@ All federation operations emit structured log events:
 
 ## 8. Open Questions
 
-1. **ML-DSA-65 vs Ed25519**: ADR-057 mentions both. Ed25519 is available now in `rvf-crypto`. ML-DSA-65 (post-quantum) would require adding `pqcrypto-dilithium` dependency. Recommendation: start with Ed25519, add ML-DSA-65 as a future optional feature.
+1. **ML-DSA-65 vs Ed25519**: ADR-057 mentions both. Ed25519 is available now in [`rvf-crypto`](https://github.com/ruvnet/ruvector/blob/main/crates/rvf/rvf-crypto). ML-DSA-65 (post-quantum) would require adding `pqcrypto-dilithium` dependency. Recommendation: start with Ed25519, add ML-DSA-65 as a future optional feature.
 
 2. **Reputation bootstrapping**: New contributors start with no reputation. How much weight should their first contribution receive? Recommendation: fixed minimum weight of 0.1 for first 5 contributions, then reputation-based.
 
