@@ -180,7 +180,7 @@ User Query → [SONA Engine] → Model Response → User Feedback
 
 </details>
 
-### Built by rUv — Powering the World's First Agentic Chip
+### Built by rUv, powered by [Cognitum.one](https://cognitum.one)
 
 RuVector is created by [rUv](https://ruv.io) and powers [Cognitum](https://cognitum.one), a **CES 2026 Innovation Awards Honoree** — the world's first hardware designed specifically for AI agents.
 
